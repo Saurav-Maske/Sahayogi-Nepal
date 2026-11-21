@@ -1,6 +1,11 @@
 import { corsHeaders, fail, ok } from "../_shared/cors.ts";
 import { adminClient, requireUser } from "../_shared/auth.ts";
 
+declare const Deno: {
+  env: { get(name: string): string | undefined };
+  serve(handler: (req: Request) => Response | Promise<Response>): void;
+};
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   const u = await requireUser(req);

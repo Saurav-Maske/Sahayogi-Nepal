@@ -1,10 +1,22 @@
 import { createClient } from '@supabase/supabase-js';
 import { createHash, randomBytes } from 'node:crypto';
 
-const { SUPABASE_URL, SERVICE_KEY } = process.env;
-if (!SUPABASE_URL || !SERVICE_KEY) {
-  console.error('Set SUPABASE_URL and SERVICE_KEY (service-role key) first.');
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.SERVICE_KEY;
+if (!SUPABASE_URL || !SERVICE_KEY || SERVICE_KEY === 'replace-me') {
+  console.error('Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY (run: node --env-file=.env scripts/seed_demo.mjs).');
   process.exit(1);
+}
+const IS_LOCAL = /127\.0\.0\.1|localhost/.test(SUPABASE_URL);
+if (!IS_LOCAL) {
+  if (process.env.ALLOW_DEMO_SEED !== 'yes') {
+    console.error(`Refusing to touch remote project ${SUPABASE_URL}. Set ALLOW_DEMO_SEED=yes if that is really what you want.`);
+    process.exit(1);
+  }
+  if (!process.env.DEMO_PASSWORD) {
+    console.error('Set DEMO_PASSWORD (>= 10 chars, upper, lower, digit, symbol) when seeding a remote project.');
+    process.exit(1);
+  }
 }
 const RESET = process.argv.includes('--reset');
 const PASSWORD = process.env.DEMO_PASSWORD ?? 'ChangeMe-Demo-123!';
@@ -17,17 +29,16 @@ const must = (res, what) => {
 const sha256 = (s) => createHash('sha256').update(s).digest('hex');
 const hoursAgo = (h) => new Date(Date.now() - h * 3600_000).toISOString();
 
-const { data: cfgRows, error: cfgErr } = await sb.from('app_settings').select('key,value');
-if (cfgErr) { console.error('Cannot read app_settings. Are the migrations pushed?\n ', cfgErr.message); process.exit(1); }
-const cfg = Object.fromEntries(cfgRows.map((r) => [r.key, r.value]));
-if (!cfg.district || !cfg.central_inventory) {
-  console.error('app_settings is missing "district" or "central_inventory". Apply supabase/seed.sql first.');
-  process.exit(1);
-}
-const { south, west, north, east } = cfg.district.bounds;
-const { lat: cLat, lng: cLng } = cfg.district.center;
-const { data: dist } = await sb.from('districts').select('id').order('id').limit(1).single();
-const districtId = dist?.id ?? null;
+// app_settings is optional: if a 'district' row exists use it, otherwise fall back to a box around Kathmandu.
+// requests.district_id is filled in by the DB trigger from the point, so the seed does not set it.
+const { data: cfgRows } = await sb.from('app_settings').select('key,value');
+const cfg = Object.fromEntries((cfgRows ?? []).map((r) => [r.key, r.value]));
+const district = cfg.district ?? {
+  center: { lat: 27.7172, lng: 85.3240 },
+  bounds: { south: 27.62, west: 85.22, north: 27.82, east: 85.44 },
+};
+const { south, west, north, east } = district.bounds;
+const { lat: cLat, lng: cLng } = district.center;
 
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 const pin = (dLat, dLng) => ({
@@ -139,7 +150,6 @@ if (reqCount > 0) {
     const token = randomBytes(16).toString('hex');
     const row = must(await sb.from('requests').insert({
       kind: d.kind, status: d.status, requester_name: d.name, requester_phone: d.phone,
-      district_id: districtId,
       location: `SRID=4326;POINT(${d.at.lng} ${d.at.lat})`,              // longitude first
       urgency: d.urgency, notes: d.notes, volunteers_needed: d.volunteers_needed ?? null,
       tracking_token_hash: sha256(token),

@@ -1,6 +1,11 @@
 import { corsHeaders, fail, ok } from "../_shared/cors.ts";
 import { adminClient, clientIp, readJson, recordAttempt, sha256, tooMany } from "../_shared/auth.ts";
 
+declare const Deno: {
+  env: { get(name: string): string | undefined };
+  serve(handler: (req: Request) => Response | Promise<Response>): void;
+};
+
 const BUCKET = "volunteer-docs";
 const EXT: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" };
 const ALLOWED_KINDS: Record<string, string[]> = {

@@ -1,6 +1,11 @@
 import { corsHeaders, fail, ok } from "../_shared/cors.ts";
 import { adminClient, clientIp, EMAIL_RE, NEPAL_PHONE_RE, readJson, recordAttempt, sha256, tooMany } from "../_shared/auth.ts";
 
+declare const Deno: {
+  env: { get(name: string): string | undefined };
+  serve(handler: (req: Request) => Response | Promise<Response>): void;
+};
+
 const BUCKET = "volunteer-docs";
 const PATH_RE = /^docs\/[0-9a-f-]{36}\.(jpg|png|webp)$/;
 const TYPES = ["manpower", "driver", "doctor"];
