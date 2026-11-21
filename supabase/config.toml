@@ -11,19 +11,66 @@ major_version = 15
 [studio]
 port = 54323
 
+[local_smtp]
+port = 54324
+
 [auth]
 site_url = "http://localhost:5173"
+additional_redirect_urls = ["http://localhost:5173/set-password/"]
 enable_signup = false
+enable_anonymous_sign_ins = false
+jwt_expiry = 3600
+enable_refresh_token_rotation = true
+refresh_token_reuse_interval = 10
+minimum_password_length = 10
+password_requirements = "lower_upper_letters_digits_symbols"
+
+[auth.email]
+enable_signup = false
+double_confirm_changes = true
+enable_confirmations = false
+
+[auth.email.smtp]
+enabled = false
+host = "smtp.gmail.com"
+port = 465
+user = "env(GMAIL_ADDRESS)"
+pass = "env(GMAIL_APP_PASSWORD)"
+admin_email = "env(GMAIL_ADDRESS)"
+sender_name = "Sahayogi Nepal"
+
+[auth.email.template.invite]
+subject = "Set your Sahayogi Nepal password"
+content_path = "./supabase/templates/invite.html"
+
+[auth.email.template.recovery]
+subject = "Reset your Sahayogi Nepal password"
+content_path = "./supabase/templates/recovery.html"
 
 [storage]
 file_size_limit = "5MiB"
 
 [functions.submit-request]
 verify_jwt = false
+[functions.admin-login]
+verify_jwt = false
+[functions.volunteer-login]
+verify_jwt = false
+[functions.auth-me]
+verify_jwt = false
+[functions.request-password-reset]
+verify_jwt = false
+[functions.create-upload-urls]
+verify_jwt = false
+[functions.submit-volunteer-application]
+verify_jwt = false
+[functions.approve-volunteer]
+verify_jwt = false
+[functions.admin-set-account-status]
+verify_jwt = false
 
 [db.seed]
 enabled = true
 sql_paths = [
-    "./seed.sql",
-    "seeds/nepal_districts.sql"
+    "./seeds/nepal_districts.sql"
 ]
