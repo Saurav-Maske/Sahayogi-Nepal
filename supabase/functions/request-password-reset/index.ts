@@ -1,6 +1,11 @@
 import { corsHeaders, fail, ok } from "../_shared/cors.ts";
 import { adminClient, anonClient, clientIp, EMAIL_RE, readJson, recordAttempt, sha256, tooMany } from "../_shared/auth.ts";
 
+declare const Deno: {
+  env: { get(name: string): string | undefined };
+  serve(handler: (req: Request) => Response | Promise<Response>): void;
+};
+
 const GENERIC = { message: "If that email belongs to an account, a link to set your password has been sent." };
 
 Deno.serve(async (req) => {

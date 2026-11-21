@@ -1,6 +1,11 @@
 import { corsHeaders, fail, ok } from "../_shared/cors.ts";
 import { adminClient, readJson, requireAdmin } from "../_shared/auth.ts";
 
+declare const Deno: {
+  env: { get(name: string): string | undefined };
+  serve(handler: (req: Request) => Response | Promise<Response>): void;
+};
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return fail("method_not_allowed", "POST only", 405);

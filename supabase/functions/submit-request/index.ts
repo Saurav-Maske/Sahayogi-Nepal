@@ -2,6 +2,11 @@
 import { createClient } from "@supabase/supabase-js";
 import { corsHeaders, ok, fail } from "../_shared/cors.ts";
 
+declare const Deno: {
+  env: { get(name: string): string | undefined };
+  serve(handler: (req: Request) => Response | Promise<Response>): void;
+};
+
 const KINDS = ["resource_request","manpower_request","donation_offer","healthcare_request","transport_request"];
 
 async function sha256(s: string) {
