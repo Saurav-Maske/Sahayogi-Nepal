@@ -2,6 +2,11 @@ import { createClient } from "@supabase/supabase-js";
 
 const URL_ = Deno.env.get("SUPABASE_URL")!;
 
+declare const Deno: {
+  env: { get(name: string): string | undefined };
+  serve(handler: (req: Request) => Response | Promise<Response>): void;
+};
+
 export const adminClient = () =>
   createClient(URL_, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, {
     auth: { persistSession: false, autoRefreshToken: false },
