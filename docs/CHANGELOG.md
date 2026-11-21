@@ -2,6 +2,16 @@
 
 Newest first. Anything that changes a payload, table, function or seed behaviour gets a line here.
 
+## 2026-11-22 (push notifications)
+
+- **Migration `20261122000009_push_outbox.sql`:** new `push_outbox` table (no client access), triggers that queue a `new_offer` row when an assignment is inserted as `offered` or released back to the pool, `_push_enqueue_escalations()` (tier A, once per assignment), `_push_kick()` (calls the function through `pg_net`), and service-role-only `push_claim_batch(p_limit)` and `push_recipients(p_assignment, p_kind)`. pg_cron job `push-escalations` runs every minute (queues escalations and retries failed rows); `purge-push-outbox` deletes finished rows after 7 days.
+- **Edge Function `send-push`** plus `_shared/fcm.ts` (FCM HTTP v1, service-account JWT, no SDK). Listed in `config.toml` with `verify_jwt = false`; it is protected by the `x-push-secret` header instead.
+- **Behaviour:** who gets a push uses the same rule as `my_offers`. Payload is IDs only (`type`, `assignment_id`, `request_id`); the OTP is never pushed. Dead tokens are removed. A row is tried up to 5 times.
+- **Setup (once per project):** secrets `PUSH_WEBHOOK_SECRET`, `FCM_SERVICE_ACCOUNT` (and `PUSH_DRY_RUN=true` locally only); two vault entries `push_function_url` and `push_secret`; `supabase functions deploy send-push`. Without the vault entries nothing is sent and the outbox just waits.
+- **Not audited on purpose:** no business state changes and the volume would flood the hash chain.
+- **Flutter (Person 1):** call `register_device_token` on start and on token refresh; handle `data.type` `new_offer | escalated` by opening the offer or refreshing `my_offers()`; create a high-importance Android channel.
+- **Contract:** v1.3. The Push notifications section replaces the planned item.
+
 ## 2026-11-22 (email OTP for sign-up and forgot password)
 
 - **Migration `20261122000008_email_otp.sql`:** new `email_otps` table (one row per email + purpose, HMAC hashes only, no client access), `auth_attempts.kind` now also allows `otp_send | otp_verify`, new column `volunteer_applications.email_verified_at`, `purge_email_otps()` and `revoke_user_sessions(uuid)` (both service role only).

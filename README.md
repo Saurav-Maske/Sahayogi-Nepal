@@ -1,4 +1,3 @@
-
 # Sahayogi Nepal
 
 Mobile coordination platform for community requests, donations, volunteers and emergency supplies.
@@ -77,7 +76,7 @@ The Android emulator reaches your machine at `10.0.2.2`; the iOS simulator uses 
 |                                   | `DEMO_PASSWORD`                                          | 10+ chars with upper, lower, digit and symbol. Required for remote seeding.                                         |
 |                                   | `ALLOW_DEMO_SEED=yes`                                    | Safety switch: scripts refuse to touch a non-local project without it.                                              |
 |                                   | `CONFIRM_PROJECT_REF`                                    | Only for `reset_demo_remote.mjs`: the `<ref>` in `https://<ref>.supabase.co`.                                 |
-| `supabase/functions/.env`       | `SET_PASSWORD_URL`, `ALLOWED_ORIGIN`, `VALHALLA_URL` | Edge Function secrets. Push to the hosted project with `supabase secrets set --env-file supabase/functions/.env`. |
+| `supabase/functions/.env`       | `SET_PASSWORD_URL`, `ALLOWED_ORIGIN`, `VALHALLA_URL`, `PUSH_WEBHOOK_SECRET`, `FCM_SERVICE_ACCOUNT` | Edge Function secrets. Push to the hosted project with `supabase secrets set --env-file supabase/functions/.env`. |
 | `apps/admin/.env`               | `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`          | Anon key only.                                                                                                      |
 
 On Windows PowerShell, `VAR=value command` does not work. Put variables in `.env` instead.
@@ -117,7 +116,8 @@ approval and stock reservation, assignment and claim, delivery progress, OTP, re
 markers, volunteer location and stats, device tokens, inventory import and moves, incidents and the audit
 timeline (migrations `...000003` to `...000007`, each RPC granted explicitly).
 
-Not built yet: push notifications (device tokens are stored, nothing sends yet), the `routes` table for
+Push notifications are built (`send-push`, migration `...000009`); setup steps are in `docs/CHANGELOG.md` and the header of that migration.
+Not built yet: the `routes` table for
 `get-route` with `save: true`, and a clean-up migration that revokes the default public execute right on
 older helper functions. The admin app still calls a few RPC names that do not exist (see
 `docs/CHANGELOG.md`). Details: [`docs/API-CONTRACT.md`](docs/API-CONTRACT.md).

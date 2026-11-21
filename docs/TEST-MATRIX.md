@@ -28,6 +28,10 @@ Run against the demo project after `seed_demo.mjs` and `seed_extra.mjs`. Reset w
 | Lot moves             | Partial move splits the lot; reserved stock cannot be moved; `adjusted` needs a reason | `admin_move_lot`             |     |     |     |     |
 | Audit timeline        | Pages by `next_before`; filter by action; non-admin gets `forbidden`                   | `admin_list_audit`           |     |     |     |     |
 | Admin-only RPCs       | Volunteer and anon calls to every `admin_*` RPC fail (`forbidden` / permission denied) | all `admin_*`                |     |     |     |     |
+| Push: new offer       | Creating assignments queues one push per eligible volunteer device; payload has only `type`, `assignment_id`, `request_id`; ineligible and declining volunteers get nothing | `send-push`, `push_recipients` |     |     |     |     |
+| Push: escalation      | Unclaimed tier A offer sends one `escalated` push to volunteers with A plus B or C, within about a minute after `escalate_at`; exactly-{A} volunteers are not pushed twice | `push-escalations` cron      |     |     |     |     |
+| Push: privileges      | Anon and volunteer cannot call `push_claim_batch`, `push_recipients` or read `push_outbox`; `send-push` without the right `x-push-secret` returns 401 | revoke/grant migration       |     |     |     |     |
+| Push: dead token      | A token FCM reports unregistered is removed from `device_tokens`; the rest still receive the push | `send-push`                  |     |     |     |     |
 
 ## Seed smoke checks (live now)
 

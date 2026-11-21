@@ -79,6 +79,9 @@ verify_jwt = false
 # get-route checks the caller itself (requireUser), like the rest. Listed explicitly so behaviour is not left to defaults.
 [functions.get-route]
 verify_jwt = false
+# send-push is called by the database (pg_net) with a shared secret in x-push-secret, not by users.
+[functions.send-push]
+verify_jwt = false
 
 [db.seed]
 enabled = true
