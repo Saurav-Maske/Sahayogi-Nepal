@@ -16,13 +16,17 @@ import AssignmentDetailPage from "./pages/AssignmentDetailPage";
 import IncidentsPage from "./pages/IncidentsPage";
 import IncidentDetailPage from "./pages/IncidentDetailPage";
 import NotificationsPage from "./pages/NotificationsPage";
+import SettingsPage from "./pages/SettingsPage";
+import InventoryPage from "./pages/InventoryPage";
+import InventoryDetailPage from "./pages/InventoryDetailPage";
+import InventoryMovementPage from "./pages/InventoryMovementPage";
+import InventoryTimelinePage from "./pages/InventoryTimelinePage";
+import InventoryMovementDetailPage from "./pages/InventoryMovementDetailPage";
 
 // Swap each PlaceholderPage for the real page as you build it.
 const PAGES: [path: string, title: string][] = [
   ["volunteers", "Volunteer Management"],
-  ["inventory", "Central Inventory"],
   ["map", "Live Map"],
-  ["settings", "Settings"],
 ];
 
 export default function App() {
@@ -45,6 +49,12 @@ export default function App() {
           <Route path="incidents" element={<IncidentsPage />} />
           <Route path="incidents/:id" element={<IncidentDetailPage />} />
           <Route path="notifications" element={<NotificationsPage />} />
+          <Route path="settings" element={<SettingsPage />} />
+          <Route path="inventory" element={<InventoryPage />} />
+          <Route path="inventory/timeline" element={<InventoryTimelinePage />} />
+          <Route path="inventory/movement/new" element={<InventoryMovementPage />} />
+          <Route path="inventory/movements/:movementId" element={<InventoryMovementDetailPage />} />
+          <Route path="inventory/:id" element={<InventoryDetailPage />} />
           {PAGES.map(([path, title]) => (
             <Route key={path} path={path} element={<PlaceholderPage title={title} />} />
           ))}
