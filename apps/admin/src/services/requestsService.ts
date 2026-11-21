@@ -4,9 +4,9 @@ import { PAGE_SIZE, TABS } from '../utils/requests';
 import { hasSession } from './session';
 
 /* ---- backend contract: confirm with Person 2 (admin_review_request is still a TODO in API-CONTRACT.md) ---- */
-const REVIEW_RPC = 'admin_review_request';
-const DECISION = { approve: 'approve', decline: 'decline' } as const;
-const RPC_PARAMS = (id: string, decision: string, items: ApprovedItem[], reason: string) => ({
+export const REVIEW_RPC = 'admin_review_request';
+export const DECISION = { approve: 'approve', decline: 'decline' } as const;
+export const RPC_PARAMS = (id: string, decision: string, items: ApprovedItem[], reason: string) => ({
   p_request_id: id, p_decision: decision, p_approved_items: items, p_reason: reason,
 });
 const IN_STOCK_PHASES = ['received', 'processing', 'ready_to_ship'];
