@@ -24,7 +24,7 @@ export default function BarChart({ title, caption, points }: Props) {
               <div
                 className={`chart__bar ${i % 2 === 0 ? 'chart__bar--navy' : 'chart__bar--teal'}`}
                 style={{ height: Math.max(26, (p.value / max) * CHART_HEIGHT) }}
-                title={`${p.label}: ${p.value}`}
+                title={`${p.hint ?? p.label}: ${p.value}`}
               >
                 {p.value}
               </div>
