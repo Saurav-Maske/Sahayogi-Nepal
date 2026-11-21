@@ -41,6 +41,22 @@ export async function requireUser(req: Request) {
   return error || !data.user ? null : { user: data.user, token };
 }
 
+export async function requireDriver(req: Request) {
+  const u = await requireUser(req);
+  if (!u) return null;
+  const { data: p } = await adminClient().from("profiles")
+    .select("id, role, account_status").eq("id", u.user.id).maybeSingle();
+  return p && p.role.includes("B") && p.account_status === "active" ? { id: u.user.id } : null;
+}
+
+export async function requireDoctor(req: Request) {
+  const u = await requireUser(req);
+  if (!u) return null;
+  const { data: p } = await adminClient().from("profiles")
+    .select("id, role, account_status").eq("id", u.user.id).maybeSingle();
+  return p && p.role.includes("C") && p.account_status === "active" ? { id: u.user.id } : null;
+}
+
 export async function requireAdmin(req: Request) {
   const u = await requireUser(req);
   if (!u) return null;
