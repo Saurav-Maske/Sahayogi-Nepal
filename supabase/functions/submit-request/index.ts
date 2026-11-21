@@ -3,6 +3,11 @@
 import { corsHeaders, fail, ok } from "../_shared/cors.ts";
 import { adminClient, NEPAL_PHONE_RE, readJson, requireUser, sha256 } from "../_shared/auth.ts";
 
+declare const Deno: {
+  env: { get(name: string): string | undefined };
+  serve(handler: (req: Request) => Response | Promise<Response>): void;
+};
+
 const ITEM_KINDS = ["resource_request", "donation_offer"]; // need an items[] list
 const VOLUNTEER_KINDS = ["manpower_request", "healthcare_request", "transport_request"]; // need volunteers_needed
 const ITEM_TYPES = ["food", "cloth", "temp_shelter", "medical_supplies", "drinking_water"];
