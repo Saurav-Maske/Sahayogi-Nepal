@@ -1,6 +1,7 @@
+
 # Sahayogi Nepal – Auth & Account API
 
-Owner: Person 2 (backend). Status: **v1 – auth layer**. Every change goes through a PR + a message in team chat.
+Owner: Person 2 (Rujan Dhamala, Aakash Thakur). Status: **v1 – auth layer**. Every change goes through a PR + a message in team chat.
 
 Base URL: `https://<project-ref>.supabase.co` (local: `http://127.0.0.1:54321`)
 Edge Functions: `POST {BASE}/functions/v1/<name>`
@@ -290,7 +291,7 @@ await supabase.functions.invoke('request-password-reset', body: {'email': email}
 
 ## 6. Demo accounts (local / demo project only)
 
-Created by `node --env-file=.env scripts/seed_users.mjs`.
+Created by `node --env-file=.env scripts/seed_demo.mjs` (or the users-only `scripts/seed_users.mjs`). For a hosted project see [`REMOTE-SEED.md`](REMOTE-SEED.md).
 
 | Email                                | Role                 | Categories |
 | ------------------------------------ | -------------------- | ---------- |
@@ -299,7 +300,7 @@ Created by `node --env-file=.env scripts/seed_users.mjs`.
 | general@demo.test                    | volunteer (manpower) | A          |
 | doctor@demo.test                     | volunteer (doctor)   | A, C       |
 
-Password: shared by Person 2 in the team chat (not in Git). Demo emails do not receive mail; use the real flow only with real Gmail addresses.
+Password: the `DEMO_PASSWORD` from `.env`, shared in the team chat (not in Git). Demo emails do not receive mail; use the real flow only with real Gmail addresses.
 
 ---
 
@@ -325,6 +326,6 @@ curl -s -X POST "$SUPABASE_URL/functions/v1/approve-volunteer" -H "apikey: $KEY"
 curl -s -X POST "$SUPABASE_URL/functions/v1/auth-me" -H "apikey: $KEY" -H "Authorization: Bearer <access_token>"
 ```
 
-Local emails (invite / reset) appear in Inbucket: http://127.0.0.1:54324 (unless Gmail SMTP is enabled).
+On Windows PowerShell, use `$env:KEY="..."` instead of `export`. Local emails (invite / reset) appear in Inbucket: http://127.0.0.1:54324 (unless Gmail SMTP is enabled).
 
 ---

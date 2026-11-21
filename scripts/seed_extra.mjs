@@ -216,6 +216,17 @@ else {
   const aL = await mkAsg({ req: rL.id, type: 'transport', tier: 'B', state: 'offered', declined: [P.driver1], offeredH: 0.2, route: [{ label: 'requester', ...L }] });
   await events(aL, [['offered', null, null, 0.2], ['declined', P.driver1, null, 0.1]]);
 
+  await mkAsg({ req: rL.id, type: 'transport', tier: 'B', state: 'declined', declined: [P.driver2], offeredH: 0.8, route: [{ label: 'requester', ...L }] });
+
+  // S7b: donation pickup, driver is on the way (state en_route_to_pickup)
+  const Q = pin(0.018, 0.030);
+  const rQ = await mkReq({ name: 'Demo Donor Q', phone: '9800000016', kind: 'donation_offer', status: 'assigned', at: Q, notes: 'DEMO: driver heading to the donor',
+    items: [['cloth', 25, 'piece', 25, null]], approved_at: ago(0.7) });
+  const aQ = await mkAsg({ req: rQ.id, type: 'pickup', tier: 'B', state: 'en_route_to_pickup', vol: P.driver1, offeredH: 0.6, acceptedH: 0.5,
+    route: [drv(hub.lat, hub.lng), { label: 'donor', ...Q }, hubPt], snap: [{ item_type: 'cloth', qty: 25, unit: 'piece' }] });
+  await events(aQ, [['offered', null, null, 0.6], ['accepted', P.driver1, null, 0.5], ['en_route_to_pickup', P.driver1, null, 0.4]]);
+  await otp(aQ, 'pickup');
+
   // S8: approved resource request awaiting a driver, ACTIVE reservation against the main water lot
   const N = pin(-0.028, -0.012);
   const rN = await mkReq({ name: 'Demo Requester N', phone: '9800000013', kind: 'resource_request', status: 'awaiting_assignment', at: N, urgency: 'high',
@@ -237,7 +248,7 @@ else {
   // inventory: one lot each in 'adjusted' and 'returned'
   await mkLot({ item_type: 'food', unit: 'pack', quantity: 10, phase: 'adjusted', provider: 'Demo Count Correction', note: 'stock count correction' }, ['received', 'adjusted']);
   await mkLot({ item_type: 'medical_supplies', unit: 'box', quantity: 5, phase: 'returned', provider: 'Demo Returned Goods', note: 'returned unopened' }, ['received', 'ready_to_ship', 'dispatched', 'returned']);
-  console.log('operations scenario: 7 new requests + assignments in every state, events, OTPs, 2 incidents, reservations, extra lots created');
+  console.log('operations scenario: 8 new requests + assignments in all 10 states, events, OTPs, 2 incidents, reservations, extra lots created');
   console.log(`  Active delivery OTP (assignment for "Demo Requester I") is ${DEMO_OTP} (stored hashed).`);
 }
 
