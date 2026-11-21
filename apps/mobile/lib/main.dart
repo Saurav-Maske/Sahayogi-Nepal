@@ -105,9 +105,9 @@ class _StartupScreenState extends State<StartupScreen> {
                 ),
               ),
               const SizedBox(height: 29),
-              Row(
+              const Row(
                 mainAxisSize: MainAxisSize.min,
-                children: const [
+                children: [
                   _Dot(color: _gold),
                   SizedBox(width: 6),
                   _Dot(color: Color(0xFF526273)),
