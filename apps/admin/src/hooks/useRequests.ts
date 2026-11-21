@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { getRequest, listRequests } from '../services/requestsService';
 import type { DetailResult, ListResult, RequestFilters } from '../types/requests';
 
-function useAsync<T>(load: () => Promise<T>, deps: unknown[]) {
+export function useAsync<T>(load: () => Promise<T>, deps: unknown[]) {
   const [state, setState] = useState<{ data: T | null; loading: boolean; error: string | null }>({ data: null, loading: true, error: null });
   const [tick, setTick] = useState(0);
 

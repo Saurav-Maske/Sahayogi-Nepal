@@ -1,6 +1,6 @@
-interface Props { page: number; total: number; pageSize: number; onPage: (p: number) => void }
+interface Props { page: number; total: number; pageSize: number; onPage: (p: number) => void; noun?: string }
 
-export default function Pagination({ page, total, pageSize, onPage }: Props) {
+export default function Pagination({ page, total, pageSize, onPage, noun = 'requests' }: Props) {
   const pages = Math.max(1, Math.ceil(total / pageSize));
   const from = total ? (page - 1) * pageSize + 1 : 0;
   const to = Math.min(total, page * pageSize);
@@ -13,7 +13,7 @@ export default function Pagination({ page, total, pageSize, onPage }: Props) {
 
   return (
     <div className="pager">
-      <span>Showing {from}–{to} of {total.toLocaleString('en-US')} requests</span>
+      <span>Showing {from}–{to} of {total.toLocaleString('en-US')} {noun}</span>
       <nav aria-label="Pagination">
         <button disabled={page <= 1} onClick={() => onPage(page - 1)}>‹ Previous</button>
         {nums.map((n, i) =>

@@ -7,10 +7,11 @@ import LoginPage from "./pages/LoginPage";
 import PlaceholderPage from "./pages/PlaceholderPage";
 import RequestsPage from "./pages/RequestPage";
 import RequestReviewPage from "./pages/RequestReviewPage";
+import DonationsPage from "./pages/DonationsPage";
+import DonationDetailPage from "./pages/DonationDetailPage";
 
 // Swap each PlaceholderPage for the real page as you build it.
 const PAGES: [path: string, title: string][] = [
-  ["donations", "Donations"],
   ["volunteers", "Volunteer Management"],
   ["assignments", "Assignments"],
   ["inventory", "Central Inventory"],
@@ -31,6 +32,8 @@ export default function App() {
           <Route path="analytics" element={<AnalyticsPage />} />
           <Route path="requests" element={<RequestsPage />} />
           <Route path="requests/:id" element={<RequestReviewPage />} />
+          <Route path="donations" element={<DonationsPage />} />
+          <Route path="donations/:id" element={<DonationDetailPage />} />
           {PAGES.map(([path, title]) => (
             <Route key={path} path={path} element={<PlaceholderPage title={title} />} />
           ))}
