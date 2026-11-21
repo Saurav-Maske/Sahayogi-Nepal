@@ -15,3 +15,5 @@ GoogleService-Info.plist
 *.jks
 key.properties
 .DS_Store
+supabase/functions/node_modules
+
