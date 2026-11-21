@@ -16,6 +16,8 @@ class VolunteerRegistrationScreen extends StatefulWidget {
 
 class _VolunteerRegistrationScreenState
     extends State<VolunteerRegistrationScreen> {
+  static const _maxNidImageBytes = 5 * 1024 * 1024;
+
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
@@ -38,10 +40,12 @@ class _VolunteerRegistrationScreenState
       if (image == null) return;
 
       final imageBytes = await image.readAsBytes();
-      if (imageBytes.lengthInBytes > 10 * 1024 * 1024) {
+      if (imageBytes.lengthInBytes > _maxNidImageBytes) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Choose an image smaller than 10 MB.')),
+          const SnackBar(
+            content: Text('Choose an image no larger than 5 MB.'),
+          ),
         );
         return;
       }

@@ -2,9 +2,11 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../core/app_colors.dart';
+import 'explore_screen.dart';
 import 'donate_resources_screen.dart';
 import 'request_assistance_screen.dart';
 import 'request_help_screen.dart';
+import 'my_requests_screen.dart';
 import 'volunteer_login_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -25,6 +27,12 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _openVolunteerLogin() {
     openVolunteerLogin(context);
+  }
+
+  void _openExplore() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => const ExploreScreen()),
+    );
   }
 
   void _openRequestHelp() {
@@ -48,6 +56,12 @@ class _HomeScreenState extends State<HomeScreen> {
       MaterialPageRoute<void>(
         builder: (_) => const DonateResourcesScreen(),
       ),
+    );
+  }
+
+  void _openMyRequests() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => const MyRequestsScreen()),
     );
   }
 
@@ -241,13 +255,13 @@ class _HomeScreenState extends State<HomeScreen> {
                   icon: Icons.map_outlined,
                   label: 'Explore',
                   selected: _selectedTab == 1,
-                  onTap: () => setState(() => _selectedTab = 1),
+                  onTap: _openExplore,
                 ),
                 _NavigationItem(
                   icon: Icons.inventory_2_outlined,
                   label: 'Requests',
                   selected: _selectedTab == 2,
-                  onTap: () => setState(() => _selectedTab = 2),
+                  onTap: _openMyRequests,
                 ),
                 _NavigationItem(
                   icon: Icons.person_outline_rounded,
