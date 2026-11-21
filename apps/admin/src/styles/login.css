@@ -17,8 +17,9 @@
 .field input:focus { outline: 2px solid var(--blue); outline-offset: 0; border-color: var(--blue); }
 
 .login { display: grid; grid-template-columns: 1fr 1fr; min-height: 100%; }
-.login__brand { background: var(--navy); color: #fff; padding: 48px; display: flex; flex-direction: column; justify-content: center; }
+.login__brand { background: var(--navy); color: #fff; padding: 48px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
 .login__brand h2 { font-size: 32px; line-height: 40px; font-weight: 700; }
+.login__logo { display: block; width: min(100%, 460px); height: auto; object-fit: contain; object-position: center; }
 .login__console { margin-top: 12px; font-size: 10px; letter-spacing: .08em; color: #9fb4c4; }
 .login__tagline { margin-top: 40px; font-size: 14px; color: #dbe6ee; }
 .login__panel { display: grid; place-items: center; padding: 32px; }
@@ -26,5 +27,6 @@
   .login { grid-template-columns: 1fr; }
   .login__brand { padding: 28px 24px; }
   .login__brand h2 { font-size: 24px; line-height: 32px; }
+  .login__logo { width: min(100%, 380px); }
   .login__tagline { margin-top: 12px; }
 }
