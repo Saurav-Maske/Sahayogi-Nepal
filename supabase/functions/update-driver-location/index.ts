@@ -3,7 +3,7 @@
 // ASSUMPTIONS (change to match your tables):
 //   assignment_current_event (view, see the migration): assignment_id, volunteer_id, event_type
 //   driver_latest_location:  assign_id, volunteer_id, tracking_number, loc, updated_at
-//                            (one row per assignment, created by the trigger on public.assignment)
+//                            (one row per assignment, created by the trigger on public.assignments)
 // A ping updates the caller's rows for ALL of their live assignments. It never creates rows.
 
 import { corsHeaders, fail, ok } from "../_shared/cors.ts";
