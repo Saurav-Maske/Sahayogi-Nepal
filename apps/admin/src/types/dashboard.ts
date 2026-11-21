@@ -19,6 +19,7 @@ export interface DashboardStats {
 export interface ChartPoint {
   label: string;
   value: number;
+  hint?: string; // longer text for the hover tooltip
 }
 
 export interface ActivityItem {
