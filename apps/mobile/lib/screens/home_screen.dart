@@ -1,10 +1,7 @@
-import 'dart:async';
-
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../core/app_colors.dart';
-import '../core/push_notifications.dart';
-import '../widgets/community_map_preview.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -15,12 +12,6 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedTab = 0;
-
-  @override
-  void initState() {
-    super.initState();
-    unawaited(PushNotifications.initialize());
-  }
 
   void _showComingSoon() {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -38,63 +29,60 @@ class _HomeScreenState extends State<HomeScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                _brandHeader(),
+                const SizedBox(height: 10),
                 _supportBanner(),
                 const SizedBox(height: 20),
                 _quickActions(),
-                const SizedBox(height: 22),
-                _sectionHeading('Around your community', 'View map'),
-                const SizedBox(height: 20),
-                const CommunityMapPreview(height: 164),
                 const SizedBox(height: 18),
                 const _NearbyCounts(),
-                const SizedBox(height: 24),
-                _sectionHeading('Latest disaster alerts', 'All alerts'),
-                const SizedBox(height: 30),
-                Row(
-                  children: [
-                    const Expanded(
-                      child: Text(
-                        'Sahayogi Nepal',
-                        style: TextStyle(
-                          color: appNavy,
-                          fontSize: 17,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                    IconButton(
-                      onPressed: _showComingSoon,
-                      tooltip: 'Notifications',
-                      icon: Stack(
-                        clipBehavior: Clip.none,
-                        children: [
-                          const Icon(
-                            Icons.notifications_none_rounded,
-                            color: appNavy,
-                            size: 25,
-                          ),
-                          Positioned(
-                            right: -1,
-                            top: 1,
-                            child: Container(
-                              width: 7,
-                              height: 7,
-                              decoration: const BoxDecoration(
-                                color: appGold,
-                                shape: BoxShape.circle,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
               ],
             ),
           ),
         ),
         bottomNavigationBar: _bottomNavigation(),
+      );
+
+  Widget _brandHeader() => Row(
+        children: [
+          Expanded(
+            child: SizedBox(
+              height: 44,
+              child: SvgPicture.asset(
+                '../public/images/HorizontalLogo.svg',
+                fit: BoxFit.contain,
+                alignment: Alignment.centerLeft,
+                semanticsLabel: 'Sahayogi Nepal',
+              ),
+            ),
+          ),
+          IconButton(
+            onPressed: _showComingSoon,
+            tooltip: 'Notifications',
+            icon: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                const Icon(
+                  Icons.notifications_none_rounded,
+                  color: appNavy,
+                  size: 25,
+                ),
+                Positioned(
+                  right: -1,
+                  top: 1,
+                  child: Container(
+                    width: 7,
+                    height: 7,
+                    decoration: const BoxDecoration(
+                      color: appGold,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       );
 
   Widget _supportBanner() => Container(
@@ -194,34 +182,6 @@ class _HomeScreenState extends State<HomeScreen> {
               icon: Icons.people_outline_rounded,
               label: 'Become a\nVolunteer',
               onTap: _showComingSoon,
-            ),
-          ),
-        ],
-      );
-
-  Widget _sectionHeading(String title, String action) => Row(
-        children: [
-          Expanded(
-            child: Text(
-              title,
-              style: const TextStyle(
-                color: appNavy,
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-          TextButton(
-            onPressed: _showComingSoon,
-            style: TextButton.styleFrom(
-              foregroundColor: appTeal,
-              padding: EdgeInsets.zero,
-              minimumSize: const Size(0, 36),
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            ),
-            child: Text(
-              action,
-              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
             ),
           ),
         ],
