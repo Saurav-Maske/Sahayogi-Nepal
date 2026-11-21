@@ -2,6 +2,8 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+<key>NSLocationWhenInUseUsageDescription</key>
+<string>Sahayogi Nepal uses your location to show your live position on the Explore map while you use the app.</string>
 <key>NSPhotoLibraryUsageDescription</key>
 <string>Select an image of your NID or Citizenship document for volunteer registration.</string>
 	<key>CADisableMinimumFrameDurationOnPhone</key>

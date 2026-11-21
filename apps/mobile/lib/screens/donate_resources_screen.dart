@@ -1,7 +1,11 @@
+import 'package:geolocator/geolocator.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../core/app_colors.dart';
-import '../widgets/community_map_preview.dart';
+import 'explore_screen.dart';
+import 'location_picker_screen.dart';
+import 'my_requests_screen.dart';
 import 'volunteer_login_screen.dart';
 
 class DonateResourcesScreen extends StatefulWidget {
@@ -26,7 +30,10 @@ class _DonateResourcesScreenState extends State<DonateResourcesScreen> {
 
   final List<String?> _categories = [null];
   final List<bool> _categoryErrors = [false];
-  String? _location;
+  LatLng? _location;
+  LatLng? _currentLocation;
+  bool _locationAllowed = false;
+  bool _locationServiceEnabled = true;
   bool _locationError = false;
 
   static const _categoryOptions = [
@@ -37,12 +44,65 @@ class _DonateResourcesScreenState extends State<DonateResourcesScreen> {
     'Temporary shelter',
   ];
 
-  static const _locations = [
-    'Melamchi, Ward 11',
-    'Kathmandu, Ward 5',
-    'Balaju, Ward 16',
-    'Boudha, Ward 6',
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _requestLiveLocation();
+  }
+
+  Future<void> _requestLiveLocation() async {
+    final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      if (!mounted) return;
+      setState(() {
+        _locationServiceEnabled = false;
+        _locationAllowed = false;
+      });
+      return;
+    }
+
+    var permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+    }
+    final allowed = permission == LocationPermission.whileInUse ||
+        permission == LocationPermission.always;
+    if (!mounted) return;
+    setState(() {
+      _locationServiceEnabled = true;
+      _locationAllowed = allowed;
+    });
+    if (!allowed) return;
+
+    try {
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+        ),
+      );
+      if (!mounted) return;
+      setState(() {
+        _currentLocation = LatLng(position.latitude, position.longitude);
+      });
+    } catch (_) {
+      // The live map layer can receive a fix when one becomes available.
+    }
+  }
+
+  Future<void> _choosePickupLocationOnMap() async {
+    final selectedLocation = await Navigator.of(context).push<LatLng>(
+      MaterialPageRoute<LatLng>(
+        builder: (_) => LocationPickerScreen(
+          initialLocation: _location ?? _currentLocation,
+        ),
+      ),
+    );
+    if (selectedLocation == null || !mounted) return;
+    setState(() {
+      _location = selectedLocation;
+      _locationError = false;
+    });
+  }
 
   @override
   void dispose() {
@@ -133,7 +193,8 @@ class _DonateResourcesScreenState extends State<DonateResourcesScreen> {
     });
     if (!fieldsValid || !categoriesValid || !locationValid) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Donation submission is not connected yet.')),
+      const SnackBar(
+          content: Text('Donation submission is not connected yet.')),
     );
   }
 
@@ -308,68 +369,53 @@ class _DonateResourcesScreenState extends State<DonateResourcesScreen> {
                   Material(
                     color: Colors.transparent,
                     borderRadius: BorderRadius.circular(16),
-                    child: InkWell(
-                      onTap: () => _chooseValue(
-                        title: 'Choose pickup location',
-                        values: _locations,
-                        selectedValue: _location ?? '',
-                        onSelected: (value) => setState(() {
-                          _location = value;
-                          _locationError = false;
-                        }),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(16),
+                        border: _locationError
+                            ? Border.all(color: Colors.redAccent)
+                            : null,
                       ),
-                      borderRadius: BorderRadius.circular(16),
-                      child: Container(
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(16),
-                          border: _locationError
-                              ? Border.all(color: Colors.redAccent)
-                              : null,
-                        ),
-                        child: Stack(
-                          children: [
-                            const CommunityMapPreview(height: 66),
-                            const Positioned.fill(
-                              child: IgnorePointer(
-                                child: Center(
-                                  child: Icon(
-                                    Icons.location_on_rounded,
-                                    color: appNavy,
-                                    size: 24,
-                                  ),
-                                ),
-                              ),
-                            ),
-                            if (_location != null)
-                              Positioned(
-                                right: 8,
-                                bottom: 8,
-                                child: DecoratedBox(
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withValues(alpha: .94),
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                  child: Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 8,
-                                      vertical: 4,
-                                    ),
-                                    child: Text(
-                                      _location!,
-                                      style: const TextStyle(
-                                        color: appNavy,
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                          ],
+                      child: LiveLocationMapPreview(
+                        height: 112,
+                        locationAllowed: _locationAllowed,
+                        locationServiceEnabled: _locationServiceEnabled,
+                        currentLocation: _currentLocation,
+                        selectedLocation: _location,
+                        onTap: _choosePickupLocationOnMap,
+                      ),
+                    ),
+                  ),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton.icon(
+                      onPressed: _choosePickupLocationOnMap,
+                      style: TextButton.styleFrom(
+                        foregroundColor: appTeal,
+                        padding: EdgeInsets.zero,
+                        minimumSize: const Size(0, 36),
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      icon:
+                          const Icon(Icons.add_location_alt_outlined, size: 18),
+                      label: Text(
+                        _location == null
+                            ? 'Choose location'
+                            : 'Change location',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                     ),
                   ),
+                  if (_location != null) ...[
+                    const SizedBox(height: 7),
+                    Text(
+                      'Pickup selected: ${_location!.latitude.toStringAsFixed(5)}, ${_location!.longitude.toStringAsFixed(5)}',
+                      style: const TextStyle(color: appMuted, fontSize: 11),
+                    ),
+                  ],
                   if (_locationError) ...[
                     const SizedBox(height: 6),
                     const Text(
@@ -540,15 +586,25 @@ Widget _donationNavigationBar(BuildContext context) => Container(
                   (route) => route.isFirst,
                 ),
               ),
-              const _DonationNavigationItem(
+              _DonationNavigationItem(
                 icon: Icons.map_outlined,
                 label: 'Explore',
                 selected: false,
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const ExploreScreen(),
+                  ),
+                ),
               ),
-              const _DonationNavigationItem(
+              _DonationNavigationItem(
                 icon: Icons.inventory_2_outlined,
                 label: 'Requests',
                 selected: false,
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const MyRequestsScreen(),
+                  ),
+                ),
               ),
               _DonationNavigationItem(
                 icon: Icons.person_outline_rounded,
@@ -587,9 +643,8 @@ class _DonationNavigationItem extends StatelessWidget {
                 width: 54,
                 height: 27,
                 decoration: BoxDecoration(
-                  color: selected
-                      ? const Color(0xFFE7F0F4)
-                      : Colors.transparent,
+                  color:
+                      selected ? const Color(0xFFE7F0F4) : Colors.transparent,
                   borderRadius: BorderRadius.circular(18),
                 ),
                 child: Icon(icon, size: 21, color: appNavy),

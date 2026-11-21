@@ -1,7 +1,11 @@
+import 'package:geolocator/geolocator.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../core/app_colors.dart';
-import '../widgets/community_map_preview.dart';
+import 'explore_screen.dart';
+import 'location_picker_screen.dart';
+import 'my_requests_screen.dart';
 import 'volunteer_login_screen.dart';
 
 class RequestHelpScreen extends StatefulWidget {
@@ -20,7 +24,10 @@ class _RequestHelpScreenState extends State<RequestHelpScreen> {
   final _contactController = TextEditingController();
   final List<String?> _resourceCategories = [null];
   final List<bool> _categoryErrors = [false];
-  String? _location;
+  LatLng? _location;
+  LatLng? _currentLocation;
+  bool _locationAllowed = false;
+  bool _locationServiceEnabled = true;
   bool _locationError = false;
 
   static const _categoryOptions = [
@@ -31,12 +38,66 @@ class _RequestHelpScreenState extends State<RequestHelpScreen> {
     'Temporary Shelter',
   ];
 
-  static const _locations = [
-    'Melamchi, Ward 11',
-    'Kathmandu, Ward 5',
-    'Balaju, Ward 16',
-    'Boudha, Ward 6',
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _requestLiveLocation();
+  }
+
+  Future<void> _requestLiveLocation() async {
+    final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      if (!mounted) return;
+      setState(() {
+        _locationServiceEnabled = false;
+        _locationAllowed = false;
+      });
+      return;
+    }
+
+    var permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+    }
+
+    final allowed = permission == LocationPermission.whileInUse ||
+        permission == LocationPermission.always;
+    if (!mounted) return;
+    setState(() {
+      _locationServiceEnabled = true;
+      _locationAllowed = allowed;
+    });
+    if (!allowed) return;
+
+    try {
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+        ),
+      );
+      if (!mounted) return;
+      setState(() {
+        _currentLocation = LatLng(position.latitude, position.longitude);
+      });
+    } catch (_) {
+      // The live map layer can still receive a position when a fix is ready.
+    }
+  }
+
+  Future<void> _chooseLocationOnMap() async {
+    final selectedLocation = await Navigator.of(context).push<LatLng>(
+      MaterialPageRoute<LatLng>(
+        builder: (_) => LocationPickerScreen(
+          initialLocation: _location ?? _currentLocation,
+        ),
+      ),
+    );
+    if (selectedLocation == null || !mounted) return;
+    setState(() {
+      _location = selectedLocation;
+      _locationError = false;
+    });
+  }
 
   @override
   void dispose() {
@@ -228,9 +289,8 @@ class _RequestHelpScreenState extends State<RequestHelpScreen> {
                     _resourceCategories.length,
                     (index) => Padding(
                       padding: EdgeInsets.only(
-                        bottom: index == _resourceCategories.length - 1
-                            ? 0
-                            : 18,
+                        bottom:
+                            index == _resourceCategories.length - 1 ? 0 : 18,
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -259,8 +319,7 @@ class _RequestHelpScreenState extends State<RequestHelpScreen> {
                             onTap: () => _chooseValue(
                               title: 'Resource category',
                               values: _categoryOptions,
-                              selectedValue:
-                                  _resourceCategories[index] ?? '',
+                              selectedValue: _resourceCategories[index] ?? '',
                               onSelected: (value) => setState(() {
                                 _resourceCategories[index] = value;
                                 _categoryErrors[index] = false;
@@ -332,25 +391,25 @@ class _RequestHelpScreenState extends State<RequestHelpScreen> {
                     ),
                   ),
                   const SizedBox(height: 18),
-                  const CommunityMapPreview(height: 66),
+                  LiveLocationMapPreview(
+                    locationAllowed: _locationAllowed,
+                    locationServiceEnabled: _locationServiceEnabled,
+                    currentLocation: _currentLocation,
+                    selectedLocation: _location,
+                    onTap: _chooseLocationOnMap,
+                  ),
                   const SizedBox(height: 18),
                   _choiceField(
-                    value: _location ?? 'Choose a location',
+                    value: _location == null
+                        ? 'Choose location on map'
+                        : '${_location!.latitude.toStringAsFixed(5)}, ${_location!.longitude.toStringAsFixed(5)}',
                     error: _locationError,
                     leading: const Icon(
                       Icons.location_on_outlined,
                       color: appTeal,
                       size: 20,
                     ),
-                    onTap: () => _chooseValue(
-                      title: 'Choose a location',
-                      values: _locations,
-                      selectedValue: _location ?? '',
-                      onSelected: (value) => setState(() {
-                        _location = value;
-                        _locationError = false;
-                      }),
-                    ),
+                    onTap: _chooseLocationOnMap,
                   ),
                   if (_locationError) ...[
                     const SizedBox(height: 6),
@@ -526,15 +585,25 @@ Widget _requestNavigationBar(BuildContext context) => Container(
                   (route) => route.isFirst,
                 ),
               ),
-              const _RequestNavigationItem(
+              _RequestNavigationItem(
                 icon: Icons.map_outlined,
                 label: 'Explore',
                 selected: false,
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const ExploreScreen(),
+                  ),
+                ),
               ),
-              const _RequestNavigationItem(
+              _RequestNavigationItem(
                 icon: Icons.inventory_2_outlined,
                 label: 'Requests',
                 selected: true,
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const MyRequestsScreen(),
+                  ),
+                ),
               ),
               _RequestNavigationItem(
                 icon: Icons.person_outline_rounded,
@@ -573,9 +642,8 @@ class _RequestNavigationItem extends StatelessWidget {
                 width: 54,
                 height: 27,
                 decoration: BoxDecoration(
-                  color: selected
-                      ? const Color(0xFFE7F0F4)
-                      : Colors.transparent,
+                  color:
+                      selected ? const Color(0xFFE7F0F4) : Colors.transparent,
                   borderRadius: BorderRadius.circular(18),
                 ),
                 child: Icon(icon, size: 21, color: appNavy),
