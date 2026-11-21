@@ -41,11 +41,18 @@ class _StartupScreenState extends State<StartupScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Image.asset(
-                  'assets/images/SahayogiNepalLogo.png',
-                  width: 58,
-                  height: 58,
-                  fit: BoxFit.contain,
+                Container(
+                  width: 82,
+                  height: 82,
+                  padding: const EdgeInsets.all(12),
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Image.asset(
+                    'assets/images/SahayogiNepalLogo.png',
+                    fit: BoxFit.contain,
+                  ),
                 ),
                 const SizedBox(height: 53),
                 const Text(

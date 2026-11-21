@@ -34,8 +34,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 _supportBanner(),
                 const SizedBox(height: 20),
                 _quickActions(),
-                const SizedBox(height: 18),
-                const _NearbyCounts(),
               ],
             ),
           ),
@@ -272,31 +270,6 @@ class _ActionCard extends StatelessWidget {
             ),
           ),
         ),
-      );
-}
-
-class _NearbyCounts extends StatelessWidget {
-  const _NearbyCounts();
-
-  @override
-  Widget build(BuildContext context) => const Row(
-        children: [
-          Text(
-            '12 nearby requests',
-            style: TextStyle(
-              color: appNavy,
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          SizedBox(width: 12),
-          Text('•', style: TextStyle(color: appMuted, fontSize: 12)),
-          SizedBox(width: 12),
-          Text(
-            '8 resource listings',
-            style: TextStyle(color: appMuted, fontSize: 12),
-          ),
-        ],
       );
 }
 
