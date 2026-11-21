@@ -2,5 +2,10 @@
   "name": "sahayogi-backend-scripts",
   "private": true,
   "type": "module",
-  "dependencies": { "@supabase/supabase-js": "^2.45.4" }
+  "scripts": {
+    "postinstall": "cd supabase/functions && deno install"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.119.2"
+  }
 }

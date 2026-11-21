@@ -68,3 +68,10 @@ verify_jwt = false
 verify_jwt = false
 [functions.admin-set-account-status]
 verify_jwt = false
+
+[db.seed]
+enabled = true
+sql_paths = [
+    "./seed.sql",
+    "seeds/nepal_districts.sql"
+]
