@@ -28,6 +28,6 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   assets:
-    - ../public/images/VerticalLogo.png
-    - ../public/images/HorizontalLogo.png
-    - ../public/images/SahayogiNepalLogo.png
+    - assets/images/VerticalLogo.png
+    - assets/images/HorizontalLogo.png
+    - assets/images/SahayogiNepalLogo.png
