@@ -1,4 +1,4 @@
-# API Contract (v1.3, owned by Person 2: Rujan Dhamala, Aakash Thakur)
+# API Contract (v1.4, owned by Person 2: Rujan Dhamala, Aakash Thakur)
 
 Change this file in the same PR as the code, and add a line to `docs/CHANGELOG.md`.
 Auth, login and volunteer sign-up endpoints are in [`api-auth.md`](api-auth.md).
@@ -55,15 +55,18 @@ Atomic: the request and its items are created by the `submit_request` RPC in one
 Errors: `invalid_kind | invalid_name | invalid_phone | invalid_location | outside_service_area | invalid_urgency | invalid_volunteers_needed | invalid_items | too_many_requests (429) | bad_json | db_error (500)`.
 Keep `tracking_token`: only its hash is stored, so it cannot be shown again.
 
-### POST `/functions/v1/get-route`  (any signed-in user)
+### POST `/functions/v1/get-route`  (any signed-in, active user)
 
 ```json
-{ "locations": [ { "lat": 27.705, "lng": 85.32 }, { "lat": 27.72, "lng": 85.33 } ], "costing": "auto", "strict_nepal": true, "save": false }
+{ "locations": [ { "lat": 27.705, "lng": 85.32 }, { "lat": 27.72, "lng": 85.33 } ], "costing": "auto", "save": false }
 ```
 
-`costing`: `auto | bicycle | pedestrian | motorcycle`. Response `data`: `{ route_id, summary: { length (km), time (s) }, shape (encoded polyline), trip }`.
-Errors: `unauthorized | bad_json | invalid_locations | invalid_coordinate | out_of_bounds | routing_upstream_error | routing_network_error`.
-**Known gap:** `save: true` inserts into a `routes` table that has no migration yet, so keep `save` false until one is added.
+- `locations`: 2 to 10 points (`lng` or `lon`). All must be inside Nepal's rough box unless you send `strict_nepal: false` (default is strict).
+- `costing`: `auto | bicycle | pedestrian | motorcycle` (default `auto`). `costing_options`: optional small object passed to Valhalla.
+- `save: true` stores the route in `routes` (migration `20261122000010_routes.sql`) and returns its id. Optional `assignment_id` (only with `save: true`) links it to an assignment you hold; admins may link any.
+- Response `data`: `{ route_id, summary: { length (km), time (s) }, shape, legs: [{ shape, length, time }], trip }`. `shape` is the first leg's encoded polyline (precision 6) and is kept for older clients; with three or more points (driver, hub, requester) draw every entry of `legs`. `route_id` is `null` unless saved.
+- Clients can read their own saved rows from `routes` (RLS); admins read all. Only the function writes.
+Errors: `unauthorized (401) | account_suspended (403) | bad_json | invalid_locations | invalid_coordinate | out_of_bounds | invalid_costing_options | invalid_assignment_id | not_found (404) | routing_upstream_error (502) | routing_network_error (502) | db_insert_failed (500)`.
 
 ### Auth and volunteer functions
 
@@ -212,7 +215,7 @@ Not an API the apps call. The database queues a push and the `send-push` Edge Fu
 
 Everything below is still to build; the UI should mock it.
 
-- A `routes` table for `get-route` with `save: true` (see the known gap above).
+- Nothing is planned right now.
 
 `submit_request(p jsonb, p_profile uuid)` is LIVE but **service role only**; it is called by the `submit-request` Edge Function, never from a client.
 
