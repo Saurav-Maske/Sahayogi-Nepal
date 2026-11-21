@@ -21,7 +21,7 @@ file_size_limit = "5MiB"
 [functions.submit-request]
 verify_jwt = false
 
-[db_seed]
+[db.seed]
 enabled = true
 sql_paths = [
     "./seed.sql",
