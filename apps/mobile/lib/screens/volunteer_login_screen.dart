@@ -4,6 +4,14 @@ import 'package:material_ui/material_ui.dart';
 import '../core/app_colors.dart';
 import 'volunteer_registration_screen.dart';
 
+void openVolunteerLogin(BuildContext context) {
+  Navigator.of(context).push(
+    MaterialPageRoute<void>(
+      builder: (_) => const VolunteerLoginScreen(),
+    ),
+  );
+}
+
 class VolunteerLoginScreen extends StatefulWidget {
   const VolunteerLoginScreen({super.key});
 
