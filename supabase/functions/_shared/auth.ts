@@ -2,6 +2,11 @@ import { createClient } from "@supabase/supabase-js";
 
 const URL_ = Deno.env.get("SUPABASE_URL")!;
 
+declare const Deno: {
+  env: { get(name: string): string | undefined };
+  serve(handler: (req: Request) => Response | Promise<Response>): void;
+};
+
 export const adminClient = () =>
   createClient(URL_, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, {
     auth: { persistSession: false, autoRefreshToken: false },
@@ -39,6 +44,22 @@ export async function requireUser(req: Request) {
   if (!token) return null;
   const { data, error } = await adminClient().auth.getUser(token);
   return error || !data.user ? null : { user: data.user, token };
+}
+
+export async function requireDriver(req: Request) {
+  const u = await requireUser(req);
+  if (!u) return null;
+  const { data: p } = await adminClient().from("profiles")
+    .select("id, role, account_status").eq("id", u.user.id).maybeSingle();
+  return p && p.role.includes("B") && p.account_status === "active" ? { id: u.user.id } : null;
+}
+
+export async function requireDoctor(req: Request) {
+  const u = await requireUser(req);
+  if (!u) return null;
+  const { data: p } = await adminClient().from("profiles")
+    .select("id, role, account_status").eq("id", u.user.id).maybeSingle();
+  return p && p.role.includes("C") && p.account_status === "active" ? { id: u.user.id } : null;
 }
 
 export async function requireAdmin(req: Request) {

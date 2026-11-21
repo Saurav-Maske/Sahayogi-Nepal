@@ -1,18 +1,14 @@
 import { supabase } from '../supabase';
-import type { DashboardData } from '../types/dashboard';
+import type { ActivityItem, DashboardData } from '../types/dashboard';
+import { kindLabel, humanize } from '../utils/labels';
+import { hasSession } from '../services/session';
 
-/**
- * Table / column names used for the live query.
- * Person 2: if the schema differs, change them here only.
- */
-const T = {
-  requests: 'requests', // status: pending | approved | fulfilled, category, created_at, fulfilled_at
-  volunteers: 'volunteers', // status: approved
-  assignments: 'assignments', // status: active
-  incidents: 'incidents', // status: open, severity: urgent
-  inventory: 'central_inventory', // quantity, category, low_stock_threshold, item_name, unit
-  activity: 'activity_log', // created_at, message, link
-};
+/* ---- business rules: tune here ---- */
+const LOW_STOCK_THRESHOLD = 100; // no threshold column in the schema yet
+const IN_STOCK_PHASES = ['received', 'processing', 'ready_to_ship'];
+const APPROVED_STATUSES = ['approved', 'awaiting_assignment'];
+const ACTIVE_ASSIGNMENT_STATES = ['accepted', 'en_route_to_pickup', 'picked_up', 'en_route_to_destination'];
+const EN_ROUTE_STATES = ['en_route_to_pickup', 'en_route_to_destination'];
 
 export const DEMO_DATA: DashboardData = {
   stats: {
@@ -26,8 +22,7 @@ export const DEMO_DATA: DashboardData = {
   },
   byCategory: [
     { label: 'Food', value: 88 }, { label: 'Water', value: 62 },
-    { label: 'Shelter', value: 45 }, { label: 'Health', value: 30 },
-    { label: 'Other', value: 52 },
+    { label: 'Shelter', value: 45 }, { label: 'Health', value: 30 }, { label: 'Other', value: 52 },
   ],
   fulfilledOverTime: [
     { label: 'Mon', value: 40 }, { label: 'Tue', value: 52 }, { label: 'Wed', value: 46 },
@@ -49,6 +44,9 @@ export const DEMO_DATA: DashboardData = {
   source: 'demo',
 };
 
+const DAY = 864e5;
+const since = (days: number) => new Date(Date.now() - days * DAY).toISOString();
+
 const count = async (table: string, filter?: (q: any) => any): Promise<number> => {
   let q: any = supabase.from(table).select('*', { count: 'exact', head: true });
   if (filter) q = filter(q);
@@ -57,82 +55,104 @@ const count = async (table: string, filter?: (q: any) => any): Promise<number> =
   return n ?? 0;
 };
 
-const hhmm = (iso: string) =>
-  new Date(iso).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+const rows = async (table: string, cols: string, filter?: (q: any) => any): Promise<any[]> => {
+  let q: any = supabase.from(table).select(cols);
+  if (filter) q = filter(q);
+  const { data, error } = await q;
+  if (error) throw error;
+  return data ?? [];
+};
+
+const stamp = (iso: string) => {
+  const d = new Date(iso);
+  return d.toDateString() === new Date().toDateString()
+    ? d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+    : d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+};
 
 async function fetchLive(): Promise<DashboardData> {
-  const monthAgo = new Date(Date.now() - 30 * 864e5).toISOString();
-  const twoMonthsAgo = new Date(Date.now() - 60 * 864e5).toISOString();
+  const startOfToday = new Date(); startOfToday.setHours(0, 0, 0, 0);
 
-  const [total, lastMonth, prevMonth, pending, approved, fulfilled, volunteers, assignments, openInc, urgentInc] =
-    await Promise.all([
-      count(T.requests),
-      count(T.requests, (q) => q.gte('created_at', monthAgo)),
-      count(T.requests, (q) => q.gte('created_at', twoMonthsAgo).lt('created_at', monthAgo)),
-      count(T.requests, (q) => q.eq('status', 'pending')),
-      count(T.requests, (q) => q.eq('status', 'approved')),
-      count(T.requests, (q) => q.eq('status', 'fulfilled')),
-      count(T.volunteers, (q) => q.eq('status', 'approved')),
-      count(T.assignments, (q) => q.eq('status', 'active')),
-      count(T.incidents, (q) => q.eq('status', 'open')),
-      count(T.incidents, (q) => q.eq('status', 'open').eq('severity', 'urgent')),
-    ]);
-
-  const [inv, reqs, log] = await Promise.all([
-    supabase.from(T.inventory).select('item_name, category, quantity, unit, low_stock_threshold'),
-    supabase.from(T.requests).select('category, status, fulfilled_at').gte('created_at', monthAgo),
-    supabase.from(T.activity).select('id, created_at, message, link').order('created_at', { ascending: false }).limit(6),
+  const [total, lastMonth, prevMonth, pending, pendingToday, approved, fulfilled,
+    volunteers, activeAsg, enRoute, openInc, discrepancies] = await Promise.all([
+    count('requests'),
+    count('requests', (q) => q.gte('created_at', since(30))),
+    count('requests', (q) => q.gte('created_at', since(60)).lt('created_at', since(30))),
+    count('requests', (q) => q.eq('status', 'pending_admin_review')),
+    count('requests', (q) => q.eq('status', 'pending_admin_review').gte('created_at', startOfToday.toISOString())),
+    count('requests', (q) => q.in('status', APPROVED_STATUSES)),
+    count('requests', (q) => q.eq('status', 'fulfilled')),
+    count('profiles', (q) => q.eq('role', 'volunteer')),
+    count('assignments', (q) => q.in('state', ACTIVE_ASSIGNMENT_STATES)),
+    count('assignments', (q) => q.in('state', EN_ROUTE_STATES)),
+    count('incidents', (q) => q.eq('status', 'open')),
+    count('incidents', (q) => q.eq('status', 'open').not('reported_shortfall', 'is', null)),
   ]);
-  if (inv.error) throw inv.error;
-  if (reqs.error) throw reqs.error;
-  if (log.error) throw log.error;
 
-  const invRows = inv.data ?? [];
-  const low = invRows
-    .filter((r: any) => r.low_stock_threshold != null && r.quantity < r.low_stock_threshold)
-    .sort((a: any, b: any) => a.quantity / a.low_stock_threshold - b.quantity / b.low_stock_threshold)[0];
+  const [vTypes, lots, kinds, fulfilledRows, newReqs, doneReqs, incs, apps] = await Promise.all([
+    rows('profiles', 'volunteer_type', (q) => q.eq('role', 'volunteer')),
+    rows('inventory_lots', 'item_type, unit, quantity, reserved_qty', (q) => q.in('phase', IN_STOCK_PHASES)),
+    rows('requests', 'kind', (q) => q.gte('created_at', since(30))),
+    rows('requests', 'fulfilled_at', (q) => q.gte('fulfilled_at', since(7))),
+    rows('requests', 'public_ref, kind, created_at', (q) => q.order('created_at', { ascending: false }).limit(5)),
+    rows('requests', 'public_ref, fulfilled_at', (q) => q.not('fulfilled_at', 'is', null).order('fulfilled_at', { ascending: false }).limit(5)),
+    rows('incidents', 'id, incident_type, created_at', (q) => q.order('created_at', { ascending: false }).limit(5)),
+    rows('volunteer_applications', 'id, full_name, review_status, reviewed_at', (q) => q.not('reviewed_at', 'is', null).order('reviewed_at', { ascending: false }).limit(5)),
+  ]);
 
-  const cat = new Map<string, number>();
-  (reqs.data ?? []).forEach((r: any) => cat.set(r.category, (cat.get(r.category) ?? 0) + 1));
+  // inventory: available = quantity - reserved, per item type
+  const stock = new Map<string, { available: number; unit: string }>();
+  lots.forEach((l) => {
+    const cur = stock.get(l.item_type) ?? { available: 0, unit: l.unit };
+    cur.available += (Number(l.quantity) || 0) - (Number(l.reserved_qty) || 0);
+    stock.set(l.item_type, cur);
+  });
+  const lowest = [...stock].filter(([, v]) => v.available < LOW_STOCK_THRESHOLD)
+    .sort((a, b) => a[1].available - b[1].available)[0];
+
+  const byKind = new Map<string, number>();
+  kinds.forEach((r) => byKind.set(r.kind, (byKind.get(r.kind) ?? 0) + 1));
 
   const days = Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - (6 - i));
-    return d;
+    const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - (6 - i)); return d;
   });
-  const fulfilledOverTime = days.map((d) => ({
-    label: d.toLocaleDateString('en-GB', { weekday: 'short' }),
-    value: (reqs.data ?? []).filter(
-      (r: any) => r.fulfilled_at && new Date(r.fulfilled_at).toDateString() === d.toDateString(),
-    ).length,
-  }));
+
+  const activity: (ActivityItem & { at: string })[] = [
+    ...newReqs.map((r) => ({ id: `n-${r.public_ref}`, at: r.created_at, href: '/requests', text: `New request — ${r.public_ref}, ${kindLabel(r.kind).toLowerCase()}` })),
+    ...doneReqs.map((r) => ({ id: `f-${r.public_ref}`, at: r.fulfilled_at, href: '/requests', text: `Request fulfilled — ${r.public_ref}` })),
+    ...incs.map((i) => ({ id: `i-${i.id}`, at: i.created_at, href: '/incidents', text: `Incident reported — ${humanize(i.incident_type)}` })),
+    ...apps.map((a) => ({ id: `a-${a.id}`, at: a.reviewed_at, href: '/volunteers', text: `Volunteer application ${humanize(a.review_status).toLowerCase()} — ${a.full_name}` })),
+  ].map((x) => ({ ...x, time: stamp(x.at) }));
+  activity.sort((a, b) => +new Date(b.at) - +new Date(a.at));
 
   return {
     stats: {
       totalRequests: total,
       totalRequestsChangePct: prevMonth ? Math.round(((lastMonth - prevMonth) / prevMonth) * 100) : 0,
       pendingRequests: pending,
-      needReviewToday: pending,
+      needReviewToday: pendingToday,
       approvedRequests: approved,
       fulfilledRequests: fulfilled,
       fulfilmentRatePct: total ? Math.round((fulfilled / total) * 100) : 0,
       activeVolunteers: volunteers,
-      volunteerCategories: 3,
-      availableInventory: invRows.reduce((s: number, r: any) => s + (r.quantity ?? 0), 0),
-      inventoryCategories: new Set(invRows.map((r: any) => r.category)).size,
-      activeAssignments: assignments,
-      driversEnRoute: assignments,
+      volunteerCategories: new Set(vTypes.map((v) => v.volunteer_type).filter(Boolean)).size,
+      availableInventory: Math.round([...stock.values()].reduce((s, v) => s + v.available, 0)),
+      inventoryCategories: stock.size,
+      activeAssignments: activeAsg,
+      driversEnRoute: enRoute,
       openIncidents: openInc,
-      urgentIncidents: urgentInc,
+      urgentIncidents: discrepancies,
     },
-    byCategory: [...cat].map(([label, value]) => ({ label, value })),
-    fulfilledOverTime,
-    activity: (log.data ?? []).map((r: any) => ({
-      id: String(r.id), time: hhmm(r.created_at), text: r.message, href: r.link ?? '/requests',
+    byCategory: [...byKind].map(([k, value]) => ({ label: kindLabel(k), value })),
+    fulfilledOverTime: days.map((d) => ({
+      label: d.toLocaleDateString('en-GB', { weekday: 'short' }),
+      value: fulfilledRows.filter((r) => new Date(r.fulfilled_at).toDateString() === d.toDateString()).length,
     })),
+    activity: activity.slice(0, 6),
     attention: {
-      quantityDiscrepancies: urgentInc,
-      lowStock: low
-        ? { item: low.item_name, available: low.quantity, threshold: low.low_stock_threshold, unit: low.unit ?? 'units' }
+      quantityDiscrepancies: discrepancies,
+      lowStock: lowest
+        ? { item: humanize(lowest[0]), available: Math.round(lowest[1].available), threshold: LOW_STOCK_THRESHOLD, unit: lowest[1].unit }
         : null,
     },
     updatedAt: new Date().toISOString(),
@@ -140,8 +160,8 @@ async function fetchLive(): Promise<DashboardData> {
   };
 }
 
-/** Live data when Supabase answers; demo data otherwise so the UI is always usable. */
 export async function getDashboardData(): Promise<DashboardData> {
+  if (!(await hasSession())) return { ...DEMO_DATA, updatedAt: new Date().toISOString() };
   try {
     return await fetchLive();
   } catch (err) {
