@@ -1,0 +1,33 @@
+name: CI
+on:
+  pull_request:
+  push:
+    branches: [develop, main]
+jobs:
+  admin:
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: apps/admin } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - run: npm install
+      - run: npm run build
+  mobile:
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: apps/mobile } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with: { channel: stable }
+      - run: '[ -d android ] || flutter create --platforms=android,ios . --org np.sahayogi --project-name sahayogi_mobile'
+      - run: flutter pub get
+      - run: flutter analyze
+      - run: flutter test
+  functions:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v1
+        with: { deno-version: v1.x }
+      - run: deno check supabase/functions/submit-request/index.ts

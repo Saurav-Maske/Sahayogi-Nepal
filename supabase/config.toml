@@ -1,0 +1,22 @@
+project_id = "sahayogi-nepal"
+
+[api]
+port = 54321
+schemas = ["public", "graphql_public"]
+
+[db]
+port = 54322
+major_version = 15
+
+[studio]
+port = 54323
+
+[auth]
+site_url = "http://localhost:5173"
+enable_signup = false
+
+[storage]
+file_size_limit = "5MiB"
+
+[functions.submit-request]
+verify_jwt = false
