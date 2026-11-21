@@ -1,7 +1,12 @@
-
 # Contract and backend changelog
 
 Newest first. Anything that changes a payload, table, function or seed behaviour gets a line here.
+
+## 2026-11-22 (migrations 000008 and 000009 rebuilt)
+
+- **Why:** `20261122000008_email_otp.sql` and `20261122000009_push_outbox.sql` were 0 bytes in `Sahayogi-Nepal-test.zip` (issue 13). Both were rebuilt from the code that depends on them (`_shared/otp.ts`, the auth functions, `send-push`) and from the entries below. **Not yet run against a database.** If the originals exist in Git or on a project that already applied them, keep the originals and discard these.
+- **000008:** `email_otps` (unique per email + purpose), `auth_attempts.kind` widened with `otp_send | otp_verify`, `volunteer_applications.email_verified_at`, `purge_email_otps()`, `revoke_user_sessions(uuid)`. Service role only.
+- **000009:** `push_outbox`, statement-level triggers on `assignments` (new offer, released back to pool), `_push_kick()` (pg_net + vault entries `push_function_url` and `push_secret`), `_push_enqueue_escalations()`, `_push_tick()`, `push_claim_batch(int)`, `push_recipients(uuid, text)`, pg_cron jobs `push-escalations` (every minute) and `purge-push-outbox` (daily). Service role only.
 
 ## 2026-11-22 (function privileges clean-up)
 
