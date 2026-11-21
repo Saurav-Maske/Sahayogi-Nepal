@@ -22,11 +22,11 @@ import InventoryDetailPage from "./pages/InventoryDetailPage";
 import InventoryMovementPage from "./pages/InventoryMovementPage";
 import InventoryTimelinePage from "./pages/InventoryTimelinePage";
 import InventoryMovementDetailPage from "./pages/InventoryMovementDetailPage";
+import LiveMapPage from "./pages/LiveMapPage";
 
 // Swap each PlaceholderPage for the real page as you build it.
 const PAGES: [path: string, title: string][] = [
   ["volunteers", "Volunteer Management"],
-  ["map", "Live Map"],
 ];
 
 export default function App() {
@@ -55,6 +55,7 @@ export default function App() {
           <Route path="inventory/movement/new" element={<InventoryMovementPage />} />
           <Route path="inventory/movements/:movementId" element={<InventoryMovementDetailPage />} />
           <Route path="inventory/:id" element={<InventoryDetailPage />} />
+          <Route path="map" element={<LiveMapPage />} />
           {PAGES.map(([path, title]) => (
             <Route key={path} path={path} element={<PlaceholderPage title={title} />} />
           ))}
