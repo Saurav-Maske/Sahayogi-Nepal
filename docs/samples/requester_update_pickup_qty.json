@@ -1,0 +1,36 @@
+{
+  "call": "supabase.rpc('requester_update_pickup_qty', { p_ref, p_token, p_items })  // anon allowed",
+  "request": {
+    "p_ref": "AB12CD34",
+    "p_token": "<tracking_token>",
+    "p_items": [
+      {
+        "item_id": "a1b2c3d4-0001-4000-8000-000000000001",
+        "qty": 30
+      }
+    ]
+  },
+  "response": {
+    "items": [
+      {
+        "id": "a1b2c3d4-0001-4000-8000-000000000001",
+        "item_type": "food",
+        "unit": "kg",
+        "approved_qty": 50,
+        "qty": 30
+      },
+      {
+        "id": "a1b2c3d4-0002-4000-8000-000000000002",
+        "item_type": "cloth",
+        "unit": "pcs",
+        "approved_qty": 20,
+        "qty": 20
+      }
+    ]
+  },
+  "errors": [
+    "not_found",
+    "invalid_state",
+    "invalid_items"
+  ]
+}

@@ -1,7 +1,8 @@
+t 
 
 # Sahayogi Nepal – Auth & Account API
 
-Owner: Person 2 (Rujan Dhamala, Aakash Thakur). Status: **v1 – auth layer**. Every change goes through a PR + a message in team chat.
+Owner: Peirson 2 (Rujan Dhamala, Aakash Thakur). Status: **v1 – auth layer**. Every change goes through a PR + a message in team chat.
 
 Base URL: `https://<project-ref>.supabase.co` (local: `http://127.0.0.1:54321`)
 Edge Functions: `POST {BASE}/functions/v1/<name>`
@@ -291,7 +292,7 @@ await supabase.functions.invoke('request-password-reset', body: {'email': email}
 
 ## 6. Demo accounts (local / demo project only)
 
-Created by `node --env-file=.env scripts/seed_demo.mjs` (or the users-only `scripts/seed_users.mjs`). For a hosted project see [`REMOTE-SEED.md`](REMOTE-SEED.md).
+Created by `node --env-file=.env scripts/seed_demo.mjs` (or the users-only `scripts/seed_users.mjs`). For a hosted project see [`REMOTE_SEED.md`](REMOTE_SEED.md).
 
 | Email                                | Role                 | Categories |
 | ------------------------------------ | -------------------- | ---------- |

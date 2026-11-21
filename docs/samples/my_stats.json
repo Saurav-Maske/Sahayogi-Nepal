@@ -1,0 +1,20 @@
+{
+  "call": "supabase.rpc('my_stats')",
+  "request": {},
+  "response": {
+    "claimed_total": 2,
+    "active": 0,
+    "completed": 1,
+    "disputed": 1,
+    "completed_last_30_days": 1,
+    "last_completed_at": "2026-11-22T09:00:00Z",
+    "completed_by_type": {
+      "pickup": 1
+    },
+    "declined_offers": 0
+  },
+  "errors": [
+    "unauthorized",
+    "forbidden"
+  ]
+}

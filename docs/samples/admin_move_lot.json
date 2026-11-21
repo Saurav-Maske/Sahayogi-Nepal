@@ -1,0 +1,25 @@
+{
+  "call": "supabase.rpc('admin_move_lot', { p_id, p_phase, p_qty, p_reason })  // partial move splits the lot",
+  "request": {
+    "p_id": "c0ffee00-1111-4222-8333-444455556666",
+    "p_phase": "ready_to_ship",
+    "p_qty": 15
+  },
+  "response": {
+    "source_lot_id": "c0ffee00-1111-4222-8333-444455556666",
+    "lot_id": "b7e1c9d2-3a4f-4b5c-8d6e-7f8091a2b3c4",
+    "from_phase": "received",
+    "phase": "ready_to_ship",
+    "qty": 15,
+    "split": true
+  },
+  "errors": [
+    "forbidden",
+    "invalid_phase",
+    "invalid_reason",
+    "not_found",
+    "invalid_transition",
+    "lot_reserved",
+    "invalid_qty"
+  ]
+}

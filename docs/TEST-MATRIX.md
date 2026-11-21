@@ -1,6 +1,6 @@
 # Test matrix (owner: Person 4, Rujan Dhamala and Aakash Thakur)
 
-Mark each cell: ✅ pass, ❌ fail, ⏳ blocked (RPC not built yet), blank = not run.
+Mark each cell: ✅ pass, ❌ fail, ⏳ blocked, blank = not run. All RPCs are built now (migrations `...000003` to `...000007`), so nothing is blocked on the backend.
 Run against the demo project after `seed_demo.mjs` and `seed_extra.mjs`. Reset with `reset_demo_remote.mjs` between rehearsals.
 
 | Test                  | Expected                                                                               | Needs                          | H24 | H30 | H36 | H42 |
@@ -10,14 +10,24 @@ Run against the demo project after `seed_demo.mjs` and `seed_extra.mjs`. Reset w
 | Volunteer eligibility | A: general; B: +transport; C: +healthcare                                              | `my_offers`                  |     |     |     |     |
 | 60 s escalation       | A-only offer opens to B and C after `escalate_at`                                    | `my_offers`                  |     |     |     |     |
 | Double accept         | Only one claim succeeds                                                                | `claim_assignment`           |     |     |     |     |
-| Donation pickup       | Donor can lower qty before OTP; confirmed qty lands in inventory as `received`       | `driver_verify_otp`          | ⏳  |     |     |     |
-| Delivery OTP          | Single-use, expires in 15 min, locks after 5 attempts, bound to assignment and purpose | `driver_verify_otp`          | ⏳  |     |     |     |
-| Short delivery        | Incident in admin queue; request not marked fully fulfilled                            | `requester_confirm_delivery` | ⏳  |     |     |     |
-| Map windows           | Pickup older than 6 h and fulfilled older than 12 h disappear                          | `map_markers`                | ⏳  |     |     |     |
+| Donation pickup       | Donor can lower qty before OTP; confirmed qty lands in inventory as `received`       | `driver_verify_otp`          |     |     |     |     |
+| Delivery OTP          | Single-use, expires in 15 min, locks after 5 attempts, bound to assignment and purpose | `driver_verify_otp`          |     |     |     |     |
+| Short delivery        | Incident in admin queue; request not marked fully fulfilled                            | `requester_confirm_delivery` |     |     |     |     |
+| Map windows           | Pickup older than 6 h and fulfilled older than 12 h disappear                          | `map_markers`                |     |     |     |     |
 | Document privacy      | Anon and non-admin cannot read `volunteer-docs` objects                              | live                           |     |     |     |     |
 | Stock concurrency     | Available never below 0 under parallel approvals                                       | `admin_approve_request`      |     |     |     |     |
-| Function privileges   | Only tracking, requester-OTP and map functions are anon-callable                       | revoke/grant migration         | ⏳  |     |     |     |
+| Function privileges   | Only `get_tracking`, the 3 `requester_*` functions and `map_markers` are anon-callable. **Known fail:** `is_admin`, `audit_row_hash` and some trigger/helper functions from the first migrations keep the default public execute right | revoke/grant migration         |     |     |     |     |
 | Audit chain           | `select * from verify_audit_chain()` returns no broken row                           | live                           |     |     |     |     |
+| Short-delivery dispute | Report opens one incident, assignment `disputed`, request `partially_fulfilled`; a second report returns `already_reported` | `requester_confirm_delivery` |     |     |     |     |
+| Incident resolution   | Dismiss puts request back to `fulfilled`; resolve keeps `partially_fulfilled`; closed incident cannot change | `admin_resolve_incident`   |     |     |     |     |
+| OTP wrong driver      | Another volunteer's `driver_verify_otp` returns `not_found`; a replayed code returns `invalid_state` | `driver_verify_otp`          |     |     |     |     |
+| OTP re-issue          | Asking again cancels the old code; the 11th request in an hour returns `too_many_requests`   | `requester_get_otp`          |     |     |     |     |
+| Tracking privacy      | Wrong ref or token is `not_found`; response has no phone or last name; location only while `en_route_*` | `get_tracking`               |     |     |     |     |
+| Skip OTP              | `update_assignment_state` to `delivered` / `picked_up` returns `otp_required`          | `update_assignment_state`    |     |     |     |     |
+| Stock after delivery  | Delivery OTP lowers lot quantity and reserved quantity by the reserved amount; lot becomes `consumed` at 0 | `driver_verify_otp`          |     |     |     |     |
+| Lot moves             | Partial move splits the lot; reserved stock cannot be moved; `adjusted` needs a reason | `admin_move_lot`             |     |     |     |     |
+| Audit timeline        | Pages by `next_before`; filter by action; non-admin gets `forbidden`                   | `admin_list_audit`           |     |     |     |     |
+| Admin-only RPCs       | Volunteer and anon calls to every `admin_*` RPC fail (`forbidden` / permission denied) | all `admin_*`                |     |     |     |     |
 
 ## Seed smoke checks (live now)
 
@@ -35,5 +45,7 @@ Run in the SQL Editor after seeding. Expected counts are for a clean demo projec
 | Audit demo rows            | `select count(*) from audit_logs where detail->>'demo' = 'true'`   | 7                                                |
 | Map windows (data only)    | requests with `picked_up_at` 2 h ago and 7 h ago both exist        | 1 inside 6 h, 1 outside                          |
 
-Role tests to add once RPCs land: run each RPC as anon, volunteer (A, A+B, A+C) and admin, and confirm the denied cases return `forbidden` or `not_eligible`.
+Run each RPC as anon, volunteer (A, A+B, A+C) and admin, and confirm the denied cases return `forbidden` or `not_eligible`.
+
+Local check (2026-11-22): migrations `...000001` to `...000007` apply cleanly in order on PostgreSQL 16 with PostGIS and stubbed Supabase roles/auth, and the flows above were exercised by hand (delivery with OTP lock and expiry, donation pickup with a lowered quantity, dispute and dismissal, lot split, audit paging, map markers). That was not the demo project, so the cells stay blank until someone runs them there.
 Postman: `postman/sahayogi.postman_collection.json`. Extend it with each new RPC and run the smoke set after every push.

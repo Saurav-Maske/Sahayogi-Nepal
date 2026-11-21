@@ -2,6 +2,20 @@
 
 Newest first. Anything that changes a payload, table, function or seed behaviour gets a line here.
 
+## 2026-11-22 (RPC parts 3 to 5)
+
+- **Migration `20261122000005_rpc_progress_otp_tracking.sql`:** `update_assignment_state` (forward-only), `driver_verify_otp` (15-minute expiry, 5-attempt lock, quantity-changed handling), `requester_get_otp`, `requester_update_pickup_qty`, `requester_confirm_delivery`, `get_tracking`, plus internal helpers `_request_id_by_token` and `_active_otp_assignment` (no client grant). The four requester RPCs and `get_tracking` are callable without signing in; the token hash is checked inside.
+- **Migration `20261122000006_rpc_map_volunteer.sql`:** `map_markers` (anon-callable, rounded to 2 decimals, pickup layer 6 h, fulfilled layer 12 h), `admin_map_markers`, `update_my_location`, `my_stats`, `register_device_token`.
+- **Migration `20261122000007_rpc_inventory_incidents.sql`:** `admin_import_stock`, `admin_move_lot` (partial moves split the lot), `admin_list_incidents`, `admin_resolve_incident`, `admin_list_audit` (keyset pagination, optional action/entity filter). Every function checks `is_admin()` first.
+- **Behaviour:** a wrong OTP does not raise an error. `driver_verify_otp` returns `{ ok: false, reason }` (`invalid_otp | otp_locked | otp_expired | otp_used | otp_not_issued | quantity_changed`) so the attempt counter is not rolled back. Wrong ref or token on the requester RPCs is always `not_found`.
+- **Behaviour:** each `requester_get_otp` call issues a new code and cancels the previous live one (only a hash is stored, so a code cannot be shown twice). Limit: 10 codes per assignment and purpose per hour.
+- **Behaviour:** `delivery -> delivered` and `pickup -> picked_up` cannot be set with `update_assignment_state` (error `otp_required`); only `driver_verify_otp` does that. Delivery OTP dispatches the reserved stock; pickup OTP adds `received` lots from the confirmed quantities.
+- **Behaviour:** a short-delivery report sets the assignment to `disputed` and the request to `partially_fulfilled`. Dismissing the incident puts the request back to `fulfilled`; resolving it keeps `partially_fulfilled`.
+- **Audit:** new actions `otp_issued`, `otp_locked`, `donor_qty_changed`, `pickup_confirmed`, `delivery_completed`, `assignment_state_changed`, `incident_opened`, `incident_under_review | resolved | dismissed`, `stock_imported`, `lot_moved`. `update_my_location` is not audited on purpose.
+- **Contract:** v1.2. Planned RPC list replaced by LIVE sections; one `docs/samples/<rpc>.json` per new RPC added. Only push notifications and the `routes` table remain planned.
+- **Docs:** README status updated; `REMOTE-SEED.md` links corrected to `REMOTE_SEED.md`.
+- **Known:** the admin app still calls `admin_review_request`, `admin_set_accepted_qty` and `admin_review_volunteer`, which do not exist. The live names are `admin_approve_request` and `admin_decline_request`; there is no volunteer-review or accepted-quantity RPC yet (volunteers go through `approve-volunteer`).
+
 ## 2026-11-22 (RPC parts 1 and 2)
 
 - **Migration `20261122000003_rpc_admin_requests.sql`:** `admin_list_requests`, `admin_approve_request` (FIFO stock reservation under row locks, all-or-nothing), `admin_decline_request`, `admin_dashboard_counts`. Granted to `authenticated`, `is_admin()` checked inside.

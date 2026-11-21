@@ -1,0 +1,27 @@
+{
+  "call": "supabase.rpc('requester_confirm_delivery', { p_ref, p_token, p_full, p_note, p_shortfall })  // anon allowed; shown: short delivery. With p_full true the response is { confirmed: true, request_status }",
+  "request": {
+    "p_ref": "AB12CD34",
+    "p_token": "<tracking_token>",
+    "p_full": false,
+    "p_note": "Only 20 litres arrived",
+    "p_shortfall": [
+      {
+        "item_id": "a1b2c3d4-0001-4000-8000-000000000001",
+        "received_qty": 20
+      }
+    ]
+  },
+  "response": {
+    "incident_id": "e5f6a7b8-1234-4abc-9def-0a1b2c3d4e5f",
+    "request_status": "partially_fulfilled",
+    "confirmed": false
+  },
+  "errors": [
+    "not_found",
+    "invalid_items",
+    "invalid_state",
+    "invalid_note",
+    "already_reported"
+  ]
+}

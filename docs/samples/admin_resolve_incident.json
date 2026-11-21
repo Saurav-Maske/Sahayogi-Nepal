@@ -1,0 +1,24 @@
+{
+  "call": "supabase.rpc('admin_resolve_incident', { p_id, p_status, p_resolution, p_notes })",
+  "request": {
+    "p_id": "e5f6a7b8-1234-4abc-9def-0a1b2c3d4e5f",
+    "p_status": "dismissed",
+    "p_resolution": "Driver photo proves delivery",
+    "p_notes": "Checked with the driver"
+  },
+  "response": {
+    "id": "e5f6a7b8-1234-4abc-9def-0a1b2c3d4e5f",
+    "status": "dismissed",
+    "resolution": "Driver photo proves delivery",
+    "admin_notes": "Checked with the driver",
+    "request_status": "fulfilled"
+  },
+  "errors": [
+    "forbidden",
+    "invalid_status",
+    "invalid_resolution",
+    "invalid_note",
+    "not_found",
+    "invalid_state"
+  ]
+}
