@@ -27,9 +27,12 @@ interface AuthState {
   loading: boolean;
   signIn: (email: string, password: string) => Promise<string | null>; // returns an error message or null
   signOut: () => Promise<void>;
+  devBypassAvailable: boolean; // dev only: VITE_DEV_BYPASS_AUTH=true
+  enterDevMode: () => void;
 }
 
 const BYPASS_PROFILE: Profile = { full_name: 'Dev Admin', role: ADMIN_ROLE };
+const BYPASS_OFF_KEY = 'dev-bypass-off';
 
 const AuthContext = createContext<AuthState | null>(null);
 
@@ -39,6 +42,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [profileError, setProfileError] = useState<string | null>(null);
   const [profileUid, setProfileUid] = useState<string | null>(null); // which user the profile belongs to
+  // bypass can be switched off with Sign out and back on from the login page
+  const [bypassOn, setBypassOn] = useState(() => sessionStorage.getItem(BYPASS_OFF_KEY) !== '1');
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -85,17 +90,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return /invalid login/i.test(error.message) ? 'Email or password is incorrect.' : error.message;
     },
     signOut: async () => { await supabase.auth.signOut(); },
+    devBypassAvailable: DEV_BYPASS,
+    enterDevMode: () => { sessionStorage.removeItem(BYPASS_OFF_KEY); setBypassOn(true); },
   }), [session, profile, profileError, sessionLoading, uid, profileUid]);
 
-  const value: AuthState = DEV_BYPASS
+  const value: AuthState = DEV_BYPASS && bypassOn
     ? {
+        ...realValue,
         session: BYPASS_SESSION,
         profile: BYPASS_PROFILE,
         profileError: null,
         isAdmin: true,
         loading: false,
-        signIn: async () => null,
-        signOut: async () => {},
+        signOut: async () => {
+          sessionStorage.setItem(BYPASS_OFF_KEY, '1');
+          setBypassOn(false);
+        },
       }
     : realValue;
 

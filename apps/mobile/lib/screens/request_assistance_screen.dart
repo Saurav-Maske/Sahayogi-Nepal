@@ -1,0 +1,589 @@
+import 'package:material_ui/material_ui.dart';
+
+import '../core/app_colors.dart';
+import '../widgets/community_map_preview.dart';
+import 'volunteer_login_screen.dart';
+
+class RequestAssistanceScreen extends StatefulWidget {
+  const RequestAssistanceScreen({super.key});
+
+  @override
+  State<RequestAssistanceScreen> createState() =>
+      _RequestAssistanceScreenState();
+}
+
+class _RequestAssistanceScreenState extends State<RequestAssistanceScreen> {
+  final _formKey = GlobalKey<FormState>();
+  final _contactController = TextEditingController();
+  final _affectedPeopleController = TextEditingController();
+  final List<TextEditingController> _numberControllers = [
+    TextEditingController(),
+  ];
+  final List<String?> _assistanceTypes = [null];
+  final List<bool> _typeErrors = [false];
+  String? _location;
+  bool _locationError = false;
+
+  static const _assistanceOptions = [
+    'Health Worker',
+    'Transport Manpower',
+    'Human Manpower',
+  ];
+
+  static const _locations = [
+    'Melamchi, Ward 11',
+    'Kathmandu, Ward 5',
+    'Balaju, Ward 16',
+    'Boudha, Ward 6',
+  ];
+
+  @override
+  void dispose() {
+    _contactController.dispose();
+    _affectedPeopleController.dispose();
+    for (final controller in _numberControllers) {
+      controller.dispose();
+    }
+    super.dispose();
+  }
+
+  void _addAssistanceType() => setState(() {
+        _assistanceTypes.add(null);
+        _typeErrors.add(false);
+        _numberControllers.add(TextEditingController());
+      });
+
+  void _removeAssistanceType(int index) {
+    if (_assistanceTypes.length <= 1) return;
+    setState(() {
+      _assistanceTypes.removeAt(index);
+      _typeErrors.removeAt(index);
+      _numberControllers.removeAt(index).dispose();
+    });
+  }
+
+  Future<void> _chooseValue({
+    required String title,
+    required List<String> values,
+    required String selectedValue,
+    required ValueChanged<String> onSelected,
+  }) async {
+    final selected = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: appPaper,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        child: ListView(
+          shrinkWrap: true,
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Text(
+                title,
+                style: const TextStyle(
+                  color: appNavy,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            ...values.map(
+              (value) => ListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text(value),
+                trailing: value == selectedValue
+                    ? const Icon(Icons.check_rounded, color: appTeal)
+                    : null,
+                onTap: () => Navigator.of(context).pop(value),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (selected != null && mounted) onSelected(selected);
+  }
+
+  String? _validatePositiveInteger(String? value, String fieldName) {
+    final number = int.tryParse(value?.trim() ?? '');
+    if (number == null || number < 1) return 'Enter a valid $fieldName';
+    return null;
+  }
+
+  void _submitRequest() {
+    final fieldsValid = _formKey.currentState!.validate();
+    final typesValid = _assistanceTypes.every((type) => type != null);
+    final locationValid = _location != null;
+    setState(() {
+      for (var i = 0; i < _assistanceTypes.length; i++) {
+        _typeErrors[i] = _assistanceTypes[i] == null;
+      }
+      _locationError = !locationValid;
+    });
+    if (!fieldsValid || !typesValid || !locationValid) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Assistance request submission is not connected yet.'),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+        backgroundColor: appPaper,
+        body: SafeArea(
+          bottom: false,
+          child: Form(
+            key: _formKey,
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(24, 12, 24, 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      IconButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints.tightFor(
+                          width: 32,
+                          height: 40,
+                        ),
+                        icon: const Icon(
+                          Icons.arrow_back_rounded,
+                          color: appNavy,
+                          size: 22,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      const Expanded(
+                        child: Text(
+                          'Request Assistance',
+                          style: TextStyle(
+                            color: appNavy,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                      const Icon(
+                        Icons.verified_user_outlined,
+                        color: appTeal,
+                        size: 20,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                  const Text(
+                    'What kind of human\nassistance do you need?',
+                    style: TextStyle(
+                      color: appNavy,
+                      fontSize: 24,
+                      height: 1.2,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'A few details help us match you with nearby\nsupport.',
+                    style: TextStyle(
+                      color: appMuted,
+                      fontSize: 14,
+                      height: 1.4,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  const Row(
+                    children: [
+                      Icon(
+                        Icons.verified_user_outlined,
+                        color: appTeal,
+                        size: 17,
+                      ),
+                      SizedBox(width: 8),
+                      Text(
+                        'Private details · Verified community network',
+                        style: TextStyle(color: appTeal, fontSize: 11),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 26),
+                  _fieldLabel('Contact number'),
+                  const SizedBox(height: 8),
+                  _textField(
+                    controller: _contactController,
+                    hint: '+977 9841 234 567',
+                    keyboardType: TextInputType.phone,
+                    validator: (value) {
+                      final contact = value?.trim() ?? '';
+                      if (contact.isEmpty) return 'Enter a contact number';
+                      if (contact.replaceAll(RegExp(r'\D'), '').length < 7) {
+                        return 'Enter a valid contact number';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 26),
+                  ...List.generate(
+                    _assistanceTypes.length,
+                    (index) => Padding(
+                      padding: EdgeInsets.only(
+                        bottom: index == _assistanceTypes.length - 1 ? 0 : 18,
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: _fieldLabel('Human Assistance type'),
+                              ),
+                              if (_assistanceTypes.length > 1)
+                                IconButton(
+                                  onPressed: () => _removeAssistanceType(index),
+                                  visualDensity: VisualDensity.compact,
+                                  tooltip: 'Remove assistance type',
+                                  icon: const Icon(
+                                    Icons.remove_circle_outline_rounded,
+                                    color: appMuted,
+                                    size: 19,
+                                  ),
+                                ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          _choiceField(
+                            value: _assistanceTypes[index] ?? 'Select a type',
+                            error: _typeErrors[index],
+                            onTap: () => _chooseValue(
+                              title: 'Human Assistance type',
+                              values: _assistanceOptions,
+                              selectedValue: _assistanceTypes[index] ?? '',
+                              onSelected: (value) => setState(() {
+                                _assistanceTypes[index] = value;
+                                _typeErrors[index] = false;
+                              }),
+                            ),
+                          ),
+                          if (_typeErrors[index]) ...[
+                            const SizedBox(height: 6),
+                            const Text(
+                              'Choose an assistance type.',
+                              style: TextStyle(
+                                color: Colors.redAccent,
+                                fontSize: 11,
+                              ),
+                            ),
+                          ],
+                          const SizedBox(height: 18),
+                          _fieldLabel('Required Number'),
+                          const SizedBox(height: 8),
+                          _textField(
+                            controller: _numberControllers[index],
+                            hint: 'e.g. 8',
+                            keyboardType: TextInputType.number,
+                            validator: (value) =>
+                                _validatePositiveInteger(value, 'number'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton.icon(
+                      onPressed: _addAssistanceType,
+                      style: TextButton.styleFrom(
+                        foregroundColor: appTeal,
+                        padding: EdgeInsets.zero,
+                        minimumSize: const Size(0, 36),
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      icon: const Icon(Icons.add_rounded, size: 20),
+                      label: const Text(
+                        'Add another assistance type',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  const Text(
+                    'Food · Drinking Water · Medicine\nClothing · Temporary Shelter',
+                    style: TextStyle(
+                      color: appMuted,
+                      fontSize: 12,
+                      height: 1.5,
+                    ),
+                  ),
+                  const SizedBox(height: 22),
+                  const Text(
+                    'Where is help needed?',
+                    style: TextStyle(
+                      color: appNavy,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  const CommunityMapPreview(height: 66),
+                  const SizedBox(height: 18),
+                  _choiceField(
+                    value: _location ?? 'Choose a location',
+                    error: _locationError,
+                    leading: const Icon(
+                      Icons.location_on_outlined,
+                      color: appTeal,
+                      size: 20,
+                    ),
+                    onTap: () => _chooseValue(
+                      title: 'Choose a location',
+                      values: _locations,
+                      selectedValue: _location ?? '',
+                      onSelected: (value) => setState(() {
+                        _location = value;
+                        _locationError = false;
+                      }),
+                    ),
+                  ),
+                  if (_locationError) ...[
+                    const SizedBox(height: 6),
+                    const Text(
+                      'Choose a location for the request.',
+                      style: TextStyle(color: Colors.redAccent, fontSize: 11),
+                    ),
+                  ],
+                  const SizedBox(height: 18),
+                  _fieldLabel('Estimated number of affected people'),
+                  const SizedBox(height: 8),
+                  _textField(
+                    controller: _affectedPeopleController,
+                    hint: 'e.g. 8 people',
+                    keyboardType: TextInputType.number,
+                    validator: (value) =>
+                        _validatePositiveInteger(value, 'number of people'),
+                  ),
+                  const SizedBox(height: 24),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 52,
+                    child: FilledButton.icon(
+                      onPressed: _submitRequest,
+                      iconAlignment: IconAlignment.end,
+                      icon: const Icon(Icons.arrow_forward_rounded, size: 20),
+                      label: const Text('Submit request'),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: appNavy,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(15),
+                        ),
+                        textStyle: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        bottomNavigationBar: _assistanceNavigationBar(context),
+      );
+
+  Widget _fieldLabel(String text) => Text(
+        text,
+        style: const TextStyle(
+          color: Color(0xFF263746),
+          fontSize: 12,
+          fontWeight: FontWeight.w500,
+        ),
+      );
+
+  Widget _choiceField({
+    required String value,
+    required VoidCallback onTap,
+    Widget? leading,
+    bool error = false,
+  }) =>
+      Material(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(14),
+          child: Container(
+            width: double.infinity,
+            height: 50,
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            decoration: BoxDecoration(
+              border: Border.all(
+                color: error ? Colors.redAccent : const Color(0xFFE0E6EC),
+              ),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Row(
+              children: [
+                if (leading != null) ...[
+                  leading,
+                  const SizedBox(width: 10),
+                ],
+                Expanded(
+                  child: Text(
+                    value,
+                    style: const TextStyle(color: appMuted, fontSize: 14),
+                  ),
+                ),
+                const Icon(
+                  Icons.chevron_right_rounded,
+                  color: appMuted,
+                  size: 22,
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+
+  Widget _textField({
+    required TextEditingController controller,
+    required String hint,
+    required String? Function(String?) validator,
+    TextInputType keyboardType = TextInputType.text,
+  }) =>
+      TextFormField(
+        controller: controller,
+        keyboardType: keyboardType,
+        validator: validator,
+        style: const TextStyle(color: appNavy, fontSize: 14),
+        decoration: InputDecoration(
+          hintText: hint,
+          hintStyle: const TextStyle(color: appMuted, fontSize: 13),
+          filled: true,
+          fillColor: Colors.white,
+          isDense: true,
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 14, vertical: 15),
+          suffixIcon: const Icon(
+            Icons.chevron_right_rounded,
+            color: appMuted,
+            size: 22,
+          ),
+          errorStyle: const TextStyle(fontSize: 11),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: const BorderSide(color: Color(0xFFE0E6EC)),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: const BorderSide(color: Color(0xFFE0E6EC)),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: const BorderSide(color: appTeal, width: 1.4),
+          ),
+          errorBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: const BorderSide(color: Colors.redAccent),
+          ),
+          focusedErrorBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: const BorderSide(color: Colors.redAccent),
+          ),
+        ),
+      );
+}
+
+Widget _assistanceNavigationBar(BuildContext context) => Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(top: BorderSide(color: Color(0xFFE0E6EC))),
+      ),
+      child: SafeArea(
+        top: false,
+        child: SizedBox(
+          height: 68,
+          child: Row(
+            children: [
+              _AssistanceNavigationItem(
+                icon: Icons.home_outlined,
+                label: 'Home',
+                selected: false,
+                onTap: () => Navigator.of(context).popUntil(
+                  (route) => route.isFirst,
+                ),
+              ),
+              const _AssistanceNavigationItem(
+                icon: Icons.map_outlined,
+                label: 'Explore',
+                selected: false,
+              ),
+              const _AssistanceNavigationItem(
+                icon: Icons.inventory_2_outlined,
+                label: 'Requests',
+                selected: true,
+              ),
+              _AssistanceNavigationItem(
+                icon: Icons.person_outline_rounded,
+                label: 'Profile',
+                selected: false,
+                onTap: () => openVolunteerLogin(context),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+class _AssistanceNavigationItem extends StatelessWidget {
+  const _AssistanceNavigationItem({
+    required this.icon,
+    required this.label,
+    required this.selected,
+    this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final bool selected;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) => Expanded(
+        child: InkWell(
+          onTap: onTap,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 160),
+                width: 54,
+                height: 27,
+                decoration: BoxDecoration(
+                  color: selected
+                      ? const Color(0xFFE7F0F4)
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                child: Icon(icon, size: 21, color: appNavy),
+              ),
+              const SizedBox(height: 3),
+              Text(
+                label,
+                style: TextStyle(
+                  color: appNavy,
+                  fontSize: 10,
+                  fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+}

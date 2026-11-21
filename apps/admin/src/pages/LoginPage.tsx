@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import '../styles/login.css';
 
 export default function LoginPage() {
-  const { session, isAdmin, loading, signIn } = useAuth();
+  const { session, isAdmin, loading, signIn, devBypassAvailable, enterDevMode } = useAuth();
   const location = useLocation();
   const from = (location.state as { from?: string } | null)?.from ?? '/';
 
@@ -55,6 +55,12 @@ export default function LoginPage() {
             disabled={submitting || !email || !password}>
             {submitting ? 'Signing in…' : 'Sign in'}
           </button>
+
+          {devBypassAvailable && (
+            <button type="button" className="btn auth-submit" onClick={enterDevMode}>
+              Continue as Dev Admin (dev only)
+            </button>
+          )}
         </form>
       </section>
     </div>

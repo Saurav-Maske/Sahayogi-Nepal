@@ -2,6 +2,10 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../core/app_colors.dart';
+import 'donate_resources_screen.dart';
+import 'request_assistance_screen.dart';
+import 'request_help_screen.dart';
+import 'volunteer_login_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -16,6 +20,34 @@ class _HomeScreenState extends State<HomeScreen> {
   void _showComingSoon() {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('This section is coming soon.')),
+    );
+  }
+
+  void _openVolunteerLogin() {
+    openVolunteerLogin(context);
+  }
+
+  void _openRequestHelp() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => const RequestHelpScreen(),
+      ),
+    );
+  }
+
+  void _openRequestAssistance() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => const RequestAssistanceScreen(),
+      ),
+    );
+  }
+
+  void _openDonateResources() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => const DonateResourcesScreen(),
+      ),
     );
   }
 
@@ -47,7 +79,7 @@ class _HomeScreenState extends State<HomeScreen> {
             child: SizedBox(
               height: 44,
               child: SvgPicture.asset(
-                '../public/images/HorizontalLogo.svg',
+                'assets/images/HorizontalLogo.svg',
                 fit: BoxFit.contain,
                 alignment: Alignment.centerLeft,
                 semanticsLabel: 'Sahayogi Nepal',
@@ -91,9 +123,10 @@ class _HomeScreenState extends State<HomeScreen> {
           borderRadius: BorderRadius.circular(18),
         ),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             const Row(
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Icon(Icons.verified_user_outlined, color: appGold, size: 20),
                 SizedBox(width: 10),
@@ -111,6 +144,7 @@ class _HomeScreenState extends State<HomeScreen> {
             const SizedBox(height: 12),
             const Text(
               'You’re not alone.\nLet’s find you support.',
+              textAlign: TextAlign.center,
               style: TextStyle(
                 color: Colors.white,
                 fontSize: 24,
@@ -122,6 +156,7 @@ class _HomeScreenState extends State<HomeScreen> {
             const SizedBox(height: 10),
             const Text(
               'Food, water, medicine and a safer place.',
+              textAlign: TextAlign.center,
               style: TextStyle(
                 color: Color(0xFFD1DDE5),
                 fontSize: 13,
@@ -132,7 +167,7 @@ class _HomeScreenState extends State<HomeScreen> {
               width: double.infinity,
               height: 52,
               child: FilledButton(
-                onPressed: _showComingSoon,
+                onPressed: _openRequestHelp,
                 style: FilledButton.styleFrom(
                   backgroundColor: appGold,
                   foregroundColor: appNavy,
@@ -163,7 +198,7 @@ class _HomeScreenState extends State<HomeScreen> {
             child: _ActionCard(
               icon: Icons.inventory_2_outlined,
               label: 'Request\nAssistance',
-              onTap: _showComingSoon,
+              onTap: _openRequestAssistance,
             ),
           ),
           const SizedBox(width: 10),
@@ -171,7 +206,7 @@ class _HomeScreenState extends State<HomeScreen> {
             child: _ActionCard(
               icon: Icons.favorite_border_rounded,
               label: 'Donate\nResources',
-              onTap: _showComingSoon,
+              onTap: _openDonateResources,
             ),
           ),
           const SizedBox(width: 10),
@@ -179,7 +214,7 @@ class _HomeScreenState extends State<HomeScreen> {
             child: _ActionCard(
               icon: Icons.people_outline_rounded,
               label: 'Become a\nVolunteer',
-              onTap: _showComingSoon,
+              onTap: _openVolunteerLogin,
             ),
           ),
         ],
@@ -218,7 +253,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   icon: Icons.person_outline_rounded,
                   label: 'Profile',
                   selected: _selectedTab == 3,
-                  onTap: () => setState(() => _selectedTab = 3),
+                  onTap: _openVolunteerLogin,
                 ),
               ],
             ),
