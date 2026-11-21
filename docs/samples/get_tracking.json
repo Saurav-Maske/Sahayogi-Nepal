@@ -1,0 +1,49 @@
+{
+  "call": "supabase.rpc('get_tracking', { p_ref, p_token })  // anon allowed",
+  "request": {
+    "p_ref": "AB12CD34",
+    "p_token": "<tracking_token from submit-request>"
+  },
+  "response": {
+    "public_ref": "AB12CD34",
+    "kind": "resource_request",
+    "status": "in_progress",
+    "urgency": "high",
+    "decline_reason": null,
+    "created_at": "2026-11-22T06:00:00Z",
+    "approved_at": "2026-11-22T06:05:00Z",
+    "picked_up_at": null,
+    "fulfilled_at": null,
+    "otp_purpose": "delivery",
+    "can_update_pickup_qty": false,
+    "incident_status": null,
+    "items": [
+      {
+        "id": "a1b2c3d4-0001-4000-8000-000000000001",
+        "item_type": "drinking_water",
+        "unit": "litre",
+        "requested_qty": 40,
+        "approved_qty": 40,
+        "donor_qty": null,
+        "confirmed_qty": null
+      }
+    ],
+    "assignments": [
+      {
+        "assignment_type": "delivery",
+        "state": "en_route_to_destination",
+        "volunteer_first_name": "Driver",
+        "accepted_at": "2026-11-22T06:17:00Z",
+        "completed_at": null,
+        "location": {
+          "lat": 27.705,
+          "lng": 85.321,
+          "updated_at": "2026-11-22T06:31:00Z"
+        }
+      }
+    ]
+  },
+  "errors": [
+    "not_found"
+  ]
+}

@@ -268,7 +268,7 @@
           ]
         },
         {
-          "name": "Forgot password",
+          "name": "Forgot password 1 - email me a code",
           "request": {
             "method": "POST",
             "header": [
@@ -296,7 +296,7 @@
                 "request-password-reset"
               ]
             },
-            "description": "Local mail shows up in Inbucket: http://127.0.0.1:54324"
+            "description": "Always 200, same body for unknown emails. Code is valid 10 min. Local without Gmail: set OTP_DEV_LOG=true in supabase/functions/.env and read the code in the `supabase functions serve` terminal. Put it into the environment variable reset_otp."
           },
           "event": [
             {
@@ -306,6 +306,137 @@
                 "exec": [
                   "pm.test('status 200', () => pm.response.to.have.status(200));",
                   "console.log(pm.response.text());"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Forgot password 2 - verify code",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{volunteer_email}}\",\n  \"otp\": \"{{reset_otp}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/verify-reset-otp",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "verify-reset-otp"
+              ]
+            },
+            "description": "Set reset_otp in the environment first. A wrong code returns 400 invalid_otp with attempts_left; the 5th wrong code is 429 otp_locked."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const j = pm.response.json();",
+                  "if (j.data) pm.environment.set('reset_token', j.data.reset_token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Forgot password 3 - set new password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{volunteer_email}}\",\n  \"reset_token\": \"{{reset_token}}\",\n  \"new_password\": \"{{new_password}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/reset-password",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "reset-password"
+              ]
+            },
+            "description": "Uses reset_token from step 2 (single use, 10 min). new_password needs 10+ chars with upper, lower, digit and symbol. Sets the password of the demo user, so use the same value as DEMO_PASSWORD to keep the other requests working."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Forgot password - replay token (must be 400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{volunteer_email}}\",\n  \"reset_token\": \"{{reset_token}}\",\n  \"new_password\": \"{{new_password}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/reset-password",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "reset-password"
+              ]
+            },
+            "description": "Run right after step 3: the token is already spent."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 400 invalid_token', () => { pm.response.to.have.status(400); pm.expect(pm.response.json().error.code).to.eql('invalid_token'); });"
                 ]
               }
             }
@@ -378,7 +509,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"kind\": \"donation_offer\",\n  \"requester_name\": \"Postman Donor\",\n  \"requester_phone\": \"9812345678\",\n  \"lat\": 28.2096,\n  \"lng\": 83.9856,\n  \"items\": [\n    {\n      \"item_type\": \"cloth\",\n      \"qty\": 40,\n      \"unit\": \"piece\"\n    }\n  ]\n}"
+              "raw": "{\n  \"kind\": \"donation_offer\",\n  \"requester_name\": \"Postman Donor\",\n  \"requester_phone\": \"9812345678\",\n  \"lat\": 27.6588,\n  \"lng\": 85.3247,\n  \"items\": [\n    {\n      \"item_type\": \"cloth\",\n      \"qty\": 40,\n      \"unit\": \"piece\"\n    }\n  ]\n}"
             },
             "url": {
               "raw": "{{base_url}}/functions/v1/submit-request",
@@ -592,6 +723,95 @@
       "name": "3 - Volunteer application",
       "item": [
         {
+          "name": "0a. Send sign-up code",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"postman.driver@example.com\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/send-signup-otp",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "send-signup-otp"
+              ]
+            },
+            "description": "Code goes to the email (local without Gmail: printed in the functions serve terminal when OTP_DEV_LOG=true). Put it into signup_otp. A second call within 60 s is 429 resend_too_soon."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "console.log(pm.response.text());"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "0b. Verify sign-up code",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"postman.driver@example.com\",\n  \"otp\": \"{{signup_otp}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/verify-signup-otp",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "verify-signup-otp"
+              ]
+            },
+            "description": "Stores email_verification_token (valid 30 min, single use) for step 2."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const j = pm.response.json();",
+                  "if (j.data) pm.environment.set('email_verification_token', j.data.email_verification_token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
           "name": "1. Get upload URLs (driver)",
           "request": {
             "method": "POST",
@@ -653,7 +873,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"full_name\": \"Postman Driver\",\n  \"email\": \"postman.driver@example.com\",\n  \"phone\": \"9801112233\",\n  \"volunteer_type\": \"driver\",\n  \"citizenship_no\": \"12-34-56-78901\",\n  \"citizenship_photo_path\": \"{{citizenship_path}}\",\n  \"license_no\": \"01-06-00123456\",\n  \"license_photo_path\": \"{{license_path}}\"\n}"
+              "raw": "{\n  \"full_name\": \"Postman Driver\",\n  \"email\": \"postman.driver@example.com\",\n  \"email_verification_token\": \"{{email_verification_token}}\",\n  \"phone\": \"9801112233\",\n  \"volunteer_type\": \"driver\",\n  \"citizenship_no\": \"12-34-56-78901\",\n  \"citizenship_photo_path\": \"{{citizenship_path}}\",\n  \"license_no\": \"01-06-00123456\",\n  \"license_photo_path\": \"{{license_path}}\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/functions/v1/submit-volunteer-application",
@@ -666,7 +886,7 @@
                 "submit-volunteer-application"
               ]
             },
-            "description": ""
+            "description": "Needs email_verification_token from step 0b. Without it: 403 email_not_verified."
           },
           "event": [
             {
@@ -721,6 +941,49 @@
                 "exec": [
                   "pm.test('status 400', () => pm.response.to.have.status(400));",
                   "console.log(pm.response.text());"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Submit without email token (must be 403)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"full_name\": \"No Token\",\n  \"email\": \"notoken@example.com\",\n  \"phone\": \"9801112244\",\n  \"volunteer_type\": \"manpower\",\n  \"citizenship_no\": \"12-34-56-78901\",\n  \"citizenship_photo_path\": \"docs/00000000-0000-0000-0000-000000000000.jpg\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/submit-volunteer-application",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "submit-volunteer-application"
+              ]
+            },
+            "description": "The token check comes before any database write."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 403 email_not_verified', () => { pm.response.to.have.status(403); pm.expect(pm.response.json().error.code).to.eql('email_not_verified'); });"
                 ]
               }
             }

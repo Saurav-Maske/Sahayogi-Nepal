@@ -20,6 +20,16 @@ export const anonClient = () =>
 export const EMAIL_RE = /^[^\s@]{1,64}@[^\s@]+\.[^\s@]{2,}$/;
 export const NEPAL_PHONE_RE = /^(\+977)?9[6-8][0-9]{8}$/; // same rule as submit_request in the playbook
 
+// Same rule as config.toml (minimum_password_length = 10, lower_upper_letters_digits_symbols). Returns a message or null.
+export function passwordProblem(p: string): string | null {
+  if (p.length < 10) return "Password must be at least 10 characters.";
+  if (p.length > 128) return "Password must be at most 128 characters.";
+  if (!/[a-z]/.test(p) || !/[A-Z]/.test(p) || !/[0-9]/.test(p) || !/[^A-Za-z0-9]/.test(p)) {
+    return "Password needs a lowercase letter, an uppercase letter, a number and a symbol.";
+  }
+  return null;
+}
+
 export async function sha256(s: string): Promise<string> {
   const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
   return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, "0")).join("");
@@ -46,31 +56,35 @@ export async function requireUser(req: Request) {
   return error || !data.user ? null : { user: data.user, token };
 }
 
-export async function requireDriver(req: Request) {
+// One profile lookup shared by every role guard. Suspended accounts never pass.
+// NOTE: `role` is only 'volunteer' | 'admin'. Driver / doctor / general are CATEGORIES (A, B, C) on a volunteer.
+async function activeProfile(req: Request) {
   const u = await requireUser(req);
   if (!u) return null;
   const { data: p } = await adminClient().from("profiles")
-    .select("id, role, account_status").eq("id", u.user.id).maybeSingle();
-  return p && p.role.includes("B") && p.account_status === "active" ? { id: u.user.id } : null;
+    .select("id, role, categories, account_status").eq("id", u.user.id).maybeSingle();
+  return p && p.account_status === "active" ? p : null;
+}
+
+const hasCategory = (p: { role: string; categories: string[] | null }, c: "A" | "B" | "C") =>
+  p.role === "volunteer" && (p.categories ?? []).includes(c);
+
+export async function requireDriver(req: Request) {
+  const p = await activeProfile(req);
+  return p && hasCategory(p, "B") ? { id: p.id } : null;
 }
 
 export async function requireDoctor(req: Request) {
-  const u = await requireUser(req);
-  if (!u) return null;
-  const { data: p } = await adminClient().from("profiles")
-    .select("id, role, account_status").eq("id", u.user.id).maybeSingle();
-  return p && p.role.includes("C") && p.account_status === "active" ? { id: u.user.id } : null;
+  const p = await activeProfile(req);
+  return p && hasCategory(p, "C") ? { id: p.id } : null;
 }
 
 export async function requireAdmin(req: Request) {
-  const u = await requireUser(req);
-  if (!u) return null;
-  const { data: p } = await adminClient().from("profiles")
-    .select("id, role, account_status").eq("id", u.user.id).maybeSingle();
-  return p && p.role === "admin" && p.account_status === "active" ? { id: u.user.id } : null;
+  const p = await activeProfile(req);
+  return p && p.role === "admin" ? { id: p.id } : null;
 }
 
-export type ThrottleKind = "login" | "reset" | "apply" | "upload";
+export type ThrottleKind = "login" | "reset" | "apply" | "upload" | "otp_send" | "otp_verify";
 
 export async function tooMany(
   sb: ReturnType<typeof adminClient>,
@@ -91,3 +105,20 @@ export async function tooMany(
 
 export const recordAttempt = (sb: ReturnType<typeof adminClient>, kind: ThrottleKind, identHash: string, ip: string, success = false) =>
   sb.from("auth_attempts").insert({ kind, identifier: identHash, ip, success });
+
+// Writes one row to the hash-chained audit log. ALWAYS go through this (it calls append_audit_log, which takes
+// the chain lock before the id is assigned); a direct insert can put ids out of chain order and break verification.
+// Best effort: the action it records has already happened, so a failure is logged, not returned to the caller.
+export async function audit(
+  sb: ReturnType<typeof adminClient>,
+  a: { action: string; actorId?: string | null; entity: string; entityId?: string | null; detail?: Record<string, unknown> | null },
+) {
+  const { error } = await sb.rpc("append_audit_log", {
+    p_action: a.action,
+    p_actor_id: a.actorId ?? null,
+    p_entity: a.entity,
+    p_entity_id: a.entityId ?? null,
+    p_detail: a.detail ?? null,
+  });
+  if (error) console.error(`audit log write failed (${a.action}):`, error.message);
+}

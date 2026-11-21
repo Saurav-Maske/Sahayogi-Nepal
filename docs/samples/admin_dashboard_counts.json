@@ -1,0 +1,25 @@
+{
+  "call": "supabase.rpc('admin_dashboard_counts')",
+  "response": {
+    "requests_by_status": {
+      "pending_admin_review": 4,
+      "awaiting_assignment": 2,
+      "fulfilled": 3
+    },
+    "assignments_by_state": {
+      "offered": 3,
+      "accepted": 1,
+      "delivered": 2
+    },
+    "open_offers": 3,
+    "open_incidents": 1,
+    "pending_applications": 2,
+    "stock_available": {
+      "drinking_water": 220,
+      "food": 75
+    }
+  },
+  "errors": [
+    "forbidden"
+  ]
+}

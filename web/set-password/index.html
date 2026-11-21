@@ -6,7 +6,7 @@
   <meta name="referrer" content="no-referrer">
   <meta http-equiv="Content-Security-Policy"
         content="default-src 'none'; script-src 'self' https://cdn.jsdelivr.net; style-src 'unsafe-inline'; connect-src 'self' https://*.supabase.co http://127.0.0.1:54321 http://localhost:54321; img-src 'self' data:; base-uri 'none'; form-action 'none'">
-  <title>Set your password – Sahayogi Nepal</title>
+  <title>Set or reset your password – Sahayogi Nepal</title>
   <style>
     :root { color-scheme: light dark; --brand:#b3261e; --bg:#f7f4f2; --card:#fff; --fg:#1b1b1b; --muted:#666; --line:#d8d2cf; }
     @media (prefers-color-scheme: dark) { :root { --bg:#161413; --card:#211e1d; --fg:#f1ecea; --muted:#a8a09c; --line:#3a3533; } }
@@ -62,14 +62,27 @@
     <p class="sub" id="admin-link" hidden><a id="admin-href" href="#">Go to admin sign-in</a></p>
   </section>
 
-  <section id="s-expired" hidden>
-    <div class="msg err" id="exp-msg">This link is invalid or has expired.</div>
-    <form id="reset-form" style="margin-top:8px">
-      <label for="email">Send me a new link</label>
+  <section id="s-email" hidden>
+    <div class="msg err" id="exp-msg" hidden>This link is invalid or has expired.</div>
+    <p class="sub" style="margin-top:12px">Forgot your password, or is your link no longer working? We will email you a 6-digit code.</p>
+    <form id="email-form">
+      <label for="email">Email</label>
       <input id="email" type="email" autocomplete="email" maxlength="254" required placeholder="you@gmail.com">
-      <button type="submit" id="reset-btn">Send new link</button>
+      <button type="submit" id="email-btn">Email me a code</button>
     </form>
-    <div id="reset-msg" class="msg good" hidden></div>
+    <div id="email-msg" class="msg err" hidden></div>
+  </section>
+
+  <section id="s-code" hidden>
+    <p class="sub" id="code-who">We sent a 6-digit code to your email.</p>
+    <form id="code-form" autocomplete="off">
+      <label for="otp">6-digit code</label>
+      <input id="otp" type="text" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" required placeholder="123456">
+      <button type="submit" id="code-btn">Verify code</button>
+    </form>
+    <button type="button" id="resend-btn" style="background:transparent;color:var(--brand);border:1px solid var(--line);margin-top:10px" disabled>Resend code</button>
+    <p class="sub" style="margin-top:14px"><a href="#" id="change-email">Use a different email</a></p>
+    <div id="code-msg" class="msg err" hidden></div>
   </section>
 </main>
 

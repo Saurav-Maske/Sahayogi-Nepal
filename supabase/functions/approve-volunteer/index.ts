@@ -1,5 +1,5 @@
 import { corsHeaders, fail, ok } from "../_shared/cors.ts";
-import { adminClient, readJson, requireAdmin } from "../_shared/auth.ts";
+import { adminClient, audit, readJson, requireAdmin } from "../_shared/auth.ts";
 
 const CATEGORIES: Record<string, string[]> = { manpower: ["A"], driver: ["A", "B"], doctor: ["A", "C"] };
 
@@ -34,7 +34,7 @@ Deno.serve(async (req) => {
     await sb.from("volunteer_applications").update({
       review_status: "declined", review_note: note, reviewed_by: caller.id, reviewed_at: now,
     }).eq("id", app.id);
-    await sb.from("audit_logs").insert({ actor_id: caller.id, action: "volunteer_declined", entity: "volunteer_application", entity_id: app.id, detail: { note } });
+    await audit(sb, { action: "volunteer_declined", actorId: caller.id, entity: "volunteer_application", entityId: app.id, detail: { note } });
     return ok({ application_id: app.id, decision });
   }
 
@@ -71,8 +71,8 @@ Deno.serve(async (req) => {
     review_status: "approved", profile_id: invited.user.id, review_note: note,
     reviewed_by: caller.id, reviewed_at: now,
   }).eq("id", app.id);
-  await sb.from("audit_logs").insert({
-    actor_id: caller.id, action: "volunteer_approved", entity: "volunteer_application", entity_id: app.id,
+  await audit(sb, {
+    action: "volunteer_approved", actorId: caller.id, entity: "volunteer_application", entityId: app.id,
     detail: { profile_id: invited.user.id, categories: CATEGORIES[app.volunteer_type] },
   });
   return ok({ application_id: app.id, decision, profile_id: invited.user.id });

@@ -1,0 +1,17 @@
+{
+  "call": "supabase.rpc('admin_decline_request', { p_id, p_reason })",
+  "request": {
+    "p_id": "3f1c2a52-8d0e-4b7a-9c61-2b7e5a0d1f01",
+    "p_reason": "Duplicate of an earlier request"
+  },
+  "response": {
+    "request_id": "3f1c2a52-8d0e-4b7a-9c61-2b7e5a0d1f01",
+    "status": "declined"
+  },
+  "errors": [
+    "forbidden",
+    "not_found",
+    "invalid_state",
+    "invalid_reason"
+  ]
+}

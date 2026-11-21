@@ -1,0 +1,40 @@
+{
+  "call": "supabase.rpc('admin_import_stock', { p_items })",
+  "request": {
+    "p_items": [
+      {
+        "item_type": "drinking_water",
+        "qty": 100,
+        "unit": "litre",
+        "phase": "ready_to_ship"
+      },
+      {
+        "item_type": "food",
+        "qty": 40
+      }
+    ]
+  },
+  "response": {
+    "lots": [
+      {
+        "id": "c0ffee00-1111-4222-8333-444455556666",
+        "item_type": "drinking_water",
+        "unit": "litre",
+        "quantity": 100,
+        "phase": "ready_to_ship"
+      },
+      {
+        "id": "b7e1c9d2-3a4f-4b5c-8d6e-7f8091a2b3c4",
+        "item_type": "food",
+        "unit": "unit",
+        "quantity": 40,
+        "phase": "received"
+      }
+    ]
+  },
+  "errors": [
+    "forbidden",
+    "invalid_items",
+    "invalid_phase"
+  ]
+}

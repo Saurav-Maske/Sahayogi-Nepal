@@ -1,5 +1,5 @@
 import { corsHeaders, fail, ok } from "../_shared/cors.ts";
-import { adminClient, readJson, requireDoctor, requireDriver, requireUser } from "../_shared/auth.ts";
+import { adminClient, readJson, requireUser } from "../_shared/auth.ts";
 
 declare const Deno: {
   env: { get(name: string): string | undefined };
