@@ -1,4 +1,7 @@
 {
+  "scripts": {
+    "postinstall": "cd supabase/functions && deno install"
+  },
   "dependencies": {
     "@supabase/supabase-js": "^2.119.2"
   }
