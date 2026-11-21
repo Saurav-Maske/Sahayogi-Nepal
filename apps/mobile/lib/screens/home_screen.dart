@@ -2,6 +2,9 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../core/app_colors.dart';
+import 'donate_resources_screen.dart';
+import 'request_assistance_screen.dart';
+import 'request_help_screen.dart';
 import 'volunteer_login_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -21,9 +24,29 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _openVolunteerLogin() {
+    openVolunteerLogin(context);
+  }
+
+  void _openRequestHelp() {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => const VolunteerLoginScreen(),
+        builder: (_) => const RequestHelpScreen(),
+      ),
+    );
+  }
+
+  void _openRequestAssistance() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => const RequestAssistanceScreen(),
+      ),
+    );
+  }
+
+  void _openDonateResources() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => const DonateResourcesScreen(),
       ),
     );
   }
@@ -144,7 +167,7 @@ class _HomeScreenState extends State<HomeScreen> {
               width: double.infinity,
               height: 52,
               child: FilledButton(
-                onPressed: _showComingSoon,
+                onPressed: _openRequestHelp,
                 style: FilledButton.styleFrom(
                   backgroundColor: appGold,
                   foregroundColor: appNavy,
@@ -175,7 +198,7 @@ class _HomeScreenState extends State<HomeScreen> {
             child: _ActionCard(
               icon: Icons.inventory_2_outlined,
               label: 'Request\nAssistance',
-              onTap: _showComingSoon,
+              onTap: _openRequestAssistance,
             ),
           ),
           const SizedBox(width: 10),
@@ -183,7 +206,7 @@ class _HomeScreenState extends State<HomeScreen> {
             child: _ActionCard(
               icon: Icons.favorite_border_rounded,
               label: 'Donate\nResources',
-              onTap: _showComingSoon,
+              onTap: _openDonateResources,
             ),
           ),
           const SizedBox(width: 10),
@@ -230,7 +253,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   icon: Icons.person_outline_rounded,
                   label: 'Profile',
                   selected: _selectedTab == 3,
-                  onTap: () => setState(() => _selectedTab = 3),
+                  onTap: _openVolunteerLogin,
                 ),
               ],
             ),

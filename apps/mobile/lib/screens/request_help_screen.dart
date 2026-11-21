@@ -1,0 +1,596 @@
+import 'package:material_ui/material_ui.dart';
+
+import '../core/app_colors.dart';
+import '../widgets/community_map_preview.dart';
+import 'volunteer_login_screen.dart';
+
+class RequestHelpScreen extends StatefulWidget {
+  const RequestHelpScreen({super.key});
+
+  @override
+  State<RequestHelpScreen> createState() => _RequestHelpScreenState();
+}
+
+class _RequestHelpScreenState extends State<RequestHelpScreen> {
+  final _formKey = GlobalKey<FormState>();
+  final List<TextEditingController> _quantityControllers = [
+    TextEditingController(),
+  ];
+  final _affectedPeopleController = TextEditingController();
+  final _contactController = TextEditingController();
+  final List<String?> _resourceCategories = [null];
+  final List<bool> _categoryErrors = [false];
+  String? _location;
+  bool _locationError = false;
+
+  static const _categoryOptions = [
+    'Food',
+    'Drinking Water',
+    'Medicine',
+    'Clothing',
+    'Temporary Shelter',
+  ];
+
+  static const _locations = [
+    'Melamchi, Ward 11',
+    'Kathmandu, Ward 5',
+    'Balaju, Ward 16',
+    'Boudha, Ward 6',
+  ];
+
+  @override
+  void dispose() {
+    for (final controller in _quantityControllers) {
+      controller.dispose();
+    }
+    _affectedPeopleController.dispose();
+    _contactController.dispose();
+    super.dispose();
+  }
+
+  void _addResourceNeed() {
+    setState(() {
+      _resourceCategories.add(null);
+      _categoryErrors.add(false);
+      _quantityControllers.add(TextEditingController());
+    });
+  }
+
+  void _removeResourceNeed(int index) {
+    if (_resourceCategories.length <= 1) return;
+    setState(() {
+      _resourceCategories.removeAt(index);
+      _categoryErrors.removeAt(index);
+      _quantityControllers.removeAt(index).dispose();
+    });
+  }
+
+  Future<void> _chooseValue({
+    required String title,
+    required List<String> values,
+    required String selectedValue,
+    required ValueChanged<String> onSelected,
+  }) async {
+    final value = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: appPaper,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        child: ListView(
+          shrinkWrap: true,
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Text(
+                title,
+                style: const TextStyle(
+                  color: appNavy,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            ...values.map(
+              (value) => ListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text(value),
+                trailing: value == selectedValue
+                    ? const Icon(Icons.check_rounded, color: appTeal)
+                    : null,
+                onTap: () => Navigator.of(context).pop(value),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (value != null && mounted) onSelected(value);
+  }
+
+  void _submitRequest() {
+    final fieldsValid = _formKey.currentState!.validate();
+    final categoriesValid = _resourceCategories.every((value) => value != null);
+    final locationValid = _location != null;
+    setState(() {
+      for (var i = 0; i < _resourceCategories.length; i++) {
+        _categoryErrors[i] = _resourceCategories[i] == null;
+      }
+      _locationError = !locationValid;
+    });
+    if (!fieldsValid || !categoriesValid || !locationValid) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Request submission is not connected yet.')),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+        backgroundColor: appPaper,
+        body: SafeArea(
+          bottom: false,
+          child: Form(
+            key: _formKey,
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(24, 12, 24, 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      IconButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints.tightFor(
+                          width: 32,
+                          height: 40,
+                        ),
+                        icon: const Icon(
+                          Icons.arrow_back_rounded,
+                          color: appNavy,
+                          size: 22,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      const Expanded(
+                        child: Text(
+                          'Request Help',
+                          style: TextStyle(
+                            color: appNavy,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                      const Icon(
+                        Icons.verified_user_outlined,
+                        color: appTeal,
+                        size: 20,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                  const Text(
+                    'Tell us what you need.',
+                    style: TextStyle(
+                      color: appNavy,
+                      fontSize: 24,
+                      height: 1.2,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'A few details help us match you with nearby\nsupport.',
+                    style: TextStyle(
+                      color: appMuted,
+                      fontSize: 14,
+                      height: 1.4,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  const Row(
+                    children: [
+                      Icon(
+                        Icons.verified_user_outlined,
+                        color: appTeal,
+                        size: 17,
+                      ),
+                      SizedBox(width: 8),
+                      Text(
+                        'Private details · Verified community network',
+                        style: TextStyle(color: appTeal, fontSize: 11),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 28),
+                  _fieldLabel('Contact information'),
+                  const SizedBox(height: 8),
+                  _textField(
+                    controller: _contactController,
+                    hint: 'Phone number for responders to reach you',
+                    keyboardType: TextInputType.phone,
+                    validator: (value) {
+                      final contact = value?.trim() ?? '';
+                      if (contact.isEmpty) {
+                        return 'Enter a contact phone number';
+                      }
+                      final digitCount =
+                          contact.replaceAll(RegExp(r'\D'), '').length;
+                      if (digitCount < 7) {
+                        return 'Enter a valid contact phone number';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 30),
+                  ...List.generate(
+                    _resourceCategories.length,
+                    (index) => Padding(
+                      padding: EdgeInsets.only(
+                        bottom: index == _resourceCategories.length - 1
+                            ? 0
+                            : 18,
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(child: _fieldLabel('Resource category')),
+                              if (_resourceCategories.length > 1)
+                                IconButton(
+                                  onPressed: () => _removeResourceNeed(index),
+                                  visualDensity: VisualDensity.compact,
+                                  tooltip: 'Remove resource',
+                                  icon: const Icon(
+                                    Icons.remove_circle_outline_rounded,
+                                    color: appMuted,
+                                    size: 19,
+                                  ),
+                                ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          _choiceField(
+                            value:
+                                _resourceCategories[index] ?? 'Select category',
+                            error: _categoryErrors[index],
+                            onTap: () => _chooseValue(
+                              title: 'Resource category',
+                              values: _categoryOptions,
+                              selectedValue:
+                                  _resourceCategories[index] ?? '',
+                              onSelected: (value) => setState(() {
+                                _resourceCategories[index] = value;
+                                _categoryErrors[index] = false;
+                              }),
+                            ),
+                          ),
+                          if (_categoryErrors[index]) ...[
+                            const SizedBox(height: 6),
+                            const Text(
+                              'Choose a resource category.',
+                              style: TextStyle(
+                                color: Colors.redAccent,
+                                fontSize: 11,
+                              ),
+                            ),
+                          ],
+                          const SizedBox(height: 18),
+                          _fieldLabel('Required quantity'),
+                          const SizedBox(height: 8),
+                          _textField(
+                            controller: _quantityControllers[index],
+                            hint: 'e.g. 8 kits',
+                            validator: (value) =>
+                                value == null || value.trim().isEmpty
+                                    ? 'Enter the required quantity'
+                                    : null,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton.icon(
+                      onPressed: _addResourceNeed,
+                      style: TextButton.styleFrom(
+                        foregroundColor: appTeal,
+                        padding: EdgeInsets.zero,
+                        minimumSize: const Size(0, 36),
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      icon: const Icon(Icons.add_rounded, size: 20),
+                      label: const Text(
+                        'Add another resource',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  const Text(
+                    'Food · Drinking Water · Medicine\nClothing · Temporary Shelter',
+                    style: TextStyle(
+                      color: appMuted,
+                      fontSize: 12,
+                      height: 1.5,
+                    ),
+                  ),
+                  const SizedBox(height: 22),
+                  const Text(
+                    'Where is help needed?',
+                    style: TextStyle(
+                      color: appNavy,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  const CommunityMapPreview(height: 66),
+                  const SizedBox(height: 18),
+                  _choiceField(
+                    value: _location ?? 'Choose a location',
+                    error: _locationError,
+                    leading: const Icon(
+                      Icons.location_on_outlined,
+                      color: appTeal,
+                      size: 20,
+                    ),
+                    onTap: () => _chooseValue(
+                      title: 'Choose a location',
+                      values: _locations,
+                      selectedValue: _location ?? '',
+                      onSelected: (value) => setState(() {
+                        _location = value;
+                        _locationError = false;
+                      }),
+                    ),
+                  ),
+                  if (_locationError) ...[
+                    const SizedBox(height: 6),
+                    const Text(
+                      'Choose a location for the request.',
+                      style: TextStyle(color: Colors.redAccent, fontSize: 11),
+                    ),
+                  ],
+                  const SizedBox(height: 18),
+                  _fieldLabel('Estimated number of affected people'),
+                  const SizedBox(height: 8),
+                  _textField(
+                    controller: _affectedPeopleController,
+                    hint: 'e.g. 8 people',
+                    keyboardType: TextInputType.number,
+                    validator: (value) {
+                      final count = int.tryParse(value?.trim() ?? '');
+                      if (count == null || count < 1) {
+                        return 'Enter a valid number of affected people';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 24),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 52,
+                    child: FilledButton.icon(
+                      onPressed: _submitRequest,
+                      iconAlignment: IconAlignment.end,
+                      icon: const Icon(Icons.arrow_forward_rounded, size: 20),
+                      label: const Text('Submit request'),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: appNavy,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(15),
+                        ),
+                        textStyle: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        bottomNavigationBar: _requestNavigationBar(context),
+      );
+
+  Widget _fieldLabel(String text) => Text(
+        text,
+        style: const TextStyle(
+          color: Color(0xFF263746),
+          fontSize: 12,
+          fontWeight: FontWeight.w500,
+        ),
+      );
+
+  Widget _choiceField({
+    required String value,
+    required VoidCallback onTap,
+    Widget? leading,
+    bool error = false,
+  }) =>
+      Material(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(14),
+          child: Container(
+            width: double.infinity,
+            height: 50,
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            decoration: BoxDecoration(
+              border: Border.all(
+                color: error ? Colors.redAccent : const Color(0xFFE0E6EC),
+              ),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Row(
+              children: [
+                if (leading != null) ...[
+                  leading,
+                  const SizedBox(width: 10),
+                ],
+                Expanded(
+                  child: Text(
+                    value,
+                    style: const TextStyle(color: appMuted, fontSize: 14),
+                  ),
+                ),
+                const Icon(
+                  Icons.chevron_right_rounded,
+                  color: appMuted,
+                  size: 22,
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+
+  Widget _textField({
+    required TextEditingController controller,
+    required String hint,
+    required String? Function(String?) validator,
+    TextInputType keyboardType = TextInputType.text,
+  }) =>
+      TextFormField(
+        controller: controller,
+        keyboardType: keyboardType,
+        validator: validator,
+        style: const TextStyle(color: appNavy, fontSize: 14),
+        decoration: InputDecoration(
+          hintText: hint,
+          hintStyle: const TextStyle(color: appMuted, fontSize: 13),
+          filled: true,
+          fillColor: Colors.white,
+          isDense: true,
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 14, vertical: 15),
+          suffixIcon: const Icon(
+            Icons.chevron_right_rounded,
+            color: appMuted,
+            size: 22,
+          ),
+          errorStyle: const TextStyle(fontSize: 11),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: const BorderSide(color: Color(0xFFE0E6EC)),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: const BorderSide(color: Color(0xFFE0E6EC)),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: const BorderSide(color: appTeal, width: 1.4),
+          ),
+          errorBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: const BorderSide(color: Colors.redAccent),
+          ),
+          focusedErrorBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: const BorderSide(color: Colors.redAccent),
+          ),
+        ),
+      );
+}
+
+Widget _requestNavigationBar(BuildContext context) => Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(top: BorderSide(color: Color(0xFFE0E6EC))),
+      ),
+      child: SafeArea(
+        top: false,
+        child: SizedBox(
+          height: 68,
+          child: Row(
+            children: [
+              _RequestNavigationItem(
+                icon: Icons.home_outlined,
+                label: 'Home',
+                selected: false,
+                onTap: () => Navigator.of(context).popUntil(
+                  (route) => route.isFirst,
+                ),
+              ),
+              const _RequestNavigationItem(
+                icon: Icons.map_outlined,
+                label: 'Explore',
+                selected: false,
+              ),
+              const _RequestNavigationItem(
+                icon: Icons.inventory_2_outlined,
+                label: 'Requests',
+                selected: true,
+              ),
+              _RequestNavigationItem(
+                icon: Icons.person_outline_rounded,
+                label: 'Profile',
+                selected: false,
+                onTap: () => openVolunteerLogin(context),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+class _RequestNavigationItem extends StatelessWidget {
+  const _RequestNavigationItem({
+    required this.icon,
+    required this.label,
+    required this.selected,
+    this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final bool selected;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) => Expanded(
+        child: InkWell(
+          onTap: onTap,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 160),
+                width: 54,
+                height: 27,
+                decoration: BoxDecoration(
+                  color: selected
+                      ? const Color(0xFFE7F0F4)
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                child: Icon(icon, size: 21, color: appNavy),
+              ),
+              const SizedBox(height: 3),
+              Text(
+                label,
+                style: TextStyle(
+                  color: appNavy,
+                  fontSize: 10,
+                  fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+}
