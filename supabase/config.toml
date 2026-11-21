@@ -70,7 +70,7 @@ verify_jwt = false
 verify_jwt = false
 
 [db.seed]
-enabled = false
+enabled = true
 sql_paths = [
     "./seeds/nepal_districts.sql"
 ]

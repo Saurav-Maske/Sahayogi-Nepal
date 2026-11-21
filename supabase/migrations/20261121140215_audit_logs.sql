@@ -1,5 +1,5 @@
 -- Append-only, hash-chained audit log, written by Edge Functions (service role).
-
+drop table if exists public.audit_logs cascade;
 create extension if not exists pgcrypto with schema extensions;
 
 create table if not exists public.audit_logs (
