@@ -1,15 +1,25 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'core/config.dart';
+import 'core/push_notifications.dart';
+import 'firebase_options.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Supabase.initialize(url: Config.supabaseUrl, anonKey: Config.supabaseAnonKey);
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+  PushNotifications.registerBackgroundHandler();
+  await Supabase.initialize(
+    url: Config.supabaseUrl,
+    publishableKey: Config.supabaseAnonKey,
+  );
   runApp(const ProviderScope(child: SahayogiApp()));
 }
 
@@ -51,7 +61,7 @@ class _StartupScreenState extends State<StartupScreen> {
   }
 
   Future<void> _continueAfterSplash() async {
-    await Future<void>.delayed(const Duration(seconds: 1));
+    await Future<void>.delayed(const Duration(seconds: 2));
     final prefs = await SharedPreferences.getInstance();
     if (!mounted) return;
     Navigator.of(context).pushReplacement(MaterialPageRoute<void>(
@@ -62,24 +72,59 @@ class _StartupScreenState extends State<StartupScreen> {
   }
 
   @override
-  Widget build(BuildContext context) => const Scaffold(
+  Widget build(BuildContext context) => Scaffold(
         backgroundColor: _navy,
         body: SafeArea(
           child: Center(
             child: Column(mainAxisSize: MainAxisSize.min, children: [
-              Image.asset('../public/images/SahayogiNepalLogo.png', width: 58, height: 58),
-              SizedBox(height: 53),
-              Text('Sahayogi\nNepal', textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.white, fontSize: 38, height: 1.42, fontWeight: FontWeight.w700)),
-              SizedBox(height: 24),
-              Text('Helping Hands,\nSafer Communities.', textAlign: TextAlign.center,
-                  style: TextStyle(color: Color(0xFFC5D0DA), fontSize: 16, height: 1.5)),
-              SizedBox(height: 29),
-              Row(mainAxisSize: MainAxisSize.min, children: [
-                _Dot(color: _gold), SizedBox(width: 6), _Dot(color: Color(0xFF526273)), SizedBox(width: 6), _Dot(color: Color(0xFF526273)),
-              ]),
-              SizedBox(height: 30),
-              Text('TOGETHER, WE RESPOND.', style: TextStyle(color: _gold, fontSize: 11, letterSpacing: 2.1, fontWeight: FontWeight.w700)),
+              Image.asset(
+                'assets/images/SahayogiNepalLogo.png',
+                width: 58,
+                height: 58,
+                fit: BoxFit.contain,
+              ),
+              const SizedBox(height: 53),
+              const Text(
+                'Sahayogi\nNepal',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 38,
+                  height: 1.42,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 24),
+              const Text(
+                'Helping Hands,\nSafer Communities.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Color(0xFFC5D0DA),
+                  fontSize: 16,
+                  height: 1.5,
+                ),
+              ),
+              const SizedBox(height: 29),
+              const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _Dot(color: _gold),
+                  SizedBox(width: 6),
+                  _Dot(color: Color(0xFF526273)),
+                  SizedBox(width: 6),
+                  _Dot(color: Color(0xFF526273)),
+                ],
+              ),
+              const SizedBox(height: 30),
+              const Text(
+                'TOGETHER, WE RESPOND.',
+                style: TextStyle(
+                  color: _gold,
+                  fontSize: 11,
+                  letterSpacing: 2.1,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
             ]),
           ),
         ),
@@ -270,8 +315,20 @@ class _ScenePainter extends CustomPainter {
   bool shouldRepaint(covariant _ScenePainter oldDelegate) => oldDelegate.scene != scene;
 }
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  @override
+  void initState() {
+    super.initState();
+    unawaited(PushNotifications.initialize());
+  }
+
   @override
   Widget build(BuildContext context) => Scaffold(
         appBar: AppBar(title: const Text('Sahayogi Nepal', style: TextStyle(fontWeight: FontWeight.w700)), backgroundColor: _paper),
