@@ -378,7 +378,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"kind\": \"donation_offer\",\n  \"requester_name\": \"Postman Donor\",\n  \"requester_phone\": \"9812345678\",\n  \"lat\": 28.2096,\n  \"lng\": 83.9856,\n  \"items\": [\n    {\n      \"item_type\": \"cloth\",\n      \"qty\": 40,\n      \"unit\": \"piece\"\n    }\n  ]\n}"
+              "raw": "{\n  \"kind\": \"donation_offer\",\n  \"requester_name\": \"Postman Donor\",\n  \"requester_phone\": \"9812345678\",\n  \"lat\": 27.6588,\n  \"lng\": 85.3247,\n  \"items\": [\n    {\n      \"item_type\": \"cloth\",\n      \"qty\": 40,\n      \"unit\": \"piece\"\n    }\n  ]\n}"
             },
             "url": {
               "raw": "{{base_url}}/functions/v1/submit-request",

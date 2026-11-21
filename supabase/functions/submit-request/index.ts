@@ -1,5 +1,7 @@
 // Public intake. Service role is used SERVER-SIDE ONLY; clients get no anonymous INSERT on tables.
 // A signed-in volunteer may call this too: name/phone default to their profile and the request is linked to them.
+// The request and its items are created by the submit_request RPC in ONE transaction (see migration
+// 20261122000002_submit_request_rpc.sql), which also enforces the 5-per-phone-per-hour limit and the district bounds.
 import { corsHeaders, fail, ok } from "../_shared/cors.ts";
 import { adminClient, NEPAL_PHONE_RE, readJson, requireUser, sha256 } from "../_shared/auth.ts";
 
@@ -12,8 +14,21 @@ const ITEM_KINDS = ["resource_request", "donation_offer"]; // need an items[] li
 const VOLUNTEER_KINDS = ["manpower_request", "healthcare_request", "transport_request"]; // need volunteers_needed
 const ITEM_TYPES = ["food", "cloth", "temp_shelter", "medical_supplies", "drinking_water"];
 const URGENCY = ["low", "normal", "high", "critical"];
-// Rough bounding box of Nepal; the DB trigger then picks the exact district from the point.
+// Cheap pre-check (rough bounding box of Nepal). The RPC then enforces the pilot district's own bounds.
 const LAT_MIN = 26.3, LAT_MAX = 30.5, LNG_MIN = 80.0, LNG_MAX = 88.3;
+
+// Codes the submit_request RPC raises (error.message) that are the caller's fault, with the message to show.
+const RPC_CLIENT_ERRORS: Record<string, string> = {
+  invalid_kind: "Unknown request kind.",
+  invalid_name: "Name required (2-120 chars).",
+  invalid_phone: "Enter a valid Nepal mobile number.",
+  invalid_location: "lat and lng (inside Nepal) are required.",
+  outside_service_area: "This location is outside the area we currently serve.",
+  invalid_urgency: "urgency must be low, normal, high or critical.",
+  invalid_volunteers_needed: "volunteers_needed must be a whole number from 1 to 100.",
+  invalid_items: `1-20 items, each with item_type (${ITEM_TYPES.join(", ")}), qty > 0 and unit.`,
+  too_many_requests: "Too many requests from this phone number. Please try again in an hour.",
+};
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -61,38 +76,35 @@ Deno.serve(async (req) => {
     const bad = items.length < 1 || items.length > 20 || items.some((i: any) =>
       !ITEM_TYPES.includes(String(i?.item_type)) || !(Number(i?.qty) > 0) || Number(i.qty) > 1_000_000 ||
       !i?.unit || String(i.unit).length > 20);
-    if (bad) return fail("invalid_items", `1-20 items, each with item_type (${ITEM_TYPES.join(", ")}), qty > 0 and unit.`);
+    if (bad) return fail("invalid_items", RPC_CLIENT_ERRORS.invalid_items);
   }
 
+  // The token is shown to the requester ONCE; only its hash is stored.
   const token = crypto.randomUUID() + crypto.randomUUID();
-  const { data: row, error } = await sb.from("requests").insert({
-    kind, requester_name, requester_phone,
-    requester_profile_id: profile?.id ?? null,
-    location: `SRID=4326;POINT(${b.lng} ${b.lat})`, // longitude first; district_id is set by trigger
-    address_note: b.address_note ? String(b.address_note).slice(0, 300) : null,
-    urgency, notes: b.notes ? String(b.notes).slice(0, 1000) : null,
-    volunteers_needed,
-    tracking_token_hash: await sha256(token),
-  }).select("id, public_ref, status, district_id").single();
-  if (error || !row) {
-    console.error("request insert failed:", error?.message);
+  const { data, error } = await sb.rpc("submit_request", {
+    p: {
+      kind, requester_name, requester_phone, lat: b.lat, lng: b.lng, urgency, volunteers_needed,
+      address_note: b.address_note ? String(b.address_note).slice(0, 300) : null,
+      notes: b.notes ? String(b.notes).slice(0, 1000) : null,
+      items: items.length ? items.map((i) => ({ item_type: i.item_type, qty: Number(i.qty), unit: String(i.unit) })) : null,
+      tracking_token_hash: await sha256(token),
+    },
+    p_profile: profile?.id ?? null,
+  });
+
+  if (error || !data) {
+    const msg = error?.message ?? "";
+    if (msg === "too_many_requests") return fail(msg, RPC_CLIENT_ERRORS[msg], 429);
+    if (msg in RPC_CLIENT_ERRORS) return fail(msg, RPC_CLIENT_ERRORS[msg]);
+    console.error("submit_request failed:", msg);
     return fail("db_error", "Could not create request.", 500);
   }
 
-  if (items.length) {
-    const { error: ie } = await sb.from("request_items").insert(
-      items.map((i) => ({ request_id: row.id, item_type: i.item_type, requested_qty: Number(i.qty), unit: String(i.unit) })));
-    if (ie) {
-      console.error("items insert failed:", ie.message);
-      await sb.from("requests").delete().eq("id", row.id); // do not leave a request with no items
-      return fail("db_error", "Could not save items.", 500);
-    }
-  }
-
-  let district: string | null = null;
-  if (row.district_id) {
-    const { data: d } = await sb.from("districts").select("name").eq("id", row.district_id).maybeSingle();
-    district = d?.name ?? null;
-  }
-  return ok({ public_ref: row.public_ref, tracking_token: token, status: row.status, district }, 201);
+  return ok({
+    request_id: data.request_id,
+    public_ref: data.public_ref,
+    tracking_token: token,
+    status: data.status,
+    district: data.district,
+  }, 201);
 });

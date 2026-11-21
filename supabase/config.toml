@@ -68,6 +68,9 @@ verify_jwt = false
 verify_jwt = false
 [functions.admin-set-account-status]
 verify_jwt = false
+# get-route checks the caller itself (requireUser), like the rest. Listed explicitly so behaviour is not left to defaults.
+[functions.get-route]
+verify_jwt = false
 
 [db.seed]
 enabled = true

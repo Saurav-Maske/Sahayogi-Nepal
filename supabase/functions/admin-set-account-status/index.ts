@@ -1,5 +1,5 @@
 import { corsHeaders, fail, ok } from "../_shared/cors.ts";
-import { adminClient, readJson, requireAdmin } from "../_shared/auth.ts";
+import { adminClient, audit, readJson, requireAdmin } from "../_shared/auth.ts";
 
 declare const Deno: {
   env: { get(name: string): string | undefined };
@@ -26,9 +26,9 @@ Deno.serve(async (req) => {
   const { error: e2 } = await sb.auth.admin.updateUserById(b.user_id, { ban_duration: status === "suspended" ? "876000h" : "none" });
   if (e1 || e2) return fail("update_failed", "Could not update the account.", 500);
 
-  await sb.from("audit_logs").insert({
-    actor_id: caller.id, action: status === "suspended" ? "account_suspended" : "account_reactivated",
-    entity: "profile", entity_id: b.user_id, detail: { reason: b.reason ?? null },
+  await audit(sb, {
+    action: status === "suspended" ? "account_suspended" : "account_reactivated", actorId: caller.id,
+    entity: "profile", entityId: b.user_id, detail: { reason: b.reason ?? null },
   });
   return ok({ user_id: b.user_id, status });
 });

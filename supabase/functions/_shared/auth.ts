@@ -46,28 +46,32 @@ export async function requireUser(req: Request) {
   return error || !data.user ? null : { user: data.user, token };
 }
 
-export async function requireDriver(req: Request) {
+// One profile lookup shared by every role guard. Suspended accounts never pass.
+// NOTE: `role` is only 'volunteer' | 'admin'. Driver / doctor / general are CATEGORIES (A, B, C) on a volunteer.
+async function activeProfile(req: Request) {
   const u = await requireUser(req);
   if (!u) return null;
   const { data: p } = await adminClient().from("profiles")
-    .select("id, role, account_status").eq("id", u.user.id).maybeSingle();
-  return p && p.role.includes("B") && p.account_status === "active" ? { id: u.user.id } : null;
+    .select("id, role, categories, account_status").eq("id", u.user.id).maybeSingle();
+  return p && p.account_status === "active" ? p : null;
+}
+
+const hasCategory = (p: { role: string; categories: string[] | null }, c: "A" | "B" | "C") =>
+  p.role === "volunteer" && (p.categories ?? []).includes(c);
+
+export async function requireDriver(req: Request) {
+  const p = await activeProfile(req);
+  return p && hasCategory(p, "B") ? { id: p.id } : null;
 }
 
 export async function requireDoctor(req: Request) {
-  const u = await requireUser(req);
-  if (!u) return null;
-  const { data: p } = await adminClient().from("profiles")
-    .select("id, role, account_status").eq("id", u.user.id).maybeSingle();
-  return p && p.role.includes("C") && p.account_status === "active" ? { id: u.user.id } : null;
+  const p = await activeProfile(req);
+  return p && hasCategory(p, "C") ? { id: p.id } : null;
 }
 
 export async function requireAdmin(req: Request) {
-  const u = await requireUser(req);
-  if (!u) return null;
-  const { data: p } = await adminClient().from("profiles")
-    .select("id, role, account_status").eq("id", u.user.id).maybeSingle();
-  return p && p.role === "admin" && p.account_status === "active" ? { id: u.user.id } : null;
+  const p = await activeProfile(req);
+  return p && p.role === "admin" ? { id: p.id } : null;
 }
 
 export type ThrottleKind = "login" | "reset" | "apply" | "upload";
@@ -91,3 +95,20 @@ export async function tooMany(
 
 export const recordAttempt = (sb: ReturnType<typeof adminClient>, kind: ThrottleKind, identHash: string, ip: string, success = false) =>
   sb.from("auth_attempts").insert({ kind, identifier: identHash, ip, success });
+
+// Writes one row to the hash-chained audit log. ALWAYS go through this (it calls append_audit_log, which takes
+// the chain lock before the id is assigned); a direct insert can put ids out of chain order and break verification.
+// Best effort: the action it records has already happened, so a failure is logged, not returned to the caller.
+export async function audit(
+  sb: ReturnType<typeof adminClient>,
+  a: { action: string; actorId?: string | null; entity: string; entityId?: string | null; detail?: Record<string, unknown> | null },
+) {
+  const { error } = await sb.rpc("append_audit_log", {
+    p_action: a.action,
+    p_actor_id: a.actorId ?? null,
+    p_entity: a.entity,
+    p_entity_id: a.entityId ?? null,
+    p_detail: a.detail ?? null,
+  });
+  if (error) console.error(`audit log write failed (${a.action}):`, error.message);
+}

@@ -1,5 +1,5 @@
 import { corsHeaders, fail, ok } from "./cors.ts";
-import { adminClient, anonClient, clientIp, EMAIL_RE, readJson, recordAttempt, sha256, tooMany } from "./auth.ts";
+import { adminClient, anonClient, audit, clientIp, EMAIL_RE, readJson, recordAttempt, sha256, tooMany } from "./auth.ts";
 
 export async function handleLogin(req: Request, portal: "admin" | "volunteer"): Promise<Response> {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -44,7 +44,7 @@ export async function handleLogin(req: Request, portal: "admin" | "volunteer"): 
   await recordAttempt(sb, "login", idHash, ip, true);
   await sb.from("profiles").update({ last_login_at: new Date().toISOString() }).eq("id", profile.id);
   if (portal === "admin") {
-    await sb.from("audit_logs").insert({ actor_id: profile.id, action: "admin_login", entity: "auth", entity_id: profile.id, detail: { ip } });
+    await audit(sb, { action: "admin_login", actorId: profile.id, entity: "auth", entityId: profile.id, detail: { ip } });
   }
 
   const s = data.session;

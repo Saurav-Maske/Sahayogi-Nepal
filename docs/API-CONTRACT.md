@@ -47,13 +47,14 @@ Manpower, healthcare or transport request (needs `volunteers_needed`, no items):
 Response 201:
 
 ```json
-{ "data": { "public_ref": "AB12CD34", "tracking_token": "<shown once>", "status": "pending_admin_review", "district": "KATHMANDU" }, "error": null }
+{ "data": { "request_id": "<uuid>", "public_ref": "AB12CD34", "tracking_token": "<shown once>", "status": "pending_admin_review", "district": "KATHMANDU" }, "error": null }
 ```
 
-Rules: phone is a Nepal mobile (`98XXXXXXXX` or `+97798XXXXXXXX`); 1-20 items; `volunteers_needed` 1-100; `lat`/`lng` inside the rough Nepal box (the DB trigger sets `district_id` from the point; `district` is `null` if the point is in no polygon). `lng` comes first inside the stored point, but the JSON uses `lat` and `lng` by name.
-Errors: `invalid_kind | invalid_name | invalid_phone | invalid_location | invalid_urgency | invalid_volunteers_needed | invalid_items | bad_json | db_error`.
+Rules: phone is a Nepal mobile (`98XXXXXXXX` or `+97798XXXXXXXX`); 1-20 items; `volunteers_needed` 1-100; `lat`/`lng` must be inside Nepal **and inside the pilot district's `bounds`** (the public `app_settings` row `district`). The DB trigger then sets `district_id` from the point; `district` is `null` if the point is in no polygon. `lng` comes first inside the stored point, but the JSON uses `lat` and `lng` by name.
+Rate limit: **5 requests per phone number per hour** (`+97798...` and `98...` count as the same phone). The 6th returns HTTP 429.
+Atomic: the request and its items are created by the `submit_request` RPC in one transaction, so a failure never leaves a request without items.
+Errors: `invalid_kind | invalid_name | invalid_phone | invalid_location | outside_service_area | invalid_urgency | invalid_volunteers_needed | invalid_items | too_many_requests (429) | bad_json | db_error (500)`.
 Keep `tracking_token`: only its hash is stored, so it cannot be shown again.
-**Known gaps:** no phone rate limit yet, and request + items are two inserts (a crash between them can leave a request without items).
 
 ### POST `/functions/v1/get-route`  (any signed-in user)
 
@@ -99,7 +100,7 @@ Build order and signatures follow the Backend Playbook. Every RPC will call `app
 - `update_assignment_state(p_id, p_state)` (forward only), `update_my_location(...)`, `my_stats()`, `register_device_token(...)`
 - `driver_verify_otp(p_id, p_purpose, p_code, p_confirmed)`: 15-minute expiry, 5-attempt lock, quantity-changed handling
 
-`submit_request` will move into one transactional RPC (service role only) with the 5-requests-per-phone-per-hour limit; the Edge Function will call it. The request payload above stays the same.
+`submit_request(p jsonb, p_profile uuid)` is LIVE but **service role only**; it is called by the `submit-request` Edge Function, never from a client.
 
 ## Decisions still open
 
