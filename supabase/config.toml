@@ -60,6 +60,14 @@ verify_jwt = false
 verify_jwt = false
 [functions.request-password-reset]
 verify_jwt = false
+[functions.verify-reset-otp]
+verify_jwt = false
+[functions.reset-password]
+verify_jwt = false
+[functions.send-signup-otp]
+verify_jwt = false
+[functions.verify-signup-otp]
+verify_jwt = false
 [functions.create-upload-urls]
 verify_jwt = false
 [functions.submit-volunteer-application]

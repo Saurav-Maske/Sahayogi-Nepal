@@ -2,6 +2,19 @@
 
 Newest first. Anything that changes a payload, table, function or seed behaviour gets a line here.
 
+## 2026-11-22 (email OTP for sign-up and forgot password)
+
+- **Migration `20261122000008_email_otp.sql`:** new `email_otps` table (one row per email + purpose, HMAC hashes only, no client access), `auth_attempts.kind` now also allows `otp_send | otp_verify`, new column `volunteer_applications.email_verified_at`, `purge_email_otps()` and `revoke_user_sessions(uuid)` (both service role only).
+- **Volunteer sign-up:** new `send-signup-otp` and `verify-signup-otp`. `submit-volunteer-application` now requires `email_verification_token` (from `verify-signup-otp`) and returns `403 email_not_verified` without it. The token is spent only when the application is saved. **Breaking for the Flutter registration form:** it must add the email-code step before submitting.
+- **Forgot password:** `request-password-reset` now emails a 6-digit code instead of a link (same generic 200 answer). New `verify-reset-otp` (returns a one-time `reset_token`) and `reset-password` (sets the new password, signs out every session, clears failed-login counters, audit action `password_reset`).
+- **Behaviour:** code valid 10 min, 5 guesses per code (counted before comparing, so parallel guesses cannot bypass it), 60 s resend cooldown, sign-up token 30 min, reset token 10 min, both single use and bound to the email. Limits per hour: 5 codes per email and 15 per IP; 10 wrong codes per email and 30 per IP per 15 min.
+- **Behaviour:** `reset-password` also confirms the email, so a volunteer whose invite link expired can set a first password this way. The invite link flow for newly approved volunteers is unchanged.
+- **Email delivery:** OTP emails go out through Gmail SMTP from the functions (`GMAIL_ADDRESS`, `GMAIL_APP_PASSWORD` in `supabase/functions/.env`). New optional vars `OTP_PEPPER`, `MAIL_FROM_NAME`, `OTP_DEV_LOG` (local only: prints the code in the `functions serve` terminal).
+- **Config:** four new functions listed in `config.toml` with `verify_jwt = false`.
+- **Web:** `web/set-password` now offers email, code, new password when there is no valid link (replaces "Send me a new link").
+- **Docs/Postman:** `api-auth.md` v2, new Postman requests under Auth and Volunteer application, new rows in the test matrix.
+- **Known:** Flutter `volunteer_login_screen.dart` still shows "Password reset is not connected yet" and the registration screen does not send the token. Both are Person 1 work against this contract. `create-upload-urls` is still open to anyone (IP-throttled), not gated by the email token.
+
 ## 2026-11-22 (RPC parts 3 to 5)
 
 - **Migration `20261122000005_rpc_progress_otp_tracking.sql`:** `update_assignment_state` (forward-only), `driver_verify_otp` (15-minute expiry, 5-attempt lock, quantity-changed handling), `requester_get_otp`, `requester_update_pickup_qty`, `requester_confirm_delivery`, `get_tracking`, plus internal helpers `_request_id_by_token` and `_active_otp_assignment` (no client grant). The four requester RPCs and `get_tracking` are callable without signing in; the token hash is checked inside.

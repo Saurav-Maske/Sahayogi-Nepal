@@ -49,3 +49,11 @@ Run each RPC as anon, volunteer (A, A+B, A+C) and admin, and confirm the denied 
 
 Local check (2026-11-22): migrations `...000001` to `...000007` apply cleanly in order on PostgreSQL 16 with PostGIS and stubbed Supabase roles/auth, and the flows above were exercised by hand (delivery with OTP lock and expiry, donation pickup with a lowered quantity, dispute and dismissal, lot split, audit paging, map markers). That was not the demo project, so the cells stay blank until someone runs them there.
 Postman: `postman/sahayogi.postman_collection.json`. Extend it with each new RPC and run the smoke set after every push.
+| Sign-up OTP gate | Application without a token, with another email's token, or a reused token returns `403 email_not_verified`; with a valid token returns 201 and `email_verified_at` is set | `send-signup-otp`, `verify-signup-otp`, `submit-volunteer-application` |  |  |  |  |
+| OTP wrong code | 4 wrong codes show `attempts_left`; the 5th returns `otp_locked`; the correct code afterwards is still rejected until a new code is requested | `verify-signup-otp`, `verify-reset-otp` |  |  |  |  |
+| OTP expiry and resend | Code older than 10 min returns `otp_expired`; a second send within 60 s returns `resend_too_soon`; a new code invalidates the old one | `send-signup-otp` |  |  |  |  |
+| Sign-up existing email | Email with a live application or an account returns `409 application_exists` at the send step | `send-signup-otp` |  |  |  |  |
+| Forgot password | Code, token, new password works once; login with the old password fails and the new one works; old sessions are signed out; `password_reset` is in the audit log | `request-password-reset`, `verify-reset-otp`, `reset-password` |  |  |  |  |
+| Reset does not leak accounts | Unknown, suspended and active emails all get the same 200 body from `request-password-reset`; only the active one receives mail | `request-password-reset` |  |  |  |  |
+| Reset token single use | Replaying `reset_token`, or using it after 10 min, returns `invalid_token`; a weak password returns `weak_password` and the token still works | `reset-password` |  |  |  |  |
+| Invite fallback | Approved volunteer who never opened the invite sets a first password through the OTP flow and can log in | `reset-password` |  |  |  |  |

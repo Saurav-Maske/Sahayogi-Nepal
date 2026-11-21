@@ -67,7 +67,7 @@ Errors: `unauthorized | bad_json | invalid_locations | invalid_coordinate | out_
 
 ### Auth and volunteer functions
 
-`admin-login`, `volunteer-login`, `auth-me`, `request-password-reset`, `create-upload-urls`, `submit-volunteer-application`, `approve-volunteer`, `admin-set-account-status`: see [`api-auth.md`](api-auth.md).
+`admin-login`, `volunteer-login`, `auth-me`, `send-signup-otp`, `verify-signup-otp`, `create-upload-urls`, `submit-volunteer-application` (now needs `email_verification_token`), `approve-volunteer`, `admin-set-account-status`, `request-password-reset`, `verify-reset-otp`, `reset-password`: see [`api-auth.md`](api-auth.md).
 
 ### Tables readable through the SDK (RLS applies)
 
