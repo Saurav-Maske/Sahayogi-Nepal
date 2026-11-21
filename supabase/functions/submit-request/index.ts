@@ -1,5 +1,5 @@
 // Public intake. Service role is used SERVER-SIDE ONLY; clients get no anonymous INSERT on tables.
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { createClient } from "@supabase/supabase-js";
 import { corsHeaders, ok, fail } from "../_shared/cors.ts";
 
 const KINDS = ["resource_request","manpower_request","donation_offer","healthcare_request","transport_request"];
