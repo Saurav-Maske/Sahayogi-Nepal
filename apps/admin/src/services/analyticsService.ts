@@ -1,21 +1,14 @@
 import { supabase } from '../supabase';
 import type { AnalyticsData } from '../types/analytics';
 import type { ChartPoint } from '../types/dashboard';
+import { humanize, volunteerLabel } from '../utils/labels';
+import { hasSession } from './session';
 
-/**
- * Names used for live queries. Only requests.district/status/created_at are
- * confirmed from the migration; the rest are guesses. Fix them here only.
- */
-const T = {
-  requests: 'requests', // district, status, created_at, approved_at?, people_count?
-  donations: 'donations', // quantity_kg, status, created_at
-  distributions: 'distributions', // quantity_kg, created_at
-  volunteers: 'volunteers', // category, hours_logged, status
-  assignments: 'assignments', // status
-  inventory: 'central_inventory', // category, quantity
-};
+const IN_STOCK_PHASES = ['received', 'processing', 'ready_to_ship'];
+const OUTGOING_PHASES = ['dispatched', 'consumed'];
 
-const DEMO: Omit<AnalyticsData, 'updatedAt' | 'demoSections'> = {
+
+export const DEMO: Omit<AnalyticsData, 'updatedAt' | 'demoSections'> = {
   kpis: {
     peopleSupported: 4860, districtsCovered: 12,
     volunteerHours: 2418, volunteerHoursChangePct: 18,
@@ -43,24 +36,24 @@ const DEMO: Omit<AnalyticsData, 'updatedAt' | 'demoSections'> = {
 const DAY = 864e5;
 const since = (days: number) => new Date(Date.now() - days * DAY).toISOString();
 
-const tally = (rows: any[], key: string, top?: number): ChartPoint[] => {
+const tally = (items: any[], keyOf: (r: any) => string | undefined, top?: number): ChartPoint[] => {
   const m = new Map<string, number>();
-  rows.forEach((r) => r[key] && m.set(r[key], (m.get(r[key]) ?? 0) + 1));
+  items.forEach((r) => { const k = keyOf(r); if (k) m.set(k, (m.get(k) ?? 0) + 1); });
   const sorted = [...m].sort((a, b) => b[1] - a[1]).map(([label, value]) => ({ label, value }));
   if (!top || sorted.length <= top) return sorted;
   const rest = sorted.slice(top).reduce((s, p) => s + p.value, 0);
   return [...sorted.slice(0, top), { label: 'Other', value: rest }];
 };
 
-const sum = (rows: any[], key: string) => rows.reduce((s, r) => s + (Number(r[key]) || 0), 0);
-
-async function rows(table: string, cols: string, days?: number) {
+async function rows(table: string, cols: string, filter?: (q: any) => any) {
   let q: any = supabase.from(table).select(cols);
-  if (days) q = q.gte('created_at', since(days));
+  if (filter) q = filter(q);
   const { data, error } = await q;
   if (error) throw error;
   return (data ?? []) as any[];
 }
+
+const one = (v: any) => (Array.isArray(v) ? v[0] : v); // embedded relations can come back as object or array
 
 /** Runs one section; on failure returns the demo value and records it. */
 async function section<K extends keyof typeof DEMO>(
@@ -76,61 +69,68 @@ async function section<K extends keyof typeof DEMO>(
 }
 
 export async function getAnalyticsData(): Promise<AnalyticsData> {
+  if (!(await hasSession())) {
+    return { ...DEMO, updatedAt: new Date().toISOString(), demoSections: Object.keys(DEMO) };
+  }
   const demoSections: string[] = [];
 
   const [requestsByDistrict, volunteerParticipation, inventoryStock, donationsVsDistribution, kpis] =
     await Promise.all([
       section('requestsByDistrict', async () => {
-        const p = tally(await rows(T.requests, 'district', 30), 'district', 4);
+        const r = await rows('requests', 'districts(name)', (q) => q.gte('created_at', since(30)));
+        const p = tally(r, (x) => one(x.districts)?.name ?? 'Unknown', 4);
         if (!p.length) throw new Error('no rows');
         return p;
       }, demoSections),
 
       section('volunteerParticipation', async () => {
-        const p = tally(await rows(T.volunteers, 'category'), 'category');
+        const r = await rows('profiles', 'volunteer_type', (q) => q.eq('role', 'volunteer'));
+        const p = tally(r, (x) => (x.volunteer_type ? volunteerLabel(x.volunteer_type) : undefined));
         if (!p.length) throw new Error('no rows');
         return p;
       }, demoSections),
 
       section('inventoryStock', async () => {
-        const inv = await rows(T.inventory, 'category, quantity');
+        const lots = await rows('inventory_lots', 'item_type, quantity, reserved_qty', (q) => q.in('phase', IN_STOCK_PHASES));
         const m = new Map<string, number>();
-        inv.forEach((r) => m.set(r.category, (m.get(r.category) ?? 0) + (Number(r.quantity) || 0)));
+        lots.forEach((l) => m.set(l.item_type, (m.get(l.item_type) ?? 0) + (Number(l.quantity) || 0) - (Number(l.reserved_qty) || 0)));
         if (!m.size) throw new Error('no rows');
-        return [...m].map(([label, value]) => ({ label, value }));
+        return [...m].sort((a, b) => b[1] - a[1]).slice(0, 5).map(([k, v]) => ({ label: humanize(k), value: Math.round(v) }));
       }, demoSections),
 
+      // donated = stock received, distributed = stock dispatched or consumed (kg lots only)
       section('donationsVsDistribution', async () => {
-        const [don, dist] = await Promise.all([rows(T.donations, 'quantity_kg, created_at', 21), rows(T.distributions, 'quantity_kg, created_at', 21)]);
+        const mv = (await rows('inventory_movements', 'quantity, to_phase, created_at, inventory_lots(unit)', (q) => q.gte('created_at', since(21))))
+          .filter((r) => one(r.inventory_lots)?.unit === 'kg');
         const out: ChartPoint[] = [];
         for (let w = 3; w >= 1; w--) {
           const from = Date.now() - w * 7 * DAY, to = from + 7 * DAY;
           const inWeek = (r: any) => { const t = +new Date(r.created_at); return t >= from && t < to; };
+          const total = (phases: string[]) => Math.round(mv.filter((r) => inWeek(r) && phases.includes(r.to_phase)).reduce((s, r) => s + (Number(r.quantity) || 0), 0));
           const n = 4 - w;
-          out.push({ label: 'Don', value: sum(don.filter(inWeek), 'quantity_kg'), hint: `Week ${n} donated (kg)` });
-          out.push({ label: 'Dist', value: sum(dist.filter(inWeek), 'quantity_kg'), hint: `Week ${n} distributed (kg)` });
+          out.push({ label: 'Don', value: total(['received']), hint: `Week ${n} donated (kg)` });
+          out.push({ label: 'Dist', value: total(OUTGOING_PHASES), hint: `Week ${n} distributed (kg)` });
         }
         return out;
       }, demoSections),
 
       section('kpis', async () => {
-        const [req, vol, asg] = await Promise.all([
-          rows(T.requests, 'district, status, created_at, approved_at, people_count'),
-          rows(T.volunteers, 'hours_logged'),
-          rows(T.assignments, 'status'),
+        const [fulfilled, approvals, asg] = await Promise.all([
+          rows('requests', 'district_id', (q) => q.eq('status', 'fulfilled')),
+          rows('requests', 'created_at, approved_at', (q) => q.not('approved_at', 'is', null).gte('created_at', since(30))),
+          rows('assignments', 'state'),
         ]);
-        const fulfilled = req.filter((r) => r.status === 'fulfilled');
-        const done = asg.filter((a) => a.status === 'completed').length;
-        const failed = asg.filter((a) => a.status === 'failed').length;
-        const approvals = req.filter((r) => r.approved_at).map((r) => (+new Date(r.approved_at) - +new Date(r.created_at)) / 36e5);
+        const delivered = asg.filter((a) => a.state === 'delivered').length;
+        const failed = asg.filter((a) => ['disputed', 'cancelled'].includes(a.state)).length;
+        const hrs = approvals.map((r) => (+new Date(r.approved_at) - +new Date(r.created_at)) / 36e5);
         return {
-          peopleSupported: sum(fulfilled, 'people_count'),
-          districtsCovered: new Set(fulfilled.map((r) => r.district)).size,
-          volunteerHours: sum(vol, 'hours_logged'),
+          peopleSupported: fulfilled.length, // proxy: no people_count column yet
+          districtsCovered: new Set(fulfilled.map((r) => r.district_id).filter((d) => d != null)).size,
+          volunteerHours: null as any, // not tracked in the schema yet
           volunteerHoursChangePct: null,
-          deliverySuccessPct: done + failed ? Math.round((done / (done + failed)) * 1000) / 10 : 0,
-          completedJobs: done,
-          avgApprovalHours: approvals.length ? Math.round((approvals.reduce((a, b) => a + b, 0) / approvals.length) * 10) / 10 : 0,
+          deliverySuccessPct: delivered + failed ? Math.round((delivered / (delivered + failed)) * 1000) / 10 : 0,
+          completedJobs: delivered,
+          avgApprovalHours: hrs.length ? Math.round((hrs.reduce((a, b) => a + b, 0) / hrs.length) * 10) / 10 : 0,
           avgApprovalChangeMin: null,
         };
       }, demoSections),

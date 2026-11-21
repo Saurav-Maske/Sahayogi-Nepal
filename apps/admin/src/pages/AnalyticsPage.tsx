@@ -71,8 +71,8 @@ export default function AnalyticsPage() {
       <div className="grid-stats">
         <StatCard to="/requests?status=fulfilled" label="People supported" value={k.peopleSupported}
           note={`Across ${k.districtsCovered} districts`} />
-        <StatCard to="/volunteers" label="Volunteer hours" value={k.volunteerHours}
-          note={vh.note || 'All time'} tone={vh.tone} />
+        <StatCard to="/volunteers" label="Volunteer hours" value={k.volunteerHours ?? '—'}
+          note={vh.note || (k.volunteerHours === null ? 'Not tracked yet' : 'All time')} tone={vh.tone} />
         <StatCard to="/assignments" label="Delivery success" value={`${k.deliverySuccessPct}%`}
           note={`Across ${k.completedJobs} completed jobs`} />
         <StatCard to="/requests" label="Average approval" value={`${k.avgApprovalHours} hrs`}

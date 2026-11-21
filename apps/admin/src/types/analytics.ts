@@ -3,7 +3,7 @@ import type { ChartPoint } from './dashboard';
 export interface AnalyticsKpis {
   peopleSupported: number;
   districtsCovered: number;
-  volunteerHours: number;
+  volunteerHours: number | null; // null = not tracked yet
   volunteerHoursChangePct: number | null;
   deliverySuccessPct: number;
   completedJobs: number;

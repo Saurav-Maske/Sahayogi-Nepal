@@ -6,9 +6,10 @@ interface Props {
   userName: string;
   userRole: string;
   onMenuClick: () => void;
+  onSignOut: () => void;
 }
 
-export default function AdminTopbar({ notificationCount, userName, userRole, onMenuClick }: Props) {
+export default function AdminTopbar({ notificationCount, userName, userRole, onMenuClick, onSignOut }: Props) {
   const navigate = useNavigate();
   const [query, setQuery] = useState('');
 
@@ -48,6 +49,7 @@ export default function AdminTopbar({ notificationCount, userName, userRole, onM
         <span className="topbar__user">
           <strong>{userName}</strong> / {userRole}
         </span>
+        <button className="topbar__signout" onClick={onSignOut}>Sign out</button>
       </div>
     </header>
   );
