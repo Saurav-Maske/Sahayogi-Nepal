@@ -1,0 +1,110 @@
+import 'package:material_ui/material_ui.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+import '../core/app_colors.dart';
+import 'home_screen.dart';
+import 'onboarding_screen.dart';
+
+class StartupScreen extends StatefulWidget {
+  const StartupScreen({super.key});
+
+  @override
+  State<StartupScreen> createState() => _StartupScreenState();
+}
+
+class _StartupScreenState extends State<StartupScreen> {
+  @override
+  void initState() {
+    super.initState();
+    _continueAfterSplash();
+  }
+
+  Future<void> _continueAfterSplash() async {
+    await Future<void>.delayed(const Duration(seconds: 2));
+    final prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
+
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute<void>(
+        builder: (_) => prefs.getBool('onboarding_complete') == true
+            ? const HomeScreen()
+            : const OnboardingScreen(),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+        backgroundColor: appNavy,
+        body: SafeArea(
+          child: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Image.asset(
+                  'assets/images/SahayogiNepalLogo.png',
+                  width: 58,
+                  height: 58,
+                  fit: BoxFit.contain,
+                ),
+                const SizedBox(height: 53),
+                const Text(
+                  'Sahayogi\nNepal',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 38,
+                    height: 1.42,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                const Text(
+                  'Helping Hands,\nSafer Communities.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Color(0xFFC5D0DA),
+                    fontSize: 16,
+                    height: 1.5,
+                  ),
+                ),
+                const SizedBox(height: 29),
+                const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _Dot(color: appGold),
+                    SizedBox(width: 6),
+                    _Dot(color: Color(0xFF526273)),
+                    SizedBox(width: 6),
+                    _Dot(color: Color(0xFF526273)),
+                  ],
+                ),
+                const SizedBox(height: 30),
+                const Text(
+                  'TOGETHER, WE RESPOND.',
+                  style: TextStyle(
+                    color: appGold,
+                    fontSize: 11,
+                    letterSpacing: 2.1,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+}
+
+class _Dot extends StatelessWidget {
+  const _Dot({required this.color});
+
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        width: 7,
+        height: 7,
+        decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+      );
+}
