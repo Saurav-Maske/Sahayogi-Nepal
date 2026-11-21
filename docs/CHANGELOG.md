@@ -2,6 +2,19 @@
 
 Newest first. Anything that changes a payload, table, function or seed behaviour gets a line here.
 
+## 2026-11-22 (migrations 000008 and 000009 rebuilt)
+
+- **Why:** `20261122000008_email_otp.sql` and `20261122000009_push_outbox.sql` were 0 bytes in `Sahayogi-Nepal-test.zip` (issue 13). Both were rebuilt from the code that depends on them (`_shared/otp.ts`, the auth functions, `send-push`) and from the entries below. **Not yet run against a database.** If the originals exist in Git or on a project that already applied them, keep the originals and discard these.
+- **000008:** `email_otps` (unique per email + purpose), `auth_attempts.kind` widened with `otp_send | otp_verify`, `volunteer_applications.email_verified_at`, `purge_email_otps()`, `revoke_user_sessions(uuid)`. Service role only.
+- **000009:** `push_outbox`, statement-level triggers on `assignments` (new offer, released back to pool), `_push_kick()` (pg_net + vault entries `push_function_url` and `push_secret`), `_push_enqueue_escalations()`, `_push_tick()`, `push_claim_batch(int)`, `push_recipients(uuid, text)`, pg_cron jobs `push-escalations` (every minute) and `purge-push-outbox` (daily). Service role only.
+
+## 2026-11-22 (function privileges clean-up)
+
+- **Migration `20261122000011_function_privileges.sql`:** closes issue 11. `audit_row_hash`, `fn_export_latest_audit_hash`, the four trigger functions (`fn_audit_logs_hash_chain`, `fn_audit_logs_append_only`, `fn_assignment_create_driver_location`, `auto_assign_request_district_id`) and any other non-RPC function in `public` (push and email OTP helpers included) are now `service_role` only. A sweep applies the rule to everything not on the client RPC list, and the migration fails and rolls back if `anon` or `authenticated` can still execute something outside its list.
+- **`is_admin()` stays executable by `anon` and `authenticated` on purpose:** RLS policies and the volunteer-docs storage policy call it as the requesting role. It returns false for anon.
+- **No payload or behaviour change for the apps.** Contract stays v1.4.
+- **New `scripts/check_function_privileges.sql`:** query 1 returns only violations (zero rows = pass); run it after every `supabase db push`.
+
 ## 2026-11-22 (get-route complete)
 
 - **Migration `20261122000010_routes.sql`:** new `routes` table (user, optional `assignment_id`, origin and destination, costing, distance, duration, first-leg `shape`, all `legs` as jsonb). RLS: a user reads their own rows, admins read all; no client writes (the function uses the service role). Closes the routes-table gap.

@@ -3,15 +3,8 @@ import type { ApprovedItem, District } from '../types/requests';
 import type { Donation, DonationDetail, DonationFilters, DonationList } from '../types/donations';
 import { DONATION_TABS } from '../utils/donations';
 import { PAGE_SIZE } from '../utils/requests';
-import { DECISION, REVIEW_RPC, RPC_PARAMS } from './requestsService';
+import { callReviewRpc } from './requestsService';
 import { hasSession } from './session';
-
-/**
- * PROPOSED RPC, not in API-CONTRACT.md yet. Ask Person 2 to add it (and to log every change,
- * since the Figma says "All quantity changes are recorded"). Names live here only.
- */
-const ADJUST_RPC = 'admin_set_accepted_qty';
-const ADJUST_PARAMS = (itemId: string, qty: number, note: string) => ({ p_request_item_id: itemId, p_qty: qty, p_note: note });
 
 const DAY = 864e5;
 const one = (v: any) => (Array.isArray(v) ? v[0] : v);
@@ -140,7 +133,7 @@ export async function getDonationDistricts(): Promise<District[]> {
   return data ?? [];
 }
 
-/** Accept or decline a pending donation. Reuses the contract's admin_review_request. */
+/** Accept or decline a pending donation. Uses admin_approve_request / admin_decline_request. */
 export async function reviewDonation(id: string, decision: 'approve' | 'decline', items: ApprovedItem[], reason: string) {
   if (!(await hasSession())) {
     const d = demo.find((x) => x.id === id);
@@ -152,8 +145,7 @@ export async function reviewDonation(id: string, decision: 'approve' | 'decline'
     d.items.forEach((i) => { i.acceptedQty = items.find((a) => a.item_id === i.id)?.qty ?? 0; });
     return;
   }
-  const { error } = await supabase.rpc(REVIEW_RPC, RPC_PARAMS(id, DECISION[decision], items, reason));
-  if (error) throw error;
+  await callReviewRpc(id, decision, items, reason);
 }
 
 /** Correct accepted quantities on an already-accepted donation. */
@@ -164,8 +156,9 @@ export async function saveAcceptedQuantities(id: string, items: ApprovedItem[], 
     d.items.forEach((i) => { const m = items.find((a) => a.item_id === i.id); if (m) i.acceptedQty = m.qty; });
     return;
   }
-  for (const it of items) {
-    const { error } = await supabase.rpc(ADJUST_RPC, ADJUST_PARAMS(it.item_id, it.qty, note));
-    if (error) throw error;
-  }
+  // No backend RPC exists for this: after approval the donor changes quantities through requester_update_pickup_qty
+  // and the driver confirms at pickup. Fail loudly instead of calling a function that does not exist.
+  // TODO (Person 2 / 3): either add an admin RPC for it or remove the "edit accepted quantities" action from the UI.
+  void note;
+  throw new Error('Changing accepted quantities after approval is not supported by the backend yet.');
 }
