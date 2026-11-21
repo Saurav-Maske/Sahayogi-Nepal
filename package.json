@@ -1,5 +1,6 @@
 {
-  "dependencies": {
-    "@supabase/supabase-js": "^2.119.2"
-  }
+  "name": "sahayogi-backend-scripts",
+  "private": true,
+  "type": "module",
+  "dependencies": { "@supabase/supabase-js": "^2.45.4" }
 }
