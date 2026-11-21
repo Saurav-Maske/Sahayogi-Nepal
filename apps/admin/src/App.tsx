@@ -11,14 +11,16 @@ import DonationsPage from "./pages/DonationsPage";
 import DonationDetailPage from "./pages/DonationDetailPage";
 import VolunteersPage from "./pages/VolunteerPage";
 import VolunteerProfilePage from "./pages/VolunteerProfilePage";
+import AssignmentsPage from "./pages/AssignmentsPage";
+import AssignmentDetailPage from "./pages/AssignmentDetailPage";
+import IncidentsPage from "./pages/IncidentsPage";
+import IncidentDetailPage from "./pages/IncidentDetailPage";
 
 // Swap each PlaceholderPage for the real page as you build it.
 const PAGES: [path: string, title: string][] = [
   ["volunteers", "Volunteer Management"],
-  ["assignments", "Assignments"],
   ["inventory", "Central Inventory"],
   ["map", "Live Map"],
-  ["incidents", "Incidents & Reports"],
   ["notifications", "Notifications"],
   ["settings", "Settings"],
 ];
@@ -38,6 +40,10 @@ export default function App() {
           <Route path="donations/:id" element={<DonationDetailPage />} />
           <Route path="volunteers" element={<VolunteersPage />} />
           <Route path="volunteers/:id" element={<VolunteerProfilePage />} />
+          <Route path="assignments" element={<AssignmentsPage />} />
+          <Route path="assignments/:id" element={<AssignmentDetailPage />} />
+          <Route path="incidents" element={<IncidentsPage />} />
+          <Route path="incidents/:id" element={<IncidentDetailPage />} />
           {PAGES.map(([path, title]) => (
             <Route key={path} path={path} element={<PlaceholderPage title={title} />} />
           ))}
