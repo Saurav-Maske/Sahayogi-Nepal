@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:firebase_core/firebase_core.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -16,7 +16,10 @@ Future<void> main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
   PushNotifications.registerBackgroundHandler();
-  await Supabase.initialize(url: Config.supabaseUrl, anonKey: Config.supabaseAnonKey);
+  await Supabase.initialize(
+    url: Config.supabaseUrl,
+    publishableKey: Config.supabaseAnonKey,
+  );
   runApp(const ProviderScope(child: SahayogiApp()));
 }
 
@@ -80,18 +83,48 @@ class _StartupScreenState extends State<StartupScreen> {
                 height: 58,
                 fit: BoxFit.contain,
               ),
-              SizedBox(height: 53),
-              Text('Sahayogi\nNepal', textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.white, fontSize: 38, height: 1.42, fontWeight: FontWeight.w700)),
-              SizedBox(height: 24),
-              Text('Helping Hands,\nSafer Communities.', textAlign: TextAlign.center,
-                  style: TextStyle(color: Color(0xFFC5D0DA), fontSize: 16, height: 1.5)),
-              SizedBox(height: 29),
-              Row(mainAxisSize: MainAxisSize.min, children: [
-                _Dot(color: _gold), SizedBox(width: 6), _Dot(color: Color(0xFF526273)), SizedBox(width: 6), _Dot(color: Color(0xFF526273)),
-              ]),
-              SizedBox(height: 30),
-              Text('TOGETHER, WE RESPOND.', style: TextStyle(color: _gold, fontSize: 11, letterSpacing: 2.1, fontWeight: FontWeight.w700)),
+              const SizedBox(height: 53),
+              const Text(
+                'Sahayogi\nNepal',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 38,
+                  height: 1.42,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 24),
+              const Text(
+                'Helping Hands,\nSafer Communities.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Color(0xFFC5D0DA),
+                  fontSize: 16,
+                  height: 1.5,
+                ),
+              ),
+              const SizedBox(height: 29),
+              const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _Dot(color: _gold),
+                  SizedBox(width: 6),
+                  _Dot(color: Color(0xFF526273)),
+                  SizedBox(width: 6),
+                  _Dot(color: Color(0xFF526273)),
+                ],
+              ),
+              const SizedBox(height: 30),
+              const Text(
+                'TOGETHER, WE RESPOND.',
+                style: TextStyle(
+                  color: _gold,
+                  fontSize: 11,
+                  letterSpacing: 2.1,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
             ]),
           ),
         ),
