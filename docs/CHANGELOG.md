@@ -1,7 +1,14 @@
-
 # Contract and backend changelog
 
 Newest first. Anything that changes a payload, table, function or seed behaviour gets a line here.
+
+## 2026-11-22 (RPC parts 1 and 2)
+
+- **Migration `20261122000003_rpc_admin_requests.sql`:** `admin_list_requests`, `admin_approve_request` (FIFO stock reservation under row locks, all-or-nothing), `admin_decline_request`, `admin_dashboard_counts`. Granted to `authenticated`, `is_admin()` checked inside.
+- **Migration `20261122000004_rpc_assignments.sql`:** `create_assignments`, `my_offers`, `my_assignment_detail`, `claim_assignment`, `decline_assignment`, plus the internal `_tier_open_to` helper (no client grant). The exactly-{A}-for-60-s rule is now live in `my_offers` and `claim_assignment`.
+- **Behaviour:** offers and unclaimed detail expose only an approximate location (2 decimals) and no requester contact; the exact route and requester name/phone appear after a claim.
+- **Behaviour:** a volunteer can hold only one assignment per request (`already_on_request`); declining your own accepted assignment releases it back to the pool.
+- **Contract:** v1.1, new LIVE RPC section; samples added under `docs/samples/`.
 
 ## 2026-11-22
 

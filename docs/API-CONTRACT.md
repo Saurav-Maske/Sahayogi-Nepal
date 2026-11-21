@@ -1,5 +1,4 @@
-
-# API Contract (v1, owned by Person 2: Rujan Dhamala, Aakash Thakur)
+# API Contract (v1.1, owned by Person 2: Rujan Dhamala, Aakash Thakur)
 
 Change this file in the same PR as the code, and add a line to `docs/CHANGELOG.md`.
 Auth, login and volunteer sign-up endpoints are in [`api-auth.md`](api-auth.md).
@@ -80,6 +79,35 @@ Errors: `unauthorized | bad_json | invalid_locations | invalid_coordinate | out_
 
 `incidents` has Realtime enabled. Re-fetch authoritative state after an event; do not trust the payload alone.
 
+## LIVE RPCs (call with the signed-in user's JWT)
+
+Call with the SDK: `supabase.rpc('<name>', { ...args })`. Unlike Edge Functions, RPCs return the raw JSON (no `{ data, error }` wrapper from us); a failure arrives as `error.message` holding one of the codes below. One request and response per RPC is in `docs/samples/`.
+
+**Admin (`is_admin()` inside; anyone else gets `forbidden`)**
+
+- `admin_list_requests(p_status text = null, p_kind text = null)` returns an array, critical urgency first then oldest first (max 500). Each row: `id, public_ref, kind, status, requester_name, requester_phone, urgency, notes, address_note, volunteers_needed, decline_reason, district, lat, lng, created_at, approved_at, picked_up_at, fulfilled_at, items[], assignments { total, open, claimed }`. Errors: `forbidden | invalid_status | invalid_kind`.
+- `admin_approve_request(p_id uuid, p_items jsonb = null)`: `p_items` is `[{ "item_id": uuid, "approved_qty": number }]`; items left out are approved at the requested quantity, and `approved_qty` cannot exceed `requested_qty`. For `resource_request` it reserves stock FIFO from `ready_to_ship` lots under row locks; if stock is short the whole call rolls back. Sets status `approved`. Errors: `forbidden | not_found | invalid_state | invalid_items | nothing_approved | insufficient_stock` (the error `details` holds the item type).
+- `admin_decline_request(p_id uuid, p_reason text)`: reason 2-300 characters; only from `pending_admin_review`. Errors: `forbidden | not_found | invalid_state | invalid_reason`.
+- `admin_dashboard_counts()` returns `{ requests_by_status, assignments_by_state, open_offers, open_incidents, pending_applications, stock_available }`.
+- `create_assignments(p_id uuid)`: only from `approved`; sets status `awaiting_assignment`. What it creates per kind:
+
+| Request kind | Assignments | Tier | `route_snapshot` |
+| --- | --- | --- | --- |
+| `resource_request` | 1 `delivery` | B | hub, requester |
+| `donation_offer` | 1 `pickup` | B | donor, hub |
+| `manpower_request` | `volunteers_needed` x `manpower`, `escalate_at` = now + 60 s | A | requester |
+| `healthcare_request` | `volunteers_needed` x `healthcare` | C | requester |
+| `transport_request` | `volunteers_needed` x `transport` | B | requester |
+
+  `items_snapshot` is `[{ item_type, qty, unit }]` (approved quantities). Route points are `{ label, lat, lng }`; the driver's own position is not included. Errors: `forbidden | not_found | invalid_state | already_assigned | hub_not_configured | nothing_to_deliver | invalid_volunteers_needed`.
+
+**Volunteer (active volunteer; otherwise `forbidden`)**
+
+- `my_offers()` returns open offers the volunteer may take: not declined by them, request still `awaiting_assignment`. Tier A is visible to volunteers with exactly `{A}` until `escalate_at`, then to everyone holding A; tier B needs B; tier C needs C. Offers carry only `approx_lat` / `approx_lng` (2 decimals), `district`, `items`, `urgency`, no requester name or phone.
+- `my_assignment_detail(p_id)`: for your own assignment it adds `route`, and `requester { name, phone, lat, lng, address_note, notes }`. For an open eligible offer you get the redacted view. Anything else is `not_found`.
+- `claim_assignment(p_id)`: one atomic conditional update; returns the same detail as `my_assignment_detail`. A volunteer can hold only one assignment per request. Sets the request to `assigned` once no open slot is left. Errors: `already_claimed | not_eligible | not_found | already_on_request | not_available`.
+- `decline_assignment(p_id)` returns `{ id, released }`. Declining an open offer hides it from you. Declining your own `accepted` assignment releases it back to everyone else (`released: true`, request goes back to `awaiting_assignment`). Later states return `invalid_state`.
+
 ## PLANNED RPCs (not implemented; UI should mock these)
 
 Build order and signatures follow the Backend Playbook. Every RPC will call `append_audit_log(...)` and be granted explicitly (`revoke ... from public, anon` first).
@@ -91,12 +119,10 @@ Build order and signatures follow the Backend Playbook. Every RPC will call `app
 
 **Admin (`is_admin()` inside)**
 
-- `admin_list_requests(p_status, p_kind)`, `admin_approve_request(p_id, p_items)` (reserves stock with row locks), `admin_decline_request(p_id, p_reason)`, `create_assignments(p_id)`
-- `admin_import_stock(...)`, `admin_move_lot(...)`, `admin_list_incidents()`, `admin_resolve_incident(...)`, `admin_dashboard_counts()`, `admin_list_audit()`, `admin_map_markers()`
+- `admin_import_stock(...)`, `admin_move_lot(...)`, `admin_list_incidents()`, `admin_resolve_incident(...)`, `admin_list_audit()`, `admin_map_markers()`
 
 **Volunteer (authenticated, eligibility checked in the DB)**
 
-- `my_offers()` (exactly category A for the first 60 s via `escalate_at`, then everyone with A), `my_assignment_detail(p_id)`, `claim_assignment(p_id)` (single atomic update; errors `already_claimed | not_eligible | not_found`), `decline_assignment(p_id)`
 - `update_assignment_state(p_id, p_state)` (forward only), `update_my_location(...)`, `my_stats()`, `register_device_token(...)`
 - `driver_verify_otp(p_id, p_purpose, p_code, p_confirmed)`: 15-minute expiry, 5-attempt lock, quantity-changed handling
 
@@ -108,6 +134,6 @@ Build order and signatures follow the Backend Playbook. Every RPC will call `app
 | ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
 | Field names `requester_name` / `requester_phone` vs `name` / `phone` | Code uses `requester_*`. Change the contract, not the app, if Person 1 already sends otherwise. |
 | One pilot district or all Nepal                                              | Seeded `district` row is Kathmandu (pilot); polygons for every district are loaded.             |
-| Who sees a general request in the first 60 s                                 | Exactly category A first, then everyone with A.                                                   |
+| Who sees a general request in the first 60 s                                 | Built in `my_offers()`: exactly category A first, then everyone with A.                           |
 | Public map                                                                   | RPC `map_markers()`, not a view.                                                                |
 | Who reads the OTP                                                            | Donor for pickup, requester for delivery, both through `requester_get_otp`.                     |
