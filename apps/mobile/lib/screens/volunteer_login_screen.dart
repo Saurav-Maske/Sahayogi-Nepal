@@ -23,6 +23,7 @@ class _VolunteerLoginScreenState extends State<VolunteerLoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  bool _passwordVisible = false;
 
   @override
   void dispose() {
@@ -136,7 +137,7 @@ class _VolunteerLoginScreenState extends State<VolunteerLoginScreen> {
                     label: 'Password',
                     hint: 'Enter your password',
                     controller: _passwordController,
-                    obscureText: true,
+                    isPassword: true,
                     validator: (value) => value == null || value.isEmpty
                         ? 'Enter your password'
                         : null,
@@ -223,7 +224,7 @@ class _VolunteerLoginScreenState extends State<VolunteerLoginScreen> {
     required TextEditingController controller,
     required String? Function(String?) validator,
     TextInputType keyboardType = TextInputType.text,
-    bool obscureText = false,
+    bool isPassword = false,
   }) =>
       Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -240,7 +241,7 @@ class _VolunteerLoginScreenState extends State<VolunteerLoginScreen> {
           TextFormField(
             controller: controller,
             keyboardType: keyboardType,
-            obscureText: obscureText,
+            obscureText: isPassword && !_passwordVisible,
             validator: validator,
             style: const TextStyle(color: appNavy, fontSize: 14),
             decoration: InputDecoration(
@@ -251,11 +252,22 @@ class _VolunteerLoginScreenState extends State<VolunteerLoginScreen> {
               isDense: true,
               contentPadding:
                   const EdgeInsets.symmetric(horizontal: 14, vertical: 15),
-              suffixIcon: const Icon(
-                Icons.chevron_right_rounded,
-                color: appMuted,
-                size: 22,
-              ),
+              suffixIcon: isPassword
+                  ? IconButton(
+                      onPressed: () => setState(
+                        () => _passwordVisible = !_passwordVisible,
+                      ),
+                      tooltip:
+                          _passwordVisible ? 'Hide password' : 'Show password',
+                      icon: Icon(
+                        _passwordVisible
+                            ? Icons.visibility_off_outlined
+                            : Icons.visibility_outlined,
+                        color: appMuted,
+                        size: 21,
+                      ),
+                    )
+                  : null,
               errorStyle: const TextStyle(fontSize: 11),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(14),
