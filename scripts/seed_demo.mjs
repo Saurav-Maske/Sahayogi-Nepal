@@ -37,6 +37,14 @@ const district = cfg.district ?? {
   center: { lat: 27.7172, lng: 85.3240 },
   bounds: { south: 27.62, west: 85.22, north: 27.82, east: 85.44 },
 };
+// Safety net: the migration seeds these rows; this only fills them in if someone deleted them.
+// ignoreDuplicates => never overwrites a value already set on the project.
+const missingSettings = [
+  ...(cfg.district ? [] : [{ key: 'district', value: { name: 'Kathmandu', ...district, zoom: 11 } }]),
+  ...(cfg.central_inventory ? [] : [{ key: 'central_inventory', value: { name: 'Central Inventory Hub', lat: 27.705, lng: 85.32, address_note: 'Placeholder hub location' } }]),
+];
+if (missingSettings.length) must(await sb.from('app_settings').upsert(missingSettings, { onConflict: 'key', ignoreDuplicates: true }), 'ensure app_settings rows');
+
 const { south, west, north, east } = district.bounds;
 const { lat: cLat, lng: cLng } = district.center;
 
@@ -50,6 +58,10 @@ if (RESET) {
   console.log('--reset: removing earlier demo rows');
   const { data: lots } = await sb.from('inventory_lots').select('id').like('provider_name', 'Demo%');
   const lotIds = (lots ?? []).map((l) => l.id);
+  const { data: demoReqs } = await sb.from('requests').select('id').like('requester_name', 'Demo %');
+  const reqIds = (demoReqs ?? []).map((r) => r.id);
+  if (reqIds.length) must(await sb.from('incidents').delete().in('request_id', reqIds), 'delete demo incidents');
+  if (lotIds.length) must(await sb.from('inventory_reservations').delete().in('lot_id', lotIds), 'delete demo reservations');
   if (lotIds.length) {
     must(await sb.from('inventory_movements').delete().in('lot_id', lotIds), 'delete demo movements');
     must(await sb.from('inventory_lots').delete().in('id', lotIds), 'delete demo lots');

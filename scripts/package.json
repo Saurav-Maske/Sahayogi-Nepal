@@ -1,2 +1,14 @@
-{ "name": "sahayogi-scripts", "private": true, "type": "module",
-  "dependencies": { "@supabase/supabase-js": "^2.45.0", "dotenv": "^16.4.5" } }
+{
+  "name": "sahayogi-scripts",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "seed": "node --env-file=../.env seed_demo.mjs && node --env-file=../.env seed_extra.mjs",
+    "reset:remote": "node --env-file=../.env reset_demo_remote.mjs"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.0",
+    "dotenv": "^16.4.5",
+    "bcryptjs": "^2.4.3"
+  }
+}
