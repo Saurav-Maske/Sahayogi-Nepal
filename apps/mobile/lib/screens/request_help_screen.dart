@@ -252,16 +252,8 @@ class _RequestHelpScreenState extends State<RequestHelpScreen> {
                     children: [
                       IconButton(
                         onPressed: () => Navigator.of(context).pop(),
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints.tightFor(
-                          width: 32,
-                          height: 40,
-                        ),
-                        icon: const Icon(
-                          Icons.arrow_back_rounded,
-                          color: appNavy,
-                          size: 22,
-                        ),
+                        tooltip: 'Back',
+                        icon: const Icon(Icons.arrow_back_rounded),
                       ),
                       const SizedBox(width: 8),
                       const Expanded(
@@ -281,7 +273,7 @@ class _RequestHelpScreenState extends State<RequestHelpScreen> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 18),
                   const Text(
                     'Tell us what you need.',
                     style: TextStyle(
@@ -291,31 +283,7 @@ class _RequestHelpScreenState extends State<RequestHelpScreen> {
                       fontWeight: FontWeight.w800,
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'A few details help us match you with nearby\nsupport.',
-                    style: TextStyle(
-                      color: appMuted,
-                      fontSize: 14,
-                      height: 1.4,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  const Row(
-                    children: [
-                      Icon(
-                        Icons.verified_user_outlined,
-                        color: appTeal,
-                        size: 17,
-                      ),
-                      SizedBox(width: 8),
-                      Text(
-                        'Private details · Verified community network',
-                        style: TextStyle(color: appTeal, fontSize: 11),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 28),
+                  const SizedBox(height: 24),
                   _fieldLabel('Contact information'),
                   const SizedBox(height: 8),
                   _textField(
@@ -494,17 +462,6 @@ class _RequestHelpScreenState extends State<RequestHelpScreen> {
                       onPressed: _isSubmitting ? null : _submitRequest,
                       child: Text(
                           _isSubmitting ? 'Submitting…' : 'Submit request'),
-                      style: FilledButton.styleFrom(
-                        backgroundColor: appNavy,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(15),
-                        ),
-                        textStyle: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
                     ),
                   ),
                 ],

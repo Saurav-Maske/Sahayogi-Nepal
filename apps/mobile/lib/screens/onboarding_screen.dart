@@ -6,29 +6,16 @@ import '../widgets/onboarding_illustration.dart';
 import 'home_screen.dart';
 
 class _OnboardingPage {
-  const _OnboardingPage(this.title, this.description, this.scene);
+  const _OnboardingPage(this.title, this.scene);
 
   final String title;
-  final String description;
   final int scene;
 }
 
 const _pages = [
-  _OnboardingPage(
-    'Help is closer\nthan you think.',
-    'Request essentials for yourself or your\ncommunity. The right support starts here.',
-    0,
-  ),
-  _OnboardingPage(
-    'Small acts.\nExtraordinary impact.',
-    'Connect with local donors, volunteers and\norganizations ready to lend a hand.',
-    1,
-  ),
-  _OnboardingPage(
-    'Every resource.\nEvery step. Visible.',
-    'Follow your request from first match to safe\ndelivery. Trust built into every update.',
-    2,
-  ),
+  _OnboardingPage('Help is closer\nthan you think.', 0),
+  _OnboardingPage('Small acts.\nExtraordinary impact.', 1),
+  _OnboardingPage('Every resource.\nEvery step. Visible.', 2),
 ];
 
 class OnboardingScreen extends StatefulWidget {
@@ -77,14 +64,21 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text(
-                        'Sahayogi',
-                        style: TextStyle(
-                          color: appNavy,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
+                      if (_index == 0)
+                        const Text(
+                          'Sahayogi',
+                          style: TextStyle(
+                            color: appNavy,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        )
+                      else
+                        IconButton(
+                          tooltip: 'Back',
+                          onPressed: () => setState(() => _index--),
+                          icon: const Icon(Icons.arrow_back_rounded),
                         ),
-                      ),
                       TextButton(
                         onPressed: _finish,
                         style: TextButton.styleFrom(foregroundColor: appTeal),
@@ -129,16 +123,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       letterSpacing: -0.5,
                     ),
                   ),
-                  const SizedBox(height: 19),
-                  Text(
-                    page.description,
-                    style: const TextStyle(
-                      color: appMuted,
-                      fontSize: 15,
-                      height: 1.48,
-                    ),
-                  ),
-                  const SizedBox(height: 27),
+                  const SizedBox(height: 24),
                   Row(
                     children: List.generate(
                       _pages.length,
