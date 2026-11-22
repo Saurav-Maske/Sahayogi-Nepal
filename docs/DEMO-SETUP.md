@@ -7,7 +7,6 @@ Use a **separate** Supabase project. Never point the scripts below at anything y
 ## 0. Before you start
 
 - [ ] Confirm the real hub coordinates with Person 4 (issue 8). `create_assignments` fails with `hub_not_configured` without them, and routes use whatever is there.
-- [ ] Confirm that `20261122000008_email_otp.sql` and `20261122000009_push_outbox.sql` in Git are the real files. If the zip's rebuilt versions are all there is, keep them, and tell anyone whose project already ran the originals.
 - [ ] Tools: Supabase CLI logged in (`supabase login`), Node 20+. On Windows use `scripts\demo_deploy.ps1`; the `.sh` version needs Git Bash or WSL.
 - [ ] `cd scripts && npm install` (the seed and test scripts load packages from there).
 
