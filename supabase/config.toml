@@ -74,6 +74,8 @@ verify_jwt = false
 verify_jwt = false
 [functions.approve-volunteer]
 verify_jwt = false
+[functions.view-volunteer-application]
+verify_jwt = false
 [functions.admin-set-account-status]
 verify_jwt = false
 # get-route checks the caller itself (requireUser), like the rest. Listed explicitly so behaviour is not left to defaults.
