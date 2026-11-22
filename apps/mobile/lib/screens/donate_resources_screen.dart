@@ -246,16 +246,8 @@ class _DonateResourcesScreenState extends State<DonateResourcesScreen> {
                     children: [
                       IconButton(
                         onPressed: () => Navigator.of(context).pop(),
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints.tightFor(
-                          width: 32,
-                          height: 40,
-                        ),
-                        icon: const Icon(
-                          Icons.arrow_back_rounded,
-                          color: appNavy,
-                          size: 22,
-                        ),
+                        tooltip: 'Back',
+                        icon: const Icon(Icons.arrow_back_rounded),
                       ),
                       const SizedBox(width: 8),
                       const Expanded(
@@ -285,12 +277,7 @@ class _DonateResourcesScreenState extends State<DonateResourcesScreen> {
                       fontWeight: FontWeight.w800,
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Your extra supplies can be someone’s lifeline.',
-                    style: TextStyle(color: appMuted, fontSize: 14),
-                  ),
-                  const SizedBox(height: 22),
+                  const SizedBox(height: 24),
                   ...List.generate(
                     _categories.length,
                     (index) => Padding(
@@ -466,17 +453,6 @@ class _DonateResourcesScreenState extends State<DonateResourcesScreen> {
                       onPressed: _isSubmitting ? null : _submitDonation,
                       child: Text(
                           _isSubmitting ? 'Submitting…' : 'Share resources'),
-                      style: FilledButton.styleFrom(
-                        backgroundColor: appNavy,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(15),
-                        ),
-                        textStyle: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
                     ),
                   ),
                 ],

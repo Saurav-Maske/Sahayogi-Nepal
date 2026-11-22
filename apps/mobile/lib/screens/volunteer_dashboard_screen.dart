@@ -66,9 +66,8 @@ class _VolunteerDashboardScreenState extends State<VolunteerDashboardScreen> {
           );
     final preferences = await SharedPreferences.getInstance();
     final activeId = preferences.getString('volunteer_active_assignment_id');
-    final activeResult = activeId == null
-        ? null
-        : await Api.getVolunteerAssignment(activeId);
+    final activeResult =
+        activeId == null ? null : await Api.getVolunteerAssignment(activeId);
     if (!mounted) return;
     final requestsById = <String, Map<String, dynamic>>{};
     for (final offer in nearbyOffersResult.data ?? const []) {
@@ -89,17 +88,14 @@ class _VolunteerDashboardScreenState extends State<VolunteerDashboardScreen> {
         'layer': 'need',
         'lat': offer['approx_lat'],
         'lng': offer['approx_lng'],
-        'item_types': items
-            .map((item) => item['item_type'])
-            .whereType<String>()
-            .toList(),
+        'item_types':
+            items.map((item) => item['item_type']).whereType<String>().toList(),
         'join_offers': <Map<String, dynamic>>[offer],
       };
     }
     final nearbyRequests = requestsById.values.toList()
       ..sort((a, b) =>
-          ((a['distance_km'] as num?)?.toDouble() ?? double.infinity)
-              .compareTo(
+          ((a['distance_km'] as num?)?.toDouble() ?? double.infinity).compareTo(
             (b['distance_km'] as num?)?.toDouble() ?? double.infinity,
           ));
     setState(() {
@@ -232,189 +228,188 @@ class _VolunteerDashboardScreenState extends State<VolunteerDashboardScreen> {
   Widget build(BuildContext context) => VolunteerSessionGuard(
         onUnauthorized: () => openVolunteerLogin(context),
         child: Scaffold(
-        backgroundColor: appPaper,
-        body: SafeArea(
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(24, 18, 24, 24),
-            children: [
-              Row(
-                children: [
-                  const Expanded(
-                    child: Text(
-                      'Volunteer hub',
-                      style: TextStyle(
-                        color: appNavy,
-                        fontSize: 17,
-                        fontWeight: FontWeight.w700,
+          backgroundColor: appPaper,
+          body: SafeArea(
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(24, 18, 24, 24),
+              children: [
+                Row(
+                  children: [
+                    const Expanded(
+                      child: Text(
+                        'Volunteer hub',
+                        style: TextStyle(
+                          color: appNavy,
+                          fontSize: 17,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                     ),
-                  ),
-                  SvgPicture.asset(
-                    'assets/images/SahayogiNepalLogo.svg',
-                    width: 36,
-                    height: 36,
-                    semanticsLabel: 'Sahayogi Nepal logo',
-                  ),
-                ],
-              ),
-              const SizedBox(height: 24),
-              const Text(
-                'Ready to make\na difference?',
-                style: TextStyle(
-                  color: appNavy,
-                  fontSize: 27,
-                  height: 1.15,
-                  fontWeight: FontWeight.w800,
+                    SvgPicture.asset(
+                      'assets/images/SahayogiNepalLogo.svg',
+                      width: 36,
+                      height: 36,
+                      semanticsLabel: 'Sahayogi Nepal logo',
+                    ),
+                  ],
                 ),
-              ),
-              const SizedBox(height: 7),
-              Text(
-                widget.account.name,
-                style: const TextStyle(color: appMuted, fontSize: 12),
-              ),
-              const SizedBox(height: 20),
-              _NextMissionCard(
-                offer: _activeAssignment,
-                loading: _loading,
-                onTap: _activeAssignment != null
-                    ? () {
-                        final id = _activeAssignment!['id'];
-                        _openAssignedTask(
-                          assignmentId: id is String ? id : null,
-                        );
-                      }
-                    : () => _openAssignedTask(),
-                buttonLabel: _activeAssignment != null
-                    ? 'View assigned task'
-                    : 'Current task',
-              ),
-              const SizedBox(height: 24),
-              const Text(
-                'Community actions',
-                style: TextStyle(
-                  color: appNavy,
-                  fontSize: 17,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 11),
-              Row(
-                children: [
-                  Expanded(
-                    child: _VolunteerActionCard(
-                      icon: Icons.inventory_2_outlined,
-                      label: 'Request help',
-                      onTap: _openRequestHelp,
-                    ),
-                  ),
-                  const SizedBox(width: 9),
-                  Expanded(
-                    child: _VolunteerActionCard(
-                      icon: Icons.people_outline_rounded,
-                      label: 'Request assistance',
-                      onTap: _openRequestAssistance,
-                    ),
-                  ),
-                  const SizedBox(width: 9),
-                  Expanded(
-                    child: _VolunteerActionCard(
-                      icon: Icons.favorite_border_rounded,
-                      label: 'Donate resources',
-                      onTap: _openDonateResources,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 26),
-              Row(
-                children: [
-                  const Expanded(
-                    child: Text(
-                      'Opportunities near you',
-                      style: TextStyle(
-                        color: appNavy,
-                        fontSize: 17,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                  TextButton(
-                    onPressed: () => _openExplore(context),
-                    style: TextButton.styleFrom(
-                      foregroundColor: appTeal,
-                      padding: EdgeInsets.zero,
-                      minimumSize: const Size(40, 36),
-                    ),
-                    child: const Text('View map'),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
-              if (_loadError != null) ...[
-                _DashboardMessage(
-                  message: _loadError!,
-                  onRetry: _loadDashboard,
-                ),
-                const SizedBox(height: 12),
-              ],
-              if (_loading && _nearbyRequests.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.all(24),
-                  child: Center(child: CircularProgressIndicator()),
-                )
-              else if (_nearbyRequests.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 20),
-                  child: Text(
-                    'No nearby requests right now.',
-                    style: TextStyle(color: appMuted, fontSize: 13),
-                  ),
-                )
-              else
-                Container(
-                  height: 360,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    border: Border.all(color: const Color(0xFFE0E6EC)),
-                    borderRadius: BorderRadius.circular(18),
-                  ),
-                  clipBehavior: Clip.antiAlias,
-                  child: ListView.separated(
-                    padding: const EdgeInsets.all(12),
-                    itemCount: _nearbyRequests.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 10),
-                    itemBuilder: (context, index) {
-                      final request = _nearbyRequests[index];
-                      return _OpportunityCard(
-                        request: request,
-                        onJoin: _joinRequest(request),
-                      );
-                    },
+                const SizedBox(height: 24),
+                const Text(
+                  'Ready to make\na difference?',
+                  style: TextStyle(
+                    color: appNavy,
+                    fontSize: 27,
+                    height: 1.15,
+                    fontWeight: FontWeight.w800,
                   ),
                 ),
-              const SizedBox(height: 14),
-              if (widget.account.roles.isNotEmpty)
+                const SizedBox(height: 7),
                 Text(
-                  'Your roles: ${widget.account.roles.join(' · ')}',
-                  style: const TextStyle(color: appMuted, fontSize: 11),
+                  widget.account.name,
+                  style: const TextStyle(color: appMuted, fontSize: 12),
                 ),
-            ],
+                const SizedBox(height: 20),
+                _NextMissionCard(
+                  offer: _activeAssignment,
+                  loading: _loading,
+                  onTap: _activeAssignment != null
+                      ? () {
+                          final id = _activeAssignment!['id'];
+                          _openAssignedTask(
+                            assignmentId: id is String ? id : null,
+                          );
+                        }
+                      : () => _openAssignedTask(),
+                  buttonLabel: _activeAssignment != null
+                      ? 'View assigned task'
+                      : 'Current task',
+                ),
+                const SizedBox(height: 24),
+                const Text(
+                  'Community actions',
+                  style: TextStyle(
+                    color: appNavy,
+                    fontSize: 17,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 11),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _VolunteerActionCard(
+                        icon: Icons.inventory_2_outlined,
+                        label: 'Request help',
+                        onTap: _openRequestHelp,
+                      ),
+                    ),
+                    const SizedBox(width: 9),
+                    Expanded(
+                      child: _VolunteerActionCard(
+                        icon: Icons.people_outline_rounded,
+                        label: 'Request assistance',
+                        onTap: _openRequestAssistance,
+                      ),
+                    ),
+                    const SizedBox(width: 9),
+                    Expanded(
+                      child: _VolunteerActionCard(
+                        icon: Icons.favorite_border_rounded,
+                        label: 'Donate resources',
+                        onTap: _openDonateResources,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 26),
+                Row(
+                  children: [
+                    const Expanded(
+                      child: Text(
+                        'Opportunities near you',
+                        style: TextStyle(
+                          color: appNavy,
+                          fontSize: 17,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () => _openExplore(context),
+                      style: TextButton.styleFrom(
+                        foregroundColor: appTeal,
+                        padding: EdgeInsets.zero,
+                        minimumSize: const Size(40, 36),
+                      ),
+                      child: const Text('View map'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                if (_loadError != null) ...[
+                  _DashboardMessage(
+                    message: _loadError!,
+                    onRetry: _loadDashboard,
+                  ),
+                  const SizedBox(height: 12),
+                ],
+                if (_loading && _nearbyRequests.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.all(24),
+                    child: Center(child: CircularProgressIndicator()),
+                  )
+                else if (_nearbyRequests.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 20),
+                    child: Text(
+                      'No nearby requests right now.',
+                      style: TextStyle(color: appMuted, fontSize: 13),
+                    ),
+                  )
+                else
+                  Container(
+                    height: 360,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      border: Border.all(color: const Color(0xFFE0E6EC)),
+                      borderRadius: BorderRadius.circular(18),
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: ListView.separated(
+                      padding: const EdgeInsets.all(12),
+                      itemCount: _nearbyRequests.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 10),
+                      itemBuilder: (context, index) {
+                        final request = _nearbyRequests[index];
+                        return _OpportunityCard(
+                          request: request,
+                          onJoin: _joinRequest(request),
+                        );
+                      },
+                    ),
+                  ),
+                const SizedBox(height: 14),
+                if (widget.account.roles.isNotEmpty)
+                  Text(
+                    'Your roles: ${widget.account.roles.join(' · ')}',
+                    style: const TextStyle(color: appMuted, fontSize: 11),
+                  ),
+              ],
+            ),
           ),
-        ),
-        bottomNavigationBar: _VolunteerNavigationBar(
-          selectedIndex: 0,
-          onHome: () {},
-          onExplore: () => _openExplore(context),
-          onRequests: () => _openRequests(context),
-          onProfile: () => Navigator.of(context).push(
-            MaterialPageRoute<void>(
-              builder: (_) => VolunteerProfileScreen(account: widget.account),
+          bottomNavigationBar: _VolunteerNavigationBar(
+            selectedIndex: 0,
+            onHome: () {},
+            onExplore: () => _openExplore(context),
+            onRequests: () => _openRequests(context),
+            onProfile: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => VolunteerProfileScreen(account: widget.account),
+              ),
             ),
           ),
         ),
-        ),
       );
-
 }
 
 class _NextMissionCard extends StatelessWidget {
@@ -466,7 +461,8 @@ class _NextMissionCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                const Icon(Icons.inventory_2_outlined, color: appGold, size: 19),
+                const Icon(Icons.inventory_2_outlined,
+                    color: appGold, size: 19),
                 const SizedBox(width: 9),
                 Text(
                   offer == null ? 'YOUR VOLUNTEER HUB' : 'MATCHED OPPORTUNITY',
@@ -508,7 +504,8 @@ class _NextMissionCard extends StatelessWidget {
                 onPressed: onTap,
                 iconAlignment: IconAlignment.end,
                 icon: const Icon(Icons.arrow_forward_rounded, size: 19),
-                label: Text(loading && offer == null ? 'Loading…' : buttonLabel),
+                label:
+                    Text(loading && offer == null ? 'Loading…' : buttonLabel),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: appGold,
                   foregroundColor: appNavy,
@@ -567,23 +564,17 @@ class _VolunteerActionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Material(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        color: Colors.transparent,
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(16),
-          child: Container(
-            height: 98,
-            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 12),
-            decoration: BoxDecoration(
-              border: Border.all(color: const Color(0xFFE0E6EC)),
-              borderRadius: BorderRadius.circular(16),
-            ),
+          borderRadius: BorderRadius.circular(12),
+          child: SizedBox(
+            height: 88,
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(icon, color: appTeal, size: 22),
-                const SizedBox(height: 8),
+                Icon(icon, color: appTeal, size: 24),
+                const SizedBox(height: 9),
                 Text(
                   label,
                   textAlign: TextAlign.center,
@@ -607,8 +598,9 @@ class _OpportunityCard extends StatelessWidget {
   final Map<String, dynamic> request;
   final VoidCallback onJoin;
 
-  List<String> get _itemTypes =>
-      (request['item_types'] as List? ?? const []).map((item) => '$item').toList();
+  List<String> get _itemTypes => (request['item_types'] as List? ?? const [])
+      .map((item) => '$item')
+      .toList();
 
   String get _title {
     final kind = '${request['kind'] ?? ''}';
@@ -692,7 +684,8 @@ class _OpportunityCard extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    const Icon(Icons.location_on_outlined, color: appTeal, size: 17),
+                    const Icon(Icons.location_on_outlined,
+                        color: appTeal, size: 17),
                     const SizedBox(width: 8),
                     const Text(
                       'NEARBY REQUEST',
@@ -727,7 +720,8 @@ class _OpportunityCard extends StatelessWidget {
                 const SizedBox(height: 12),
                 Row(
                   children: [
-                    const Icon(Icons.location_on_outlined, color: appMuted, size: 16),
+                    const Icon(Icons.location_on_outlined,
+                        color: appMuted, size: 16),
                     const SizedBox(width: 6),
                     Expanded(
                       child: Text(
@@ -737,7 +731,8 @@ class _OpportunityCard extends StatelessWidget {
                     ),
                     TextButton.icon(
                       onPressed: onJoin,
-                      icon: const Icon(Icons.volunteer_activism_outlined, size: 16),
+                      icon: const Icon(Icons.volunteer_activism_outlined,
+                          size: 16),
                       label: const Text('Join now'),
                       style: TextButton.styleFrom(
                         foregroundColor: appTeal,
@@ -836,7 +831,8 @@ class _NavItem extends StatelessWidget {
                 width: 48,
                 height: 30,
                 decoration: BoxDecoration(
-                  color: selected ? const Color(0xFFE8F0F4) : Colors.transparent,
+                  color:
+                      selected ? const Color(0xFFE8F0F4) : Colors.transparent,
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Icon(icon, color: appNavy, size: 21),

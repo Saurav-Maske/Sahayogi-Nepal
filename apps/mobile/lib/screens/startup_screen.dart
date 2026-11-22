@@ -57,7 +57,7 @@ class _StartupScreenState extends State<StartupScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Container(
+                SizedBox(
                   width: 82,
                   height: 82,
                   child: Image.asset(
@@ -76,53 +76,18 @@ class _StartupScreenState extends State<StartupScreen> {
                     fontWeight: FontWeight.w700,
                   ),
                 ),
-                const SizedBox(height: 24),
-                const Text(
-                  'Helping Hands,\nSafer Communities.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: Color(0xFFC5D0DA),
-                    fontSize: 16,
-                    height: 1.5,
-                  ),
-                ),
-                const SizedBox(height: 29),
-                const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _Dot(color: appGold),
-                    SizedBox(width: 6),
-                    _Dot(color: Color(0xFF526273)),
-                    SizedBox(width: 6),
-                    _Dot(color: Color(0xFF526273)),
-                  ],
-                ),
-                const SizedBox(height: 30),
-                const Text(
-                  'TOGETHER, WE RESPOND.',
-                  style: TextStyle(
+                const SizedBox(height: 26),
+                const SizedBox(
+                  width: 32,
+                  height: 32,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2.5,
                     color: appGold,
-                    fontSize: 11,
-                    letterSpacing: 2.1,
-                    fontWeight: FontWeight.w700,
                   ),
                 ),
               ],
             ),
           ),
         ),
-      );
-}
-
-class _Dot extends StatelessWidget {
-  const _Dot({required this.color});
-
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) => Container(
-        width: 7,
-        height: 7,
-        decoration: BoxDecoration(color: color, shape: BoxShape.circle),
       );
 }
