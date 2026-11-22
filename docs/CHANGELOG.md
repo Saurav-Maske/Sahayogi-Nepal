@@ -3,6 +3,11 @@
 
 Newest first. Anything that changes a payload, table, function or seed behaviour gets a line here.
 
+## 2026-11-23 (mobile auth, request history and transfer handoffs, contract v1.7)
+- Mobile auth-aware navigation, profile prefill and volunteer stats; saved request history clears between anonymous and volunteer sessions.
+- Added owner-scoped volunteer request history and requester/driver OTP, quantity and issue-report flows; admin assignment details can count donations and issue hub OTPs.
+- Increased the volunteer application IP limit to 500 per 24 hours; the per-phone limit remains 3.
+
 ## 2026-11-23 (hub pickup code and refusal for resource requests, contract v1.6)
 
 - **Migration `20261123000300_hub_pickup_otp.sql`:** `admin_issue_otp` now picks the purpose from the job: a `delivery` job that is `accepted` or `en_route_to_pickup` gets a `hub_pickup` code (6 digits, hashed, 15 minutes, 5 attempts, 10 per hour). The driver enters it in `driver_verify_otp` (purpose `hub_pickup`) and only then is the job `picked_up`. `update_assignment_state` no longer allows `delivery` -> `picked_up` (`otp_required`). Stock stays reserved until the requester's delivery code.

@@ -20,7 +20,7 @@ with fn as (
                       'register_public_device_token', 'get_district_config']) as name, true as for_anon
   union all
   select unnest(array['admin_list_requests', 'admin_approve_request', 'admin_decline_request',
-                      'admin_dashboard_counts', 'create_assignments', 'my_offers', 'my_assignment_detail',
+                      'admin_dashboard_counts', 'create_assignments', 'my_offers', 'my_requests', 'my_assignment_detail',
                       'claim_assignment', 'decline_assignment', 'update_assignment_state', 'driver_verify_otp',
                       'admin_map_markers', 'update_my_location', 'my_stats', 'register_device_token',
                       'admin_import_stock', 'admin_move_lot', 'admin_list_incidents',

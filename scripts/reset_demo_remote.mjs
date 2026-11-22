@@ -3,6 +3,7 @@
 // Usage (from repo root):
 //   ALLOW_DEMO_SEED=yes CONFIRM_PROJECT_REF=<ref> DEMO_PASSWORD='...' node --env-file=.env scripts/reset_demo_remote.mjs
 import { createClient } from '@supabase/supabase-js';
+import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
@@ -18,6 +19,11 @@ if (process.env.CONFIRM_PROJECT_REF !== ref) {
 if (!process.env.DEMO_PASSWORD) { console.error('Set DEMO_PASSWORD (needed by seed_demo.mjs).'); process.exit(1); }
 
 const sb = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
+const sha256 = (value) => createHash('sha256').update(value).digest('hex');
+const demoAuthHashes = [
+  sha256('driver1@demo.test'), sha256('driver2@demo.test'), sha256('general@demo.test'),
+  sha256('9800000301'), sha256('203.0.113.14'),
+];
 
 // Child-first order. request_items, assignments, otp_challenges, assignment_events,
 // volunteer_locations and inventory_reservations go away via ON DELETE CASCADE.
@@ -28,11 +34,23 @@ for (const t of order) {
   console.log(`cleared ${t}`);
 }
 // Demo-only rows in tables we otherwise keep (real applicants/devices/attempts are untouched).
-for (const [t, col, pat] of [['volunteer_applications', 'email', '%@demo.test'], ['device_tokens', 'token', 'demo-%'], ['auth_attempts', 'identifier', '%@demo.test']]) {
+const { data: demoApps, error: demoAppsError } = await sb.from('volunteer_applications')
+  .select('citizenship_photo_path,license_photo_path,service_card_photo_path').like('email', '%@demo.test');
+if (demoAppsError) { console.error(`FAILED loading demo application paths: ${demoAppsError.message}`); process.exit(1); }
+const demoDocPaths = (demoApps ?? []).flatMap((a) => [a.citizenship_photo_path, a.license_photo_path, a.service_card_photo_path]).filter(Boolean);
+if (demoDocPaths.length) {
+  const { error } = await sb.storage.from('volunteer-docs').remove(demoDocPaths);
+  if (error) { console.error(`FAILED clearing demo volunteer documents: ${error.message}`); process.exit(1); }
+  console.log(`cleared ${demoDocPaths.length} demo volunteer documents`);
+}
+for (const [t, col, pat] of [['volunteer_applications', 'email', '%@demo.test'], ['device_tokens', 'token', 'demo-%']]) {
   const { error } = await sb.from(t).delete().like(col, pat);
   if (error) { console.error(`FAILED clearing demo ${t}: ${error.message}`); process.exit(1); }
   console.log(`cleared demo rows in ${t}`);
 }
+const { error: attemptsError } = await sb.from('auth_attempts').delete().in('identifier', demoAuthHashes);
+if (attemptsError) { console.error(`FAILED clearing demo auth_attempts: ${attemptsError.message}`); process.exit(1); }
+console.log('cleared demo rows in auth_attempts');
 
 for (const script of ['./seed_demo.mjs', './seed_extra.mjs']) {
   const r = spawnSync(process.execPath, [fileURLToPath(new URL(script, import.meta.url))], { stdio: 'inherit', env: process.env });

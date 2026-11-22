@@ -3,7 +3,7 @@
 //   node --env-file=.env scripts/seed_extra.mjs
 // Safe to re-run: each section checks for its own marker rows first.
 import { createClient } from '@supabase/supabase-js';
-import { createHash, randomBytes } from 'node:crypto';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import bcrypt from 'bcryptjs';
 
 const URL_ = process.env.SUPABASE_URL;
@@ -15,6 +15,10 @@ if (!/127\.0\.0\.1|localhost/.test(URL_) && process.env.ALLOW_DEMO_SEED !== 'yes
 const sb = createClient(URL_, KEY, { auth: { persistSession: false, autoRefreshToken: false } });
 const must = (res, what) => { if (res.error) { console.error(`FAILED: ${what}\n  ${res.error.message}`); process.exit(1); } return res.data; };
 const sha256 = (s) => createHash('sha256').update(s).digest('hex');
+const demoAuthHashes = [
+  sha256('driver1@demo.test'), sha256('driver2@demo.test'), sha256('general@demo.test'),
+  sha256('9800000301'), sha256('203.0.113.14'),
+];
 const ago = (h) => new Date(Date.now() - h * 3600_000).toISOString();
 const inMin = (m) => new Date(Date.now() + m * 60_000).toISOString();
 const DEMO_OTP = '123456';
@@ -54,7 +58,7 @@ else {
   for (const a of apps) {
     const email = a.email ?? `${a.who}@demo.test`;
     const slug = email.split('@')[0];
-    const paths = { cit: `demo/${slug}/citizenship.png`, lic: a.lic ? `demo/${slug}/license.png` : null, card: a.card ? `demo/${slug}/service_card.png` : null };
+    const paths = { cit: `docs/${randomUUID()}.png`, lic: a.lic ? `docs/${randomUUID()}.png` : null, card: a.card ? `docs/${randomUUID()}.png` : null };
     for (const p of Object.values(paths).filter(Boolean)) {
       const { error } = await sb.storage.from('volunteer-docs').upload(p, PNG, { contentType: 'image/png', upsert: true });
       if (error) console.warn(`  (storage upload ${p}: ${error.message})`);
@@ -64,7 +68,7 @@ else {
       profile_id: prof?.id ?? null, full_name: a.name ?? prof?.full_name ?? slug, email, phone: a.phone ?? '9800000300',
       volunteer_type: a.type, citizenship_no: a.cit, citizenship_photo_path: paths.cit,
       license_no: a.lic ?? null, license_photo_path: paths.lic, service_card_no: a.card ?? null, service_card_photo_path: paths.card,
-      review_status: a.status, review_note: a.note ?? null,
+      email_verified_at: ago(30), review_status: a.status, review_note: a.note ?? null,
       reviewed_by: ['approved', 'declined'].includes(a.status) ? P.admin : null,
       reviewed_at: ['approved', 'declined'].includes(a.status) ? ago(30) : null,
     });
@@ -83,16 +87,16 @@ must(await sb.from('device_tokens').upsert([
 console.log('device_tokens: 4 upserted');
 
 // ---- 3. auth_attempts ------------------------------------------------------------------------
-const { count: attCount } = await sb.from('auth_attempts').select('id', { count: 'exact', head: true }).like('identifier', '%@demo.test');
+const { count: attCount } = await sb.from('auth_attempts').select('id', { count: 'exact', head: true }).in('identifier', demoAuthHashes);
 if (attCount > 0) console.log(`auth_attempts: ${attCount} demo rows already there, skipped`);
 else {
   must(await sb.from('auth_attempts').insert([
-    { kind: 'login', identifier: 'driver1@demo.test', ip: '203.0.113.10', success: true },
-    { kind: 'login', identifier: 'driver2@demo.test', ip: '203.0.113.11', success: false },
-    { kind: 'login', identifier: 'driver2@demo.test', ip: '203.0.113.11', success: true },
-    { kind: 'reset', identifier: 'general@demo.test', ip: '203.0.113.12', success: true },
-    { kind: 'apply', identifier: 'applicant.pending@demo.test', ip: '203.0.113.13', success: true },
-    { kind: 'upload', identifier: 'applicant.review@demo.test', ip: '203.0.113.14', success: true },
+    { kind: 'login', identifier: sha256('driver1@demo.test'), ip: '203.0.113.10', success: true },
+    { kind: 'login', identifier: sha256('driver2@demo.test'), ip: '203.0.113.11', success: false },
+    { kind: 'login', identifier: sha256('driver2@demo.test'), ip: '203.0.113.11', success: true },
+    { kind: 'reset', identifier: sha256('general@demo.test'), ip: '203.0.113.12', success: false },
+    { kind: 'apply', identifier: sha256('9800000301'), ip: '203.0.113.13', success: false },
+    { kind: 'upload', identifier: sha256('203.0.113.14'), ip: '203.0.113.14', success: false },
   ]), 'insert auth_attempts');
   console.log('auth_attempts: 6 created');
 }
@@ -116,7 +120,7 @@ else {
     }))).select('id,item_type'), `items ${r.name}`);
     return { id: row.id, items };
   };
-  const mkLot = async (l, chain, request_id = null) => {
+  const mkLot = async (l, chain, request_id = null, assignment_id = null) => {
     const lot = must(await sb.from('inventory_lots').insert({
       item_type: l.item_type, unit: l.unit, quantity: l.quantity, reserved_qty: l.reserved ?? 0, phase: l.phase,
       provider_name: l.provider, provider_contact: l.contact ?? '9800000299', condition_note: l.note, source_request_id: l.source ?? null,
@@ -124,8 +128,9 @@ else {
     }).select('id').single(), `lot ${l.provider}`);
     let prev = null, t = chain.length * 2;
     must(await sb.from('inventory_movements').insert(chain.map((phase) => {
-      const m = { lot_id: lot.id, from_phase: prev, to_phase: phase, quantity: l.quantity, reason: `demo: ${phase}`,
-        actor_id: P.admin, request_id, created_at: ago(t) };
+      const m = { lot_id: lot.id, from_phase: prev, to_phase: phase, quantity: l.quantity,
+        reason: phase === 'received' && assignment_id ? 'hub receipt' : `demo: ${phase}`,
+        actor_id: P.admin, request_id, assignment_id, created_at: ago(t) };
       prev = phase; t -= 2; return m;
     })), `movements ${l.provider}`);
     return lot.id;
@@ -137,69 +142,86 @@ else {
   }).select('id').single(), `assignment ${a.type}/${a.state}`).id;
   const events = async (aid, list) => must(await sb.from('assignment_events').insert(list.map(([event_type, actor_id, payload, h]) => ({
     assignment_id: aid, event_type, actor_id, payload: payload ?? null, created_at: ago(h) }))), `events ${aid}`);
-  const otp = async (aid, purpose, { consumed = false, attempts = 0 } = {}) => must(await sb.from('otp_challenges').insert({
+  const otp = async (aid, purpose, { consumed = false, attempts = 0, issuedHoursAgo = 0 } = {}) => must(await sb.from('otp_challenges').insert({
     assignment_id: aid, purpose, code_hash: bcrypt.hashSync(DEMO_OTP, 10), attempts,
-    expires_at: consumed ? ago(0.5) : inMin(15), consumed_at: consumed ? ago(1) : null,
+    created_at: ago(issuedHoursAgo),
+    expires_at: consumed ? ago(Math.max(0, issuedHoursAgo - 0.25)) : inMin(15),
+    consumed_at: consumed ? ago(Math.max(0, issuedHoursAgo - 0.05)) : null,
   }), `otp ${purpose}`);
   const reserve = async (item, lot, qty, status) => must(await sb.from('inventory_reservations').insert({
     request_item_id: item, lot_id: lot, quantity: qty, status }), 'reservation');
   const hubPt = { label: 'central inventory', lat: hub.lat, lng: hub.lng };
   const drv = (lat, lng) => ({ label: 'driver', lat, lng });
 
-  // S1: Donor E (existing, picked up 2h ago) -> pickup assignment picked_up + OTP used + received lot
+  // S1: Donor E (picked up 2h ago) -> hub counted + both OTPs used + delivered to FWU-SOE
   const reqE = await byName('Demo Donor E'); const E = pin(0.004, 0.025);
-  const aE = await mkAsg({ req: reqE, type: 'pickup', tier: 'B', state: 'picked_up', vol: P.driver1, offeredH: 4, acceptedH: 3.8,
-    route: [drv(hub.lat, hub.lng), { label: 'donor', ...E }, hubPt], snap: [{ item_type: 'food', qty: 30, unit: 'pack' }] });
+  const aE = await mkAsg({ req: reqE, type: 'pickup', tier: 'B', state: 'delivered', vol: P.driver1, offeredH: 4, acceptedH: 3.8, doneH: 1.5,
+    route: [drv(hub.lat, hub.lng), { label: 'donor', ...E }, hubPt], snap: [{ item_type: 'food', qty: 30, unit: 'kit' }] });
   await events(aE, [['offered', null, null, 4], ['accepted', P.driver1, null, 3.8], ['en_route_to_pickup', P.driver1, null, 3.2],
-    ['otp_verified', P.driver1, { purpose: 'pickup', quantity_changed: false }, 2], ['picked_up', P.driver1, { qty: 30 }, 2]]);
-  await otp(aE, 'pickup', { consumed: true, attempts: 1 });
-  await mkLot({ item_type: "food", unit: "pack", quantity: 30, phase: "received", provider: "Demo Food Donor E", note: "from pickup", source: reqE }, ["received"], reqE);
+    ['otp_verified', P.driver1, { purpose: 'pickup', quantity_changed: false }, 2], ['picked_up', P.driver1, { qty: 30 }, 2],
+    ['hub_received', P.admin, { counted_qty: 30 }, 1.7], ['otp_verified', P.driver1, { purpose: 'hub_dropoff' }, 1.5],
+    ['delivered', P.driver1, { to: 'hub' }, 1.5]]);
+  await otp(aE, 'pickup', { consumed: true, attempts: 1, issuedHoursAgo: 2 });
+  await otp(aE, 'hub_dropoff', { consumed: true, attempts: 1, issuedHoursAgo: 1.5 });
+  await mkLot({ item_type: "food", unit: "kit", quantity: 30, phase: "received", provider: "Demo Donor E", note: "counted at FWU-SOE", source: reqE }, ["received"], reqE, aE);
 
   // S2: Requester G (fulfilled 3h ago) -> delivery delivered + consumed lot + dispatched reservation
   const reqG = await byName('Demo Requester G'); const [itG] = await itemsOf(reqG); const G = pin(-0.022, 0.004);
   const aG = await mkAsg({ req: reqG, type: 'delivery', tier: 'B', state: 'delivered', vol: P.driver2, offeredH: 6, acceptedH: 5.5, doneH: 3,
-    route: [drv(hub.lat, hub.lng), hubPt, { label: 'requester', ...G }], snap: [{ item_type: 'drinking_water', qty: 100, unit: 'litre' }] });
-  await events(aG, [['offered', null, null, 6], ['accepted', P.driver2, null, 5.5], ['picked_up', P.driver2, null, 4.5],
+    route: [drv(hub.lat, hub.lng), hubPt, { label: 'requester', ...G }], snap: [{ item_type: 'drinking_water', qty: 100, unit: 'kit' }] });
+  await events(aG, [['offered', null, null, 6], ['accepted', P.driver2, null, 5.5],
+    ['otp_verified', P.driver2, { purpose: 'hub_pickup' }, 4.6], ['picked_up', P.driver2, { from: 'hub' }, 4.5],
     ['en_route_to_destination', P.driver2, null, 4.2], ['otp_verified', P.driver2, { purpose: 'delivery' }, 3], ['delivered', P.driver2, { requester_full: true }, 3]]);
-  await otp(aG, 'delivery', { consumed: true, attempts: 1 });
-  const lotG = await mkLot({ item_type: 'drinking_water', unit: 'litre', quantity: 100, reserved: 100, phase: 'consumed', provider: 'Demo Water Supplier (batch 2)', note: 'delivered' },
+  await otp(aG, 'hub_pickup', { consumed: true, attempts: 1, issuedHoursAgo: 4.6 });
+  await otp(aG, 'delivery', { consumed: true, attempts: 1, issuedHoursAgo: 3 });
+  const lotG = await mkLot({ item_type: 'drinking_water', unit: 'kit', quantity: 100, reserved: 100, phase: 'consumed', provider: 'Demo Water Supplier (batch 2)', note: 'delivered' },
     ['received', 'processing', 'ready_to_ship', 'dispatched', 'consumed'], reqG);
   await reserve(itG.id, lotG, 100, 'dispatched');
 
   // S3: Requester H (fulfilled 13h ago) -> delivered + RESOLVED incident
   const reqH = await byName('Demo Requester H'); const H = pin(0.016, -0.028);
   const aH = await mkAsg({ req: reqH, type: 'delivery', tier: 'B', state: 'delivered', vol: P.driver1, offeredH: 17, acceptedH: 16.5, doneH: 13,
-    route: [drv(hub.lat, hub.lng), hubPt, { label: 'requester', ...H }], snap: [{ item_type: 'food', qty: 60, unit: 'pack' }] });
-  await events(aH, [['offered', null, null, 17], ['accepted', P.driver1, null, 16.5], ['delivered', P.driver1, null, 13], ['incident_opened', null, { type: 'short_delivery' }, 12.5], ['incident_resolved', P.admin, null, 10]]);
-  await otp(aH, 'delivery', { consumed: true, attempts: 2 });
+    route: [drv(hub.lat, hub.lng), hubPt, { label: 'requester', ...H }], snap: [{ item_type: 'food', qty: 60, unit: 'kit' }] });
+  await events(aH, [['offered', null, null, 17], ['accepted', P.driver1, null, 16.5],
+    ['otp_verified', P.driver1, { purpose: 'hub_pickup' }, 15], ['picked_up', P.driver1, { from: 'hub' }, 14.8],
+    ['en_route_to_destination', P.driver1, null, 14.5], ['otp_verified', P.driver1, { purpose: 'delivery' }, 13],
+    ['delivered', P.driver1, null, 13], ['incident_opened', null, { type: 'short_delivery' }, 12.5], ['incident_resolved', P.admin, null, 10]]);
+  await otp(aH, 'hub_pickup', { consumed: true, attempts: 1, issuedHoursAgo: 15 });
+  await otp(aH, 'delivery', { consumed: true, attempts: 2, issuedHoursAgo: 13 });
   must(await sb.from('incidents').insert({ assignment_id: aH, request_id: reqH, incident_type: 'short_delivery', status: 'resolved',
-    reporter_note: 'Two packs missing from the box', reported_shortfall: { food: 2 }, resolution: 'Recount showed all 60 packs delivered; requester miscounted.',
+    reporter_note: 'Two kits missing from the box', reported_shortfall: { food: 2 }, resolution: 'Recount showed all 60 kits delivered; requester miscounted.',
     admin_notes: 'Called requester and driver. No action against volunteer.', created_at: ago(12.5) }), 'incident resolved');
 
   // S4: Requester I -> delivery en route, live location, ACTIVE unused delivery OTP, dispatched lot
   const I = pin(0.012, -0.020);
   const rI = await mkReq({ name: 'Demo Requester I', phone: '9800000009', kind: 'resource_request', status: 'in_progress', at: I, urgency: 'high',
-    notes: 'DEMO: delivery on the way', items: [['drinking_water', 50, 'litre', 50, null]], approved_at: ago(2) });
+    notes: 'DEMO: delivery on the way', items: [['drinking_water', 50, 'kit', 50, null]], approved_at: ago(2) });
   const aI = await mkAsg({ req: rI.id, type: 'delivery', tier: 'B', state: 'en_route_to_destination', vol: P.driver2, offeredH: 1.8, acceptedH: 1.5,
-    route: [drv(hub.lat, hub.lng), hubPt, { label: 'requester', ...I }], snap: [{ item_type: 'drinking_water', qty: 50, unit: 'litre' }] });
-  await events(aI, [['offered', null, null, 1.8], ['accepted', P.driver2, null, 1.5], ['picked_up', P.driver2, null, 1], ['en_route_to_destination', P.driver2, null, 0.9]]);
+    route: [drv(hub.lat, hub.lng), hubPt, { label: 'requester', ...I }], snap: [{ item_type: 'drinking_water', qty: 50, unit: 'kit' }] });
+  await events(aI, [['offered', null, null, 1.8], ['accepted', P.driver2, null, 1.5],
+    ['otp_verified', P.driver2, { purpose: 'hub_pickup' }, 1.2], ['picked_up', P.driver2, { from: 'hub' }, 1], ['en_route_to_destination', P.driver2, null, 0.9]]);
+  await otp(aI, 'hub_pickup', { consumed: true, attempts: 1, issuedHoursAgo: 1.2 });
   await otp(aI, 'delivery');
   must(await sb.from('volunteer_locations').insert({ assignment_id: aI, lat: +((hub.lat + I.lat) / 2).toFixed(5), lng: +((hub.lng + I.lng) / 2).toFixed(5) }), 'volunteer_locations');
-  const lotI = await mkLot({ item_type: 'drinking_water', unit: 'litre', quantity: 50, reserved: 50, phase: 'dispatched', provider: 'Demo Water Supplier (batch 3)', note: 'in transit' },
+  const lotI = await mkLot({ item_type: 'drinking_water', unit: 'kit', quantity: 50, reserved: 50, phase: 'dispatched', provider: 'Demo Water Supplier (batch 3)', note: 'in transit' },
     ['received', 'processing', 'ready_to_ship', 'dispatched'], rI.id);
   await reserve(rI.items[0].id, lotI, 50, 'dispatched');
 
   // S5: Requester J -> DISPUTED delivery + OPEN incident
   const J = pin(-0.012, 0.022);
   const rJ = await mkReq({ name: 'Demo Requester J', phone: '9800000010', kind: 'resource_request', status: 'partially_fulfilled', at: J, urgency: 'critical',
-    notes: 'DEMO: requester says food was short', items: [['food', 40, 'pack', 40, 25]], approved_at: ago(5), fulfilled_at: ago(1) });
+    notes: 'DEMO: requester says food was short', items: [['food', 40, 'kit', 40, 25]], approved_at: ago(5), fulfilled_at: ago(1) });
   const aJ = await mkAsg({ req: rJ.id, type: 'delivery', tier: 'B', state: 'disputed', vol: P.driver1, offeredH: 5, acceptedH: 4.5, doneH: 1,
-    route: [drv(hub.lat, hub.lng), hubPt, { label: 'requester', ...J }], snap: [{ item_type: 'food', qty: 40, unit: 'pack' }] });
-  await events(aJ, [['offered', null, null, 5], ['accepted', P.driver1, null, 4.5], ['otp_verified', P.driver1, { purpose: 'delivery' }, 1], ['requester_reported_short', null, { food: 15 }, 1]]);
-  await otp(aJ, 'delivery', { consumed: true, attempts: 1 });
+    route: [drv(hub.lat, hub.lng), hubPt, { label: 'requester', ...J }], snap: [{ item_type: 'food', qty: 40, unit: 'kit' }] });
+  await events(aJ, [['offered', null, null, 5], ['accepted', P.driver1, null, 4.5],
+    ['otp_verified', P.driver1, { purpose: 'hub_pickup' }, 2], ['picked_up', P.driver1, { from: 'hub' }, 1.9],
+    ['en_route_to_destination', P.driver1, null, 1.7], ['otp_verified', P.driver1, { purpose: 'delivery' }, 1],
+    ['delivered', P.driver1, null, 1], ['requester_reported_short', null, { food: 15 }, 1]]);
+  await otp(aJ, 'hub_pickup', { consumed: true, attempts: 1, issuedHoursAgo: 2 });
+  await otp(aJ, 'delivery', { consumed: true, attempts: 1, issuedHoursAgo: 1 });
   must(await sb.from('incidents').insert({ assignment_id: aJ, request_id: rJ.id, incident_type: 'short_delivery', status: 'open',
-    reporter_note: 'Only 25 of 40 packs arrived', reported_shortfall: { food: 15 }, created_at: ago(1) }), 'incident open');
-  const lotJ = await mkLot({ item_type: 'food', unit: 'pack', quantity: 40, reserved: 40, phase: 'dispatched', provider: 'Demo Food Donor (batch 2)', note: 'dispatched' },
+    reporter_note: 'Only 25 of 40 kits arrived', reported_shortfall: { food: 15 }, created_at: ago(1) }), 'incident open');
+  const lotJ = await mkLot({ item_type: 'food', unit: 'kit', quantity: 40, reserved: 40, phase: 'dispatched', provider: 'Demo Food Donor (batch 2)', note: 'dispatched' },
     ['received', 'processing', 'ready_to_ship', 'dispatched'], rJ.id);
   await reserve(rJ.items[0].id, lotJ, 40, 'dispatched');
 
@@ -221,33 +243,33 @@ else {
   // S7b: donation pickup, driver is on the way (state en_route_to_pickup)
   const Q = pin(0.018, 0.030);
   const rQ = await mkReq({ name: 'Demo Donor Q', phone: '9800000016', kind: 'donation_offer', status: 'assigned', at: Q, notes: 'DEMO: driver heading to the donor',
-    items: [['cloth', 25, 'piece', 25, null]], approved_at: ago(0.7) });
+    items: [['cloth', 25, 'kit', 25, null]], approved_at: ago(0.7) });
   const aQ = await mkAsg({ req: rQ.id, type: 'pickup', tier: 'B', state: 'en_route_to_pickup', vol: P.driver1, offeredH: 0.6, acceptedH: 0.5,
-    route: [drv(hub.lat, hub.lng), { label: 'donor', ...Q }, hubPt], snap: [{ item_type: 'cloth', qty: 25, unit: 'piece' }] });
+    route: [drv(hub.lat, hub.lng), { label: 'donor', ...Q }, hubPt], snap: [{ item_type: 'cloth', qty: 25, unit: 'kit' }] });
   await events(aQ, [['offered', null, null, 0.6], ['accepted', P.driver1, null, 0.5], ['en_route_to_pickup', P.driver1, null, 0.4]]);
   await otp(aQ, 'pickup');
 
   // S8: approved resource request awaiting a driver, ACTIVE reservation against the main water lot
   const N = pin(-0.028, -0.012);
   const rN = await mkReq({ name: 'Demo Requester N', phone: '9800000013', kind: 'resource_request', status: 'awaiting_assignment', at: N, urgency: 'high',
-    notes: 'DEMO: approved, waiting for a driver', items: [['drinking_water', 80, 'litre', 80, null]], approved_at: ago(0.3) });
+    notes: 'DEMO: approved, waiting for a driver', items: [['drinking_water', 80, 'kit', 80, null]], approved_at: ago(0.3) });
   const mainWater = must(await sb.from('inventory_lots').select('id,reserved_qty').eq('provider_name', 'Demo Water Supplier').single(), 'main water lot');
   must(await sb.from('inventory_lots').update({ reserved_qty: Number(mainWater.reserved_qty) + 80 }).eq('id', mainWater.id), 'reserve on main lot');
   await reserve(rN.items[0].id, mainWater.id, 80, 'active');
   await mkAsg({ req: rN.id, type: 'delivery', tier: 'B', state: 'offered', offeredH: 0.2,
-    route: [drv(hub.lat, hub.lng), hubPt, { label: 'requester', ...N }], snap: [{ item_type: 'drinking_water', qty: 80, unit: 'litre' }] });
+    route: [drv(hub.lat, hub.lng), hubPt, { label: 'requester', ...N }], snap: [{ item_type: 'drinking_water', qty: 80, unit: 'kit' }] });
 
   // S9: cancelled request: RELEASED reservation + cancelled assignment.  S10: declined request.
   const O = pin(0.002, -0.030);
-  const rO = await mkReq({ name: 'Demo Requester O', phone: '9800000014', kind: 'resource_request', status: 'cancelled', at: O, notes: 'DEMO: requester cancelled', items: [['cloth', 30, 'piece', 30, null]], approved_at: ago(8) });
+  const rO = await mkReq({ name: 'Demo Requester O', phone: '9800000014', kind: 'resource_request', status: 'cancelled', at: O, notes: 'DEMO: requester cancelled', items: [['cloth', 30, 'kit', 30, null]], approved_at: ago(8) });
   await reserve(rO.items[0].id, (await sb.from('inventory_lots').select('id').eq('provider_name', 'Demo Clothes Donor').single()).data.id, 30, 'released');
   await mkAsg({ req: rO.id, type: 'delivery', tier: 'B', state: 'cancelled', offeredH: 7, route: [] });
   await mkReq({ name: 'Demo Requester P', phone: '9800000015', kind: 'manpower_request', status: 'declined', at: pin(-0.030, 0.030), needed: 5,
     notes: 'DEMO: declined example', decline: 'Duplicate of an earlier request in the same ward' });
 
   // inventory: one lot each in 'adjusted' and 'returned'
-  await mkLot({ item_type: 'food', unit: 'pack', quantity: 10, phase: 'adjusted', provider: 'Demo Count Correction', note: 'stock count correction' }, ['received', 'adjusted']);
-  await mkLot({ item_type: 'medical_supplies', unit: 'box', quantity: 5, phase: 'returned', provider: 'Demo Returned Goods', note: 'returned unopened' }, ['received', 'ready_to_ship', 'dispatched', 'returned']);
+  await mkLot({ item_type: 'food', unit: 'kit', quantity: 10, phase: 'adjusted', provider: 'Demo Count Correction', note: 'stock count correction' }, ['received', 'adjusted']);
+  await mkLot({ item_type: 'medical_supplies', unit: 'kit', quantity: 5, phase: 'returned', provider: 'Demo Returned Goods', note: 'returned unopened' }, ['received', 'ready_to_ship', 'dispatched', 'returned']);
   console.log('operations scenario: 8 new requests + assignments in all 10 states, events, OTPs, 2 incidents, reservations, extra lots created');
   console.log(`  Active delivery OTP (assignment for "Demo Requester I") is ${DEMO_OTP} (stored hashed).`);
 }

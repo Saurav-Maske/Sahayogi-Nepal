@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../core/app_colors.dart';
 import '../core/volunteer_auth_service.dart';
+import '../core/request_submission.dart';
 import 'home_screen.dart';
 import 'onboarding_screen.dart';
 import 'volunteer_dashboard_screen.dart';
@@ -33,9 +34,12 @@ class _StartupScreenState extends State<StartupScreen> {
         VolunteerAuthService.hasSession) {
       try {
         final account = await VolunteerAuthService.currentVolunteer();
+        await clearSavedRequests();
         destination = VolunteerDashboardScreen(account: account);
       } catch (_) {
-        // Keep access to public screens while the session cannot be validated.
+        await VolunteerAuthService.signOut();
+        await clearSavedRequests();
+        destination = const HomeScreen();
       }
     }
     if (!mounted) return;

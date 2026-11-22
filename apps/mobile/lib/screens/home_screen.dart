@@ -2,6 +2,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../core/app_colors.dart';
+import '../core/volunteer_auth_service.dart';
 import 'explore_screen.dart';
 import 'donate_resources_screen.dart';
 import 'request_assistance_screen.dart';
@@ -265,7 +266,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 _NavigationItem(
                   icon: Icons.person_outline_rounded,
-                  label: 'Profile',
+                  label: VolunteerAuthService.hasSession ? 'Profile' : 'Join',
                   selected: _selectedTab == 3,
                   onTap: _openVolunteerLogin,
                 ),

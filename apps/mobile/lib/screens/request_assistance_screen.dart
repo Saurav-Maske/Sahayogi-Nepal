@@ -5,6 +5,7 @@ import 'package:material_ui/material_ui.dart';
 import '../core/app_colors.dart';
 import '../core/api.dart';
 import '../core/request_submission.dart';
+import '../core/volunteer_auth_service.dart';
 import 'explore_screen.dart';
 import 'location_picker_screen.dart';
 import 'my_requests_screen.dart';
@@ -44,7 +45,25 @@ class _RequestAssistanceScreenState extends State<RequestAssistanceScreen> {
   @override
   void initState() {
     super.initState();
+    _prefillVolunteer();
     _requestLiveLocation();
+  }
+
+  Future<void> _prefillVolunteer() async {
+    if (!VolunteerAuthService.hasSession) return;
+    try {
+      final account = await VolunteerAuthService.currentVolunteer();
+      if (!mounted) return;
+      setState(() {
+        _requesterNameController.text = account.name;
+        _contactController.text = account.phone;
+      });
+    } catch (_) {
+      // Public request forms remain available if a saved session has expired.
+      await VolunteerAuthService.signOut();
+      await clearSavedRequests();
+      if (mounted) setState(() {});
+    }
   }
 
   Future<void> _requestLiveLocation() async {
@@ -625,7 +644,7 @@ Widget _assistanceNavigationBar(BuildContext context) => Container(
               ),
               _AssistanceNavigationItem(
                 icon: Icons.person_outline_rounded,
-                label: 'Profile',
+                label: VolunteerAuthService.hasSession ? 'Profile' : 'Join',
                 selected: false,
                 onTap: () => openVolunteerLogin(context),
               ),

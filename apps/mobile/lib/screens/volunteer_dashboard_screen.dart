@@ -1,6 +1,5 @@
-import 'dart:convert';
+import 'dart:async';
 
-import 'package:crypto/crypto.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -34,16 +33,19 @@ class VolunteerDashboardScreen extends StatefulWidget {
 }
 
 class _VolunteerDashboardScreenState extends State<VolunteerDashboardScreen> {
-  List<Map<String, dynamic>> _offers = const [];
   List<Map<String, dynamic>> _nearbyRequests = const [];
   Map<String, dynamic>? _activeAssignment;
   bool _loading = true;
   String? _loadError;
+  Timer? _offerRefreshTimer;
 
   @override
   void initState() {
     super.initState();
     _loadDashboard();
+    _offerRefreshTimer = Timer.periodic(const Duration(seconds: 60), (_) {
+      if (mounted && !_loading) unawaited(_loadDashboard());
+    });
   }
 
   Future<void> _loadDashboard() async {
@@ -51,88 +53,83 @@ class _VolunteerDashboardScreenState extends State<VolunteerDashboardScreen> {
       _loading = true;
       _loadError = null;
     });
-    final results = await Future.wait([
-      Api.getVolunteerOffers(),
-      Api.getMapMarkers(),
-      _getCurrentPosition(),
-    ]);
-    final offersResult = results[0] as ApiResult<List<Map<String, dynamic>>>;
-    final markersResult = results[1] as ApiResult<List<Map<String, dynamic>>>;
-    final position = results[2] as Position?;
+    final position = await _getCurrentPosition();
+    final nearbyOffersResult = position == null
+        ? const ApiResult<List<Map<String, dynamic>>>(
+            errorCode: 'location_unavailable',
+            errorMessage: 'Enable location access to find nearby offers.',
+          )
+        : await Api.getNearbyVolunteerOffers(
+            latitude: position.latitude,
+            longitude: position.longitude,
+            radiusKm: 100,
+          );
     final preferences = await SharedPreferences.getInstance();
     final activeId = preferences.getString('volunteer_active_assignment_id');
-    Map<String, dynamic>? cachedAssignment;
-    final cachedJson = preferences.getString('volunteer_active_assignment');
-    if (cachedJson != null) {
-      try {
-        final decoded = jsonDecode(cachedJson);
-        if (decoded is Map) {
-          cachedAssignment = Map<String, dynamic>.from(decoded);
-        }
-      } catch (_) {
-        await preferences.remove('volunteer_active_assignment');
-      }
-    }
     final activeResult = activeId == null
         ? null
         : await Api.getVolunteerAssignment(activeId);
     if (!mounted) return;
-    final offersByMarkerKey = <String, List<Map<String, dynamic>>>{};
-    for (final offer in offersResult.data ?? const []) {
+    final requestsById = <String, Map<String, dynamic>>{};
+    for (final offer in nearbyOffersResult.data ?? const []) {
       final requestId = offer['request_id'];
       if (requestId is! String || requestId.isEmpty) continue;
-      final markerKey = sha256
-          .convert(utf8.encode(requestId))
-          .toString()
-          .substring(0, 12);
-      offersByMarkerKey.putIfAbsent(markerKey, () => []).add(offer);
-    }
-    final nearbyRequests = <Map<String, dynamic>>[];
-    if (position != null) {
-      for (final marker in markersResult.data ?? const []) {
-        final latitude = (marker['lat'] as num?)?.toDouble();
-        final longitude = (marker['lng'] as num?)?.toDouble();
-        if (latitude == null || longitude == null) continue;
-        final distanceMeters = Geolocator.distanceBetween(
-          position.latitude,
-          position.longitude,
-          latitude,
-          longitude,
-        );
-        final distanceKm = distanceMeters / 1000;
-        if (distanceKm > 100) continue;
-        nearbyRequests.add({
-          ...marker,
-          'distance_km': distanceKm,
-          'join_offers': offersByMarkerKey['${marker['key']}'] ?? const [],
-        });
+      final existing = requestsById[requestId];
+      if (existing != null) {
+        (existing['join_offers'] as List<Map<String, dynamic>>).add(offer);
+        continue;
       }
-      nearbyRequests.sort(
-        (a, b) =>
-            (a['distance_km'] as double).compareTo(b['distance_km'] as double),
-      );
+      final items = (offer['items'] as List? ?? const [])
+          .whereType<Map>()
+          .map((item) => Map<String, dynamic>.from(item))
+          .toList();
+      requestsById[requestId] = {
+        ...offer,
+        'id': offer['assignment_id'],
+        'layer': 'need',
+        'lat': offer['approx_lat'],
+        'lng': offer['approx_lng'],
+        'item_types': items
+            .map((item) => item['item_type'])
+            .whereType<String>()
+            .toList(),
+        'join_offers': <Map<String, dynamic>>[offer],
+      };
     }
+    final nearbyRequests = requestsById.values.toList()
+      ..sort((a, b) =>
+          ((a['distance_km'] as num?)?.toDouble() ?? double.infinity)
+              .compareTo(
+            (b['distance_km'] as num?)?.toDouble() ?? double.infinity,
+          ));
     setState(() {
       _loading = false;
-      if (offersResult.ok && offersResult.data != null) {
-        _offers = offersResult.data!;
-      }
-      if (markersResult.ok && markersResult.data != null) {
+      if (nearbyOffersResult.ok && nearbyOffersResult.data != null) {
         _nearbyRequests = nearbyRequests;
       }
-      _activeAssignment = activeResult?.ok == true
-          ? activeResult!.data
-          : cachedAssignment;
-      if (!offersResult.ok) {
-        _loadError = offersResult.errorMessage;
-      } else if (!markersResult.ok) {
-        _loadError = markersResult.errorMessage;
-      } else if (position == null) {
+      _activeAssignment = activeResult != null &&
+              activeResult.ok &&
+              activeResult.data?['is_mine'] == true
+          ? activeResult.data
+          : null;
+      if (position == null) {
         _loadError = 'Enable location access to find requests within 100 km.';
+      } else if (!nearbyOffersResult.ok) {
+        _loadError = nearbyOffersResult.errorMessage;
+      } else if (activeResult != null &&
+          !activeResult.ok &&
+          activeResult.errorCode != 'not_found') {
+        _loadError = activeResult.errorMessage;
       } else {
         _loadError = null;
       }
     });
+    if (activeId != null &&
+        (activeResult?.errorCode == 'not_found' ||
+            (activeResult?.ok == true &&
+                activeResult!.data?['is_mine'] != true))) {
+      await preferences.remove('volunteer_active_assignment_id');
+    }
   }
 
   Future<Position?> _getCurrentPosition() async {
@@ -154,6 +151,12 @@ class _VolunteerDashboardScreenState extends State<VolunteerDashboardScreen> {
     } catch (_) {
       return null;
     }
+  }
+
+  @override
+  void dispose() {
+    _offerRefreshTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _openOffer(Map<String, dynamic> offer) async {
@@ -271,7 +274,7 @@ class _VolunteerDashboardScreenState extends State<VolunteerDashboardScreen> {
               ),
               const SizedBox(height: 20),
               _NextMissionCard(
-                offer: _activeAssignment ?? (_offers.isEmpty ? null : _offers.first),
+                offer: _activeAssignment,
                 loading: _loading,
                 onTap: _activeAssignment != null
                     ? () {
@@ -280,14 +283,10 @@ class _VolunteerDashboardScreenState extends State<VolunteerDashboardScreen> {
                           assignmentId: id is String ? id : null,
                         );
                       }
-                    : _offers.isNotEmpty
-                        ? () => _openOffer(_offers.first)
-                        : () => _openAssignedTask(),
+                    : () => _openAssignedTask(),
                 buttonLabel: _activeAssignment != null
                     ? 'View assigned task'
-                    : _offers.isEmpty
-                        ? 'Current task'
-                        : 'View opportunity',
+                    : 'Current task',
               ),
               const SizedBox(height: 24),
               const Text(
@@ -691,7 +690,7 @@ class _OpportunityCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Row(
+                Row(
                   children: [
                     const Icon(Icons.location_on_outlined, color: appTeal, size: 17),
                     const SizedBox(width: 8),

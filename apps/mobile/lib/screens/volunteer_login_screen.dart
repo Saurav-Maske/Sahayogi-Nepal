@@ -5,6 +5,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../core/app_colors.dart';
 import '../core/saved_volunteer_application.dart';
+import '../core/request_submission.dart';
 import '../core/volunteer_auth_service.dart';
 import 'volunteer_dashboard_screen.dart';
 import 'volunteer_application_status_screen.dart';
@@ -25,6 +26,7 @@ Future<void> openVolunteerLogin(BuildContext context) async {
       return;
     } catch (_) {
       await VolunteerAuthService.signOut();
+      await clearSavedRequests();
     }
   }
   final application = await SavedVolunteerApplication.load();
@@ -86,6 +88,7 @@ class _VolunteerLoginScreenState extends State<VolunteerLoginScreen> {
         password: _passwordController.text,
       );
       await SavedVolunteerApplication.clearForEmail(account.email);
+      await clearSavedRequests();
       if (!mounted) return;
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute<void>(
