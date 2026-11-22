@@ -17,7 +17,7 @@ with fn as (
 ), allow as (
   select unnest(array['get_tracking', 'requester_get_otp', 'requester_update_pickup_qty',
                       'requester_confirm_delivery', 'map_markers', 'is_admin',
-                      'register_public_device_token']) as name, true as for_anon
+                      'register_public_device_token', 'get_district_config']) as name, true as for_anon
   union all
   select unnest(array['admin_list_requests', 'admin_approve_request', 'admin_decline_request',
                       'admin_dashboard_counts', 'create_assignments', 'my_offers', 'my_assignment_detail',

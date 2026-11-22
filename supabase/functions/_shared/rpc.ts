@@ -69,6 +69,7 @@ const MESSAGES: Record<string, string> = {
   otp_not_available: "No code can be issued right now.",
   too_many_requests: "Too many tries. Please wait and retry.",
   insufficient_stock: "Not enough stock to reserve.",
+  invalid_quantity: "Quantity must be a whole number of kits.",
   hub_not_configured: "The central hub is not configured.",
 };
 
