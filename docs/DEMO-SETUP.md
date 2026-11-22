@@ -1,12 +1,12 @@
 # Demo project: setup, test run, reset
 
-Owner: Person 4 (with Person 2). Goal: a hosted `sahayogi-demo` project where every matrix row can be run and the presentation screenshots taken. Nothing here has been run yet: the first full run will find problems, and each one is a fix to a migration or function in Git, not in the dashboard.
+Owner: Person 4 (with Person 2). Goal: a hosted `sahayogi-demo` project where every matrix row can be run and the presentation screenshots taken. A first run on the hosted demo passed the API tests on 2026-11-22 (see `docs/CHANGELOG.md`). Migrations from `20261122140000` on were tested only on a scratch PostgreSQL, so the next full run may still find problems; each one is a fix to a migration or function in Git, not in the dashboard.
 
 Use a **separate** Supabase project. Never point the scripts below at anything you cannot wipe.
 
 ## 0. Before you start
 
-- [ ] Confirm the real hub coordinates with Person 4 (issue 8). `create_assignments` fails with `hub_not_configured` without them, and routes use whatever is there.
+- [x] Hub coordinates are set by migration `20261122140000_hub_to_fwu_soe.sql` (FWU-SOE, Kanchanpur). `create_assignments` fails with `hub_not_configured` if the `central_inventory` setting is missing.
 - [ ] Tools: Supabase CLI logged in (`supabase login`), Node 20+. On Windows use `scripts\demo_deploy.ps1`; the `.sh` version needs Git Bash or WSL.
 - [ ] `cd scripts && npm install` (the seed and test scripts load packages from there).
 
@@ -51,22 +51,17 @@ Do not add `OTP_DEV_LOG` or `PUSH_DRY_RUN`; `demo_deploy.sh` / `demo_deploy.ps1`
 powershell -ExecutionPolicy Bypass -File scripts\demo_deploy.ps1          # Windows PowerShell
 ```
 
-Both scripts check that `SUPABASE_URL` matches `CONFIRM_PROJECT_REF`, asks you to retype the ref, then runs: link, `db push --include-seed` (migrations `000001` to `000011` in order, plus the 77 districts), `secrets set`, and `functions deploy` for every folder in `supabase/functions` except `_shared`.
+Both scripts check that `SUPABASE_URL` matches `CONFIRM_PROJECT_REF`, asks you to retype the ref, then runs: link, `db push --include-seed` (every migration in order, through `20261123000300`, plus the 77 districts), `secrets set`, and `functions deploy` for every folder in `supabase/functions` except `_shared`.
 
 If a migration fails, nothing after it is applied. Fix it in Git as a new migration (do not edit one that already ran on the project) and push again. `20261122000011_function_privileges.sql` rolls itself back and names the function if `anon` or `authenticated` could still run something outside their lists.
 
 ## 5. Manual settings (the CLI does not do these)
 
-1. **SQL Editor:** run `scripts/demo_vault_secrets.sql` with the real ref and the same `PUSH_WEBHOOK_SECRET` as in `.env.demo`. Without it the database cannot wake `send-push`; the cron tick still queues rows.
+1. **SQL Editor:** run `scripts/demo_vault_secrets.sql` with the real ref and the same `PUSH_WEBHOOK_SECRET` as in `.env.demo`. Without it the database cannot wake `send-push`; the cron tick still queues rows. `create_secret` fails with a duplicate-key error if an entry already exists; the script now updates existing entries instead. Then run `scripts/check_push_setup.sql`: every row should say `ok`. It cannot see the Edge Function secrets, so also check `supabase secrets list` for `PUSH_WEBHOOK_SECRET` and `FCM_SERVICE_ACCOUNT`.
 2. **Auth > URL Configuration:** site URL and `SET_PASSWORD_URL` in the redirect list.
 3. **Auth > SMTP Settings:** custom SMTP: host `smtp.resend.com`, port `465`, username `resend`, password = your Resend API key, sender = `MAIL_FROM_ADDRESS` (the default sender allows only a couple of mails per hour, which breaks invites and OTP emails during a rehearsal).
 4. **Auth > Providers / Sign In:** email sign-ups off, anonymous sign-ins off, minimum password length 10 with lower, upper, digits and symbols (what `config.toml` says locally; the hosted project does not read it).
-5. **Hub coordinates** (data, so a one-off update is acceptable; write the real values down in `docs/CHANGELOG.md`):
-   ```sql
-   update app_settings
-      set value = jsonb_set(jsonb_set(value, '{lat}', to_jsonb(<LAT>::numeric)), '{lng}', to_jsonb(<LNG>::numeric))
-    where key = 'central_inventory';
-   ```
+5. **Hub coordinates:** set by migration `20261122140000_hub_to_fwu_soe.sql` (FWU-SOE, Kanchanpur), so `supabase db push` is enough. To move the hub later, add a new migration that upserts `app_settings` key `central_inventory`.
 
 ## 6. Seed
 
@@ -135,6 +130,9 @@ Needs `ALLOW_DEMO_SEED=yes` and `CONFIRM_PROJECT_REF`. Check afterwards that the
 
 ## Known gaps after this run
 
+- The test runner (`scripts/tests/lib.mjs`) still submits requests with Kathmandu coordinates, but the pilot district is now Kanchanpur, so `submit-request` answers `outside_service_area`. Update the helper to Kanchanpur bounds before the next run (or set the `district` setting back for the run).
+- The matrix runner and Postman collection do not cover the hub count, the hub codes, driver issue reports, reserve levels or the kit rules yet (see the new rows in `docs/TEST-MATRIX.md`).
+- Low-stock pushes need ready-to-ship stock and real reserve numbers; the placeholder of 10 kits per category is silent on purpose.
 - Real FCM delivery needs a Firebase project and a device or emulator with a registered token; the runner only proves the outbox row is created once.
 - `public-api/tracking*` has no throttle on wrong ref or token guesses (needs a new `auth_attempts.kind`, so a migration).
 - Requester notifications and pushes after a claim are not built; in-app polling is the fallback.

@@ -3,6 +3,8 @@ import 'package:material_ui/material_ui.dart';
 import '../core/app_colors.dart';
 import '../core/volunteer_auth_service.dart';
 import '../core/volunteer_session_guard.dart';
+import 'explore_screen.dart';
+import 'my_requests_screen.dart';
 import 'volunteer_login_screen.dart';
 
 class VolunteerProfileScreen extends StatefulWidget {
@@ -177,6 +179,25 @@ class _VolunteerProfileScreenState extends State<VolunteerProfileScreen> {
             ),
           ],
         ),
+        bottomNavigationBar: _VolunteerNavBar(
+          onHome: () => Navigator.of(context).pop(),
+          onExplore: () {
+            Navigator.of(context).pop();
+            Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => ExploreScreen(requireVolunteerSession: true),
+              ),
+            );
+          },
+          onRequests: () {
+            Navigator.of(context).pop();
+            Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => MyRequestsScreen(requireVolunteerSession: true),
+              ),
+            );
+          },
+        ),
         ),
       );
 }
@@ -219,5 +240,100 @@ class _ProfileDetail extends StatelessWidget {
             ),
           ),
         ],
+      );
+}
+
+class _VolunteerNavBar extends StatelessWidget {
+  const _VolunteerNavBar({
+    required this.onHome,
+    required this.onExplore,
+    required this.onRequests,
+  });
+
+  final VoidCallback onHome;
+  final VoidCallback onExplore;
+  final VoidCallback onRequests;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          border: Border(top: BorderSide(color: Color(0xFFE0E6EC))),
+        ),
+        child: SafeArea(
+          top: false,
+          child: SizedBox(
+            height: 68,
+            child: Row(
+              children: [
+                _NavItem(
+                  icon: Icons.home_outlined,
+                  label: 'Home',
+                  selected: false,
+                  onTap: onHome,
+                ),
+                _NavItem(
+                  icon: Icons.map_outlined,
+                  label: 'Explore',
+                  selected: false,
+                  onTap: onExplore,
+                ),
+                _NavItem(
+                  icon: Icons.inventory_2_outlined,
+                  label: 'Requests',
+                  selected: false,
+                  onTap: onRequests,
+                ),
+                _NavItem(
+                  icon: Icons.person_outline_rounded,
+                  label: 'Profile',
+                  selected: true,
+                  onTap: () {},
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+}
+
+class _NavItem extends StatelessWidget {
+  const _NavItem({
+    required this.icon,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Expanded(
+        child: InkWell(
+          onTap: onTap,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                icon,
+                color: selected ? appNavy : appMuted,
+                size: 23,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                label,
+                style: TextStyle(
+                  color: selected ? appNavy : appMuted,
+                  fontSize: 10,
+                  fontWeight:
+                      selected ? FontWeight.w700 : FontWeight.w400,
+                ),
+              ),
+            ],
+          ),
+        ),
       );
 }

@@ -19,12 +19,6 @@ class DonateResourcesScreen extends StatefulWidget {
 
 class _DonateResourcesScreenState extends State<DonateResourcesScreen> {
   final _formKey = GlobalKey<FormState>();
-  final List<TextEditingController> _nameControllers = [
-    TextEditingController(),
-  ];
-  final List<TextEditingController> _descriptionControllers = [
-    TextEditingController(),
-  ];
   final List<TextEditingController> _quantityControllers = [
     TextEditingController(),
   ];
@@ -110,12 +104,6 @@ class _DonateResourcesScreenState extends State<DonateResourcesScreen> {
 
   @override
   void dispose() {
-    for (final controller in _nameControllers) {
-      controller.dispose();
-    }
-    for (final controller in _descriptionControllers) {
-      controller.dispose();
-    }
     for (final controller in _quantityControllers) {
       controller.dispose();
     }
@@ -127,8 +115,6 @@ class _DonateResourcesScreenState extends State<DonateResourcesScreen> {
   void _addDonationItem() => setState(() {
         _categories.add(null);
         _categoryErrors.add(false);
-        _nameControllers.add(TextEditingController());
-        _descriptionControllers.add(TextEditingController());
         _quantityControllers.add(TextEditingController());
       });
 
@@ -137,8 +123,6 @@ class _DonateResourcesScreenState extends State<DonateResourcesScreen> {
     setState(() {
       _categories.removeAt(index);
       _categoryErrors.removeAt(index);
-      _nameControllers.removeAt(index).dispose();
-      _descriptionControllers.removeAt(index).dispose();
       _quantityControllers.removeAt(index).dispose();
     });
   }
@@ -199,19 +183,12 @@ class _DonateResourcesScreenState extends State<DonateResourcesScreen> {
     if (!fieldsValid || !categoriesValid || !locationValid) return;
     setState(() => _isSubmitting = true);
     final items = List.generate(_categories.length, (index) {
-      final quantity = parseQuantityAndUnit(_quantityControllers[index].text)!;
       return {
         'item_type': resourceItemType(_categories[index]!)!,
-        ...quantity,
+        'qty': int.parse(_quantityControllers[index].text.trim()),
+        'unit': 'kit',
       };
     });
-    final itemNotes = List.generate(_categories.length, (index) {
-      final name = _nameControllers[index].text.trim();
-      final description = _descriptionControllers[index].text.trim();
-      return description.isEmpty
-          ? 'Resource: $name'
-          : 'Resource: $name — $description';
-    }).join('\n');
     final payload = <String, dynamic>{
       'kind': 'donation_offer',
       'requester_name': _donorNameController.text.trim(),
@@ -219,7 +196,6 @@ class _DonateResourcesScreenState extends State<DonateResourcesScreen> {
       'lat': _location!.latitude,
       'lng': _location!.longitude,
       'urgency': 'normal',
-      'notes': itemNotes,
       'items': items,
     };
     final result = await Api.submitRequest(payload);
@@ -346,36 +322,20 @@ class _DonateResourcesScreenState extends State<DonateResourcesScreen> {
                             ),
                           ],
                           const SizedBox(height: 18),
-                          _fieldLabel('Resource name'),
-                          const SizedBox(height: 8),
-                          _textField(
-                            controller: _nameControllers[index],
-                            hint: 'Family food kits',
-                            validator: (value) =>
-                                value == null || value.trim().isEmpty
-                                    ? 'Enter a resource name'
-                                    : null,
-                          ),
-                          const SizedBox(height: 18),
-                          _fieldLabel('Description'),
-                          const SizedBox(height: 8),
-                          _textField(
-                            controller: _descriptionControllers[index],
-                            hint: 'Rice, lentils, cooking oil and salt.',
-                            validator: null,
-                          ),
-                          const SizedBox(height: 18),
                           _fieldLabel('Available quantity'),
                           const SizedBox(height: 8),
                           _textField(
                             controller: _quantityControllers[index],
-                            hint: '40 family kits',
-                            validator: (value) => parseQuantityAndUnit(
-                                      value ?? '',
-                                    ) ==
-                                    null
-                                ? 'Enter a quantity, for example 40 kits'
-                                : null,
+                            hint: 'Enter a number',
+                            keyboardType: TextInputType.number,
+                            suffixText: 'kit',
+                            validator: (value) {
+                              final quantity =
+                                  int.tryParse(value?.trim() ?? '');
+                              return quantity == null || quantity < 1
+                                  ? 'Enter a valid quantity'
+                                  : null;
+                            },
                           ),
                         ],
                       ),
@@ -483,11 +443,9 @@ class _DonateResourcesScreenState extends State<DonateResourcesScreen> {
                   SizedBox(
                     width: double.infinity,
                     height: 52,
-                    child: FilledButton.icon(
+                    child: FilledButton(
                       onPressed: _isSubmitting ? null : _submitDonation,
-                      iconAlignment: IconAlignment.end,
-                      icon: const Icon(Icons.arrow_forward_rounded, size: 20),
-                      label: Text(
+                      child: Text(
                           _isSubmitting ? 'Submitting…' : 'Share resources'),
                       style: FilledButton.styleFrom(
                         backgroundColor: appNavy,
@@ -548,11 +506,6 @@ class _DonateResourcesScreenState extends State<DonateResourcesScreen> {
                     style: const TextStyle(color: appMuted, fontSize: 14),
                   ),
                 ),
-                const Icon(
-                  Icons.chevron_right_rounded,
-                  color: appMuted,
-                  size: 22,
-                ),
               ],
             ),
           ),
@@ -564,6 +517,7 @@ class _DonateResourcesScreenState extends State<DonateResourcesScreen> {
     required String hint,
     required String? Function(String?)? validator,
     TextInputType keyboardType = TextInputType.text,
+    String? suffixText,
   }) =>
       TextFormField(
         controller: controller,
@@ -578,11 +532,7 @@ class _DonateResourcesScreenState extends State<DonateResourcesScreen> {
           isDense: true,
           contentPadding:
               const EdgeInsets.symmetric(horizontal: 14, vertical: 15),
-          suffixIcon: const Icon(
-            Icons.chevron_right_rounded,
-            color: appMuted,
-            size: 22,
-          ),
+          suffixText: suffixText,
           errorStyle: const TextStyle(fontSize: 11),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(14),

@@ -466,11 +466,9 @@ class _RequestAssistanceScreenState extends State<RequestAssistanceScreen> {
                   SizedBox(
                     width: double.infinity,
                     height: 52,
-                    child: FilledButton.icon(
+                    child: FilledButton(
                       onPressed: _isSubmitting ? null : _submitRequest,
-                      iconAlignment: IconAlignment.end,
-                      icon: const Icon(Icons.arrow_forward_rounded, size: 20),
-                      label: Text(
+                      child: Text(
                           _isSubmitting ? 'Submitting…' : 'Submit request'),
                       style: FilledButton.styleFrom(
                         backgroundColor: appNavy,
@@ -536,11 +534,6 @@ class _RequestAssistanceScreenState extends State<RequestAssistanceScreen> {
                     style: const TextStyle(color: appMuted, fontSize: 14),
                   ),
                 ),
-                const Icon(
-                  Icons.chevron_right_rounded,
-                  color: appMuted,
-                  size: 22,
-                ),
               ],
             ),
           ),
@@ -566,11 +559,6 @@ class _RequestAssistanceScreenState extends State<RequestAssistanceScreen> {
           isDense: true,
           contentPadding:
               const EdgeInsets.symmetric(horizontal: 14, vertical: 15),
-          suffixIcon: const Icon(
-            Icons.chevron_right_rounded,
-            color: appMuted,
-            size: 22,
-          ),
           errorStyle: const TextStyle(fontSize: 11),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(14),

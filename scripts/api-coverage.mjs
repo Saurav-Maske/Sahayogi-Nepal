@@ -10,9 +10,9 @@ const ROUTERS = ["admin-api", "volunteer-api", "public-api"];
 const AUDIENCE = {
   "admin-api": "admin", "admin-login": "admin", "admin-set-account-status": "admin", "approve-volunteer": "admin",
   "volunteer-api": "mobile", "volunteer-login": "mobile", "submit-volunteer-application": "mobile", "create-upload-urls": "mobile",
-  "send-signup-otp": "mobile", "verify-signup-otp": "mobile", "update-driver-location": "mobile", "get_nearby_requests": "mobile",
+  "send-signup-otp": "mobile", "verify-signup-otp": "mobile",
   "public-api": "public", "submit-request": "public",
-  "auth-me": "shared", "get-route": "shared", "get-driver-location": "shared",
+  "auth-me": "shared", "get-route": "shared",
   "request-password-reset": "shared", "verify-reset-otp": "shared", "reset-password": "shared",
   "send-push": "internal",
 };

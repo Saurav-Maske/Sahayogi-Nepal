@@ -1,0 +1,33 @@
+{
+  "call": "supabase.functions.invoke('volunteer-api/offers/nearby', { body })",
+  "request": {
+    "lat": 27.7172,
+    "lng": 85.324,
+    "radius_km": 100
+  },
+  "response": {
+    "data": [
+      {
+      "assignment_id": "7c9d1e20-5b3a-4f68-a2d4-91e0b6c3d811",
+      "request_id": "3f1c2a52-8d0e-4b7a-9c61-2b7e5a0d1f01",
+      "public_ref": "AB12CD34",
+      "kind": "resource_request",
+      "assignment_type": "delivery",
+      "required_tier": "B",
+      "urgency": "high",
+      "district": "KATHMANDU",
+      "approx_lat": 27.72,
+      "approx_lng": 85.32,
+      "distance_km": 1.2,
+      "items": [
+        {
+          "item_type": "drinking_water",
+          "qty": 40,
+          "unit": "litre"
+        }
+      ]
+      }
+    ]
+  },
+  "claim": "POST /functions/v1/volunteer-api/assignments/claim { \"id\": \"<assignment_id>\" }"
+}

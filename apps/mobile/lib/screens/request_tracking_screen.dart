@@ -1,12 +1,15 @@
+import 'dart:async';
+
+import 'package:flutter_map/flutter_map.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:intl/intl.dart';
+import 'package:latlong2/latlong.dart';
 
 import '../core/api.dart';
 import '../core/app_home_navigation.dart';
 import '../core/app_colors.dart';
 import '../core/request_submission.dart';
 import '../models/request_summary.dart';
-import '../widgets/community_map_preview.dart';
 import 'explore_screen.dart';
 import 'volunteer_login_screen.dart';
 
@@ -22,6 +25,8 @@ class RequestTrackingScreen extends StatefulWidget {
 class _RequestTrackingScreenState extends State<RequestTrackingScreen> {
   late RequestSummaryData _currentRequest;
   Map<String, dynamic>? _tracking;
+  List<_VolunteerPosition> _volunteerPositions = const [];
+  Timer? _trackingTimer;
   bool _refreshing = false;
 
   RequestSummaryData get request => _currentRequest;
@@ -31,24 +36,40 @@ class _RequestTrackingScreenState extends State<RequestTrackingScreen> {
     super.initState();
     _currentRequest = widget.request;
     _refreshTracking();
+    _trackingTimer = Timer.periodic(
+      const Duration(seconds: 15),
+      (_) {
+        if (!{'Fulfilled', 'Declined', 'Cancelled'}.contains(request.status)) {
+          _refreshTracking(showErrors: false);
+        }
+      },
+    );
   }
 
-  Future<void> _refreshTracking() async {
+  @override
+  void dispose() {
+    _trackingTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _refreshTracking({bool showErrors = true}) async {
     final token = request.trackingToken;
-    if (token == null || token.isEmpty) return;
+    if (token == null || token.isEmpty || _refreshing) return;
     setState(() => _refreshing = true);
     final result = await Api.getRequestTracking(
       reference: request.id,
       token: token,
     );
     if (!mounted) return;
-    setState(() => _refreshing = false);
     if (!result.ok || result.data == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(result.errorMessage ?? 'Could not refresh tracking.'),
-        ),
-      );
+      setState(() => _refreshing = false);
+      if (showErrors) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result.errorMessage ?? 'Could not refresh tracking.'),
+          ),
+        );
+      }
       return;
     }
     final data = result.data!;
@@ -68,8 +89,22 @@ class _RequestTrackingScreenState extends State<RequestTrackingScreen> {
         })
         .where((value) => value.isNotEmpty)
         .join(', ');
+    final assignments = (data['assignments'] as List? ?? const [])
+        .whereType<Map>()
+        .map((item) => Map<String, dynamic>.from(item))
+        .toList();
+    final positions = assignments
+        .map(_positionFromAssignment)
+        .whereType<_VolunteerPosition>()
+        .toList()
+      ..sort((a, b) =>
+          (b.updatedAt?.millisecondsSinceEpoch ?? 0).compareTo(
+                a.updatedAt?.millisecondsSinceEpoch ?? 0,
+              ));
     setState(() {
+      _refreshing = false;
       _tracking = data;
+      _volunteerPositions = positions;
       _currentRequest = request.copyWith(
         status: _displayTrackingStatus(rawStatus),
         serverStatus: rawStatus,
@@ -77,6 +112,30 @@ class _RequestTrackingScreenState extends State<RequestTrackingScreen> {
       );
     });
     await updateSavedRequestStatus(request.id, rawStatus);
+  }
+
+  _VolunteerPosition? _positionFromAssignment(Map<String, dynamic> assignment) {
+    final rawLocation = assignment['location'];
+    if (rawLocation is! Map) return null;
+    final lat = rawLocation['lat'];
+    final lng = rawLocation['lng'];
+    if (lat is! num || lng is! num) return null;
+    final latitude = lat.toDouble();
+    final longitude = lng.toDouble();
+    if (!latitude.isFinite ||
+        !longitude.isFinite ||
+        latitude < -90 ||
+        latitude > 90 ||
+        longitude < -180 ||
+        longitude > 180) {
+      return null;
+    }
+    return _VolunteerPosition(
+      name: '${assignment['volunteer_first_name'] ?? 'Volunteer'}',
+      point: LatLng(latitude, longitude),
+      updatedAt: DateTime.tryParse('${rawLocation['updated_at'] ?? ''}')
+          ?.toLocal(),
+    );
   }
 
   int get _currentStep => switch (request.serverStatus) {
@@ -91,51 +150,19 @@ class _RequestTrackingScreenState extends State<RequestTrackingScreen> {
           },
       };
 
-  List<_JourneyStep> get _steps {
-    if (_tracking != null) return _liveSteps;
-    if (request.isDonation) {
-      return switch (request.status) {
-        'Pending' => const [
-            _JourneyStep('Donation shared', 'Today · 08:20'),
-            _JourneyStep('Recipient matched', 'Finding a nearby request'),
-            _JourneyStep('Pickup coordinated', 'Waiting for a match'),
-            _JourneyStep('Received', 'Awaiting delivery'),
-          ],
-        'Fulfilled' => const [
-            _JourneyStep('Donation shared', '19 Nov · 09:10'),
-            _JourneyStep('Recipient matched', '19 Nov · 11:20'),
-            _JourneyStep('Picked up', '20 Nov · 14:45'),
-            _JourneyStep('Received', '20 Nov · 15:35'),
-          ],
-        _ => const [
-            _JourneyStep('Donation shared', 'Yesterday · 08:20'),
-            _JourneyStep('Recipient matched', 'Yesterday · 10:05'),
-            _JourneyStep('Pickup coordinated', 'Today · 09:15'),
-            _JourneyStep('Received', 'Estimated today · 11:00'),
-          ],
-      };
-    }
+  bool get _hasAssignedVolunteer {
+    final assignments = (_tracking?['assignments'] as List? ?? const [])
+        .whereType<Map>();
+    return assignments.any((assignment) {
+      final firstName = assignment['volunteer_first_name'];
+      final state = '${assignment['state'] ?? ''}';
+      return (firstName is String && firstName.isNotEmpty) ||
+          state != 'offered';
+    });
+  }
 
-    return switch (request.status) {
-      'Pending' => const [
-          _JourneyStep('Pending', 'Today · 09:41'),
-          _JourneyStep('Matched', 'Finding nearby resources'),
-          _JourneyStep('In Progress', 'Awaiting a match'),
-          _JourneyStep('Fulfilled', 'Awaiting delivery'),
-        ],
-      'Fulfilled' => const [
-          _JourneyStep('Pending', '19 Nov · 10:15'),
-          _JourneyStep('Matched', '19 Nov · 11:00'),
-          _JourneyStep('In Progress', '19 Nov · 15:10'),
-          _JourneyStep('Fulfilled', '19 Nov · 16:30'),
-        ],
-      _ => const [
-          _JourneyStep('Pending', 'Today · 08:40'),
-          _JourneyStep('Matched', 'Today · 09:05'),
-          _JourneyStep('In Progress', 'Today · 09:25'),
-          _JourneyStep('Fulfilled', 'Estimated today · 11:00'),
-        ],
-    };
+  List<_JourneyStep> get _steps {
+    return _tracking == null ? const [] : _liveSteps;
   }
 
   List<_JourneyStep> get _liveSteps {
@@ -270,6 +297,24 @@ class _RequestTrackingScreenState extends State<RequestTrackingScreen> {
                     _RequestInfoCard(request: request),
                     const SizedBox(height: 22),
                     const Text(
+                      'Assigned volunteer location',
+                      style: TextStyle(
+                        color: appNavy,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    _VolunteerLocationMap(
+                      positions: _volunteerPositions,
+                      hasAssignedVolunteer: _hasAssignedVolunteer,
+                      loading: _refreshing && _tracking == null,
+                      trackingLoaded: _tracking != null,
+                      trackingTokenAvailable:
+                          request.trackingToken?.isNotEmpty == true,
+                    ),
+                    const SizedBox(height: 22),
+                    const Text(
                       'Your relief journey',
                       style: TextStyle(
                         color: appNavy,
@@ -278,11 +323,18 @@ class _RequestTrackingScreenState extends State<RequestTrackingScreen> {
                       ),
                     ),
                     const SizedBox(height: 18),
-                    _JourneyCard(
-                      steps: _steps,
-                      currentStep: _currentStep,
-                      fulfilled: request.status == 'Fulfilled',
-                    ),
+                    if (_tracking == null)
+                      _TrackingMessage(
+                        message: _refreshing
+                            ? 'Loading tracking details from the server…'
+                            : 'Tracking details are unavailable. Use refresh to try again.',
+                      )
+                    else
+                      _JourneyCard(
+                        steps: _steps,
+                        currentStep: _currentStep,
+                        fulfilled: request.status == 'Fulfilled',
+                      ),
                     const SizedBox(height: 22),
                     const Text(
                       'Latest update',
@@ -296,7 +348,6 @@ class _RequestTrackingScreenState extends State<RequestTrackingScreen> {
                     _LatestUpdate(
                       status: request.status,
                       isDonation: request.isDonation,
-                      location: request.location,
                     ),
                   ],
                 ),
@@ -534,48 +585,214 @@ class _JourneyRow extends StatelessWidget {
   }
 }
 
+class _VolunteerPosition {
+  const _VolunteerPosition({
+    required this.name,
+    required this.point,
+    required this.updatedAt,
+  });
+
+  final String name;
+  final LatLng point;
+  final DateTime? updatedAt;
+}
+
+class _VolunteerLocationMap extends StatelessWidget {
+  const _VolunteerLocationMap({
+    required this.positions,
+    required this.hasAssignedVolunteer,
+    required this.loading,
+    required this.trackingLoaded,
+    required this.trackingTokenAvailable,
+  });
+
+  final List<_VolunteerPosition> positions;
+  final bool hasAssignedVolunteer;
+  final bool loading;
+  final bool trackingLoaded;
+  final bool trackingTokenAvailable;
+
+  @override
+  Widget build(BuildContext context) {
+    if (positions.isEmpty) {
+      final String message;
+      if (loading) {
+        message = 'Loading volunteer location…';
+      } else if (!trackingTokenAvailable) {
+        message = 'A tracking token is unavailable for this request.';
+      } else if (!trackingLoaded) {
+        message = 'Could not load live location. Refresh tracking to try again.';
+      } else if (hasAssignedVolunteer) {
+        message =
+            'Waiting for the assigned volunteer to share a live location.';
+      } else {
+        message = 'A volunteer has not been assigned yet.';
+      }
+      return _TrackingMessage(message: message, height: 170);
+    }
+
+    final points = positions.map((position) => position.point).toList();
+    final mapKey = points
+        .map((point) =>
+            '${point.latitude.toStringAsFixed(3)},${point.longitude.toStringAsFixed(3)}')
+        .join('|');
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(18),
+      child: SizedBox(
+        height: 220,
+        child: Stack(
+          children: [
+            FlutterMap(
+              key: ValueKey(mapKey),
+              options: MapOptions(
+                initialCenter: points.first,
+                initialZoom: 14,
+                initialCameraFit: CameraFit.coordinates(
+                  coordinates: points,
+                  padding: const EdgeInsets.all(42),
+                ),
+              ),
+              children: [
+                TileLayer(
+                  urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                  userAgentPackageName: 'np.sahayogi.sahayogi_mobile',
+                ),
+                MarkerLayer(
+                  markers: [
+                    for (final position in positions)
+                      Marker(
+                        point: position.point,
+                        width: 48,
+                        height: 48,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: appTeal,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white, width: 3),
+                            boxShadow: const [
+                              BoxShadow(
+                                color: Color(0x33183D58),
+                                blurRadius: 7,
+                                offset: Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: const Icon(
+                            Icons.directions_walk_rounded,
+                            color: Colors.white,
+                            size: 23,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ],
+            ),
+            Positioned(
+              left: 10,
+              bottom: 10,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.94),
+                  borderRadius: BorderRadius.circular(9),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 7,
+                  ),
+                  child: Text(
+                    positions.length == 1
+                        ? '${positions.first.name} · ${_updatedLabel(positions.first.updatedAt)}'
+                        : '${positions.length} assigned volunteers · updates every 15 seconds',
+                    style: const TextStyle(
+                      color: appNavy,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _updatedLabel(DateTime? updatedAt) => updatedAt == null
+      ? 'update time unavailable'
+      : 'updated ${DateFormat('d MMM, HH:mm').format(updatedAt)}';
+}
+
+class _TrackingMessage extends StatelessWidget {
+  const _TrackingMessage({required this.message, this.height});
+
+  final String message;
+  final double? height;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        height: height,
+        width: double.infinity,
+        alignment: Alignment.center,
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(17),
+          border: Border.all(color: const Color(0xFFE0E6EC)),
+        ),
+        child: Text(
+          message,
+          textAlign: TextAlign.center,
+          style: const TextStyle(color: appMuted, fontSize: 12, height: 1.45),
+        ),
+      );
+}
+
 class _LatestUpdate extends StatelessWidget {
   const _LatestUpdate({
     required this.status,
     required this.isDonation,
-    required this.location,
   });
 
   final String status;
   final bool isDonation;
-  final String location;
 
   @override
   Widget build(BuildContext context) {
     final isFulfilled = status == 'Fulfilled';
     final isPending = status == 'Pending';
+    final isClosed = {'Declined', 'Cancelled'}.contains(status);
     final background = isFulfilled
         ? const Color(0xFFECF7EF)
         : isPending
             ? const Color(0xFFFFF7DE)
-            : const Color(0xFFEAF0F5);
-    final title = isDonation
-        ? isFulfilled
-            ? 'Your donation made a difference.'
-            : isPending
-                ? 'Your donation is listed.'
-                : 'Your donation is on the way.'
-        : isFulfilled
-            ? 'Delivered. Confirmed. Thank you.'
-            : isPending
-                ? 'Finding the right helping hand.'
-                : 'Your supplies are on the way.';
-    final message = isDonation
-        ? isFulfilled
-            ? 'Your donated supplies were received in $location. Thank you for helping your community.'
-            : isPending
-                ? 'We’re matching your supplies with a nearby request. We’ll update you when pickup is arranged.'
-                : 'A nearby recipient has been matched. Pickup is being coordinated for $location.'
-        : isFulfilled
-            ? 'All 6 food kits were received at Melamchi Ward 11. Delivery confirmed by the local distribution team.'
-            : isPending
-                ? 'Matching by distance, resource type, quantity and urgency. We’ll notify you as soon as a donor is found.'
-                : 'A nearby volunteer is coordinating this delivery. Follow the map for the community area.';
+            : isClosed
+                ? const Color(0xFFFFF0EF)
+                : const Color(0xFFEAF0F5);
+    final subject = isDonation ? 'Donation' : 'Request';
+    final title = switch (status) {
+      'Fulfilled' => '$subject fulfilled',
+      'Pending' => '$subject pending',
+      'Matched' => '$subject matched',
+      'Declined' => '$subject declined',
+      'Cancelled' => '$subject cancelled',
+      _ => '$subject in progress',
+    };
+    final subjectLower = subject.toLowerCase();
+    final message = switch (status) {
+      'Pending' =>
+        'The backend reports this $subjectLower is waiting for a volunteer match.',
+      'Matched' =>
+        'A volunteer has been assigned. Their live location appears above when sharing is active.',
+      'In progress' => 'The backend reports this $subjectLower is in progress.',
+      'Fulfilled' => 'The backend reports this $subjectLower is fulfilled.',
+      'Declined' => 'The backend reports this $subjectLower was declined.',
+      'Cancelled' => 'The backend reports this $subjectLower was cancelled.',
+      _ => 'Current status: $status.',
+    };
 
     return Container(
       padding: const EdgeInsets.all(15),
@@ -604,10 +821,6 @@ class _LatestUpdate extends StatelessWidget {
               height: 1.45,
             ),
           ),
-          if (!isPending && !isFulfilled) ...[
-            const SizedBox(height: 12),
-            const CommunityMapPreview(height: 82),
-          ],
         ],
       ),
     );

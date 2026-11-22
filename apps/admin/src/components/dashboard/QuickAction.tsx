@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+scripts/check_push_setup.sqlimport { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 
 const ACTIONS = [

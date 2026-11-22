@@ -12,7 +12,7 @@ declare const Deno: {
 //   push_claim_batch -> push_recipients -> FCM -> mark processed.
 // Payloads carry IDs only. Never an OTP, name, phone or location.
 
-type OutboxRow = { id: number; kind: "new_offer" | "escalated"; assignment_id: string; request_id: string; assignment_type: string; attempts: number };
+type OutboxRow = { id: number; kind: "new_offer" | "escalated" | "low_stock"; assignment_id: string | null; request_id: string | null; assignment_type: string | null; attempts: number; item_type: string | null };
 type Recipient = { profile_id: string; token: string; platform: string };
 
 const TITLES: Record<string, string> = {
@@ -23,19 +23,56 @@ const TITLES: Record<string, string> = {
   manpower: "Volunteers needed",
 };
 
+// Names shown in the low-stock push, per item_type.
+const ITEM_LABELS: Record<string, string> = {
+  food: "Food",
+  drinking_water: "Drinking water",
+  medical_supplies: "Medicine",
+  cloth: "Clothing",
+  temp_shelter: "Temporary shelter",
+};
+
 const BATCH = 50;
 const CHUNK = 20; // parallel FCM calls
 const BUDGET_MS = 20_000;
 
-function messageFor(row: OutboxRow, assignmentId: string) {
+
+function messageFor(row: OutboxRow, assignmentId: string | null) {
+  if (row.kind === "low_stock") {
+    const item = row.item_type ?? "";
+    const label = ITEM_LABELS[item] ?? "Relief items";
+
+    const data: Record<string, string> = {
+      type: "low_stock",
+      item_type: item,
+    };
+
+    return {
+      title: `${label} running low`,
+      body: `Our central inventory is running low on ${label.toLowerCase()}. Please consider donating.`,
+      data,
+      collapseKey: `low_stock_${item}`,
+    };
+  }
+
   const escalated = row.kind === "escalated";
+
+  const data: Record<string, string> = {
+    type: row.kind,
+    assignment_id: assignmentId ?? "",
+    request_id: row.request_id ?? "",
+  };
+
   return {
-    title: TITLES[row.assignment_type] ?? "New request",
-    body: escalated ? "Nobody has taken this yet. Open the app to claim it." : "A new request is open. Open the app to view and claim it.",
-    data: { type: row.kind, assignment_id: assignmentId, request_id: row.request_id },
-    collapseKey: row.request_id,
+    title: TITLES[row.assignment_type ?? ""] ?? "New request",
+    body: escalated
+      ? "Nobody has taken this yet. Open the app to claim it."
+      : "A new request is open. Open the app to view and claim it.",
+    data,
+    collapseKey: row.request_id ?? undefined,
   };
 }
+
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -67,7 +104,8 @@ Deno.serve(async (req) => {
     // One push per volunteer per request and kind, however many assignments (manpower needs several).
     const groups = new Map<string, OutboxRow[]>();
     for (const r of rows) {
-      const k = `${r.kind}:${r.request_id}`;
+      // low_stock rows have no request: one group (one broadcast) per item type.
+      const k = r.kind === "low_stock" ? `low_stock:${r.item_type}` : `${r.kind}:${r.request_id}`;
       groups.set(k, [...(groups.get(k) ?? []), r]);
     }
 
@@ -80,16 +118,32 @@ Deno.serve(async (req) => {
       let recipients: Recipient[] = [];
       let useAssignment = head.assignment_id;
       let lookupError: string | null = null;
-      for (const r of group) {
-        const { data: rec, error: recErr } = await sb.rpc("push_recipients", { p_assignment: r.assignment_id, p_kind: r.kind });
-        if (recErr) {
-          lookupError = recErr.message;
-          break;
+      if (head.kind === "low_stock") {
+        // Everyone who has the app: volunteers and normal users alike.
+        // PostgREST returns at most 1000 rows per call, so read the list page by page (ordered by token).
+        const PAGE = 1000;
+        for (let from = 0; ; from += PAGE) {
+          const { data: rec, error: recErr } = await sb.rpc("push_recipients_all").range(from, from + PAGE - 1);
+          if (recErr) {
+            lookupError = recErr.message;
+            break;
+          }
+          const page = (rec ?? []) as Recipient[];
+          recipients.push(...page);
+          if (page.length < PAGE) break;
         }
-        if ((rec ?? []).length) {
-          recipients = rec as Recipient[];
-          useAssignment = r.assignment_id;
-          break;
+      } else {
+        for (const r of group) {
+          const { data: rec, error: recErr } = await sb.rpc("push_recipients", { p_assignment: r.assignment_id, p_kind: r.kind });
+          if (recErr) {
+            lookupError = recErr.message;
+            break;
+          }
+          if ((rec ?? []).length) {
+            recipients = rec as Recipient[];
+            useAssignment = r.assignment_id;
+            break;
+          }
         }
       }
 
@@ -112,7 +166,7 @@ Deno.serve(async (req) => {
       if (!tokens.length) {
         // Nobody to tell (claimed already, or no registered devices). Done.
       } else if (!sa) {
-        console.log(`[push dry-run] ${head.kind} request=${head.request_id} recipients=${tokens.length}`);
+        console.log(`[push dry-run] ${head.kind} ${head.kind === "low_stock" ? `item=${head.item_type}` : `request=${head.request_id}`} recipients=${tokens.length}`);
         sent = tokens.length;
       } else {
         for (let i = 0; i < tokens.length; i += CHUNK) {
@@ -137,7 +191,7 @@ Deno.serve(async (req) => {
       const allFailedRetryable = tokens.length > 0 && sent === 0 && retryable > 0 && retryable + invalid.length === tokens.length;
       if (allFailedRetryable) {
         // Nothing got through: release the rows so the next kick (cron, every minute) tries again.
-        console.error(`push group failed (${head.kind}, request ${head.request_id}): ${lastError}`);
+        console.error(`push group failed (${head.kind}, ${head.kind === "low_stock" ? `item ${head.item_type}` : `request ${head.request_id}`}): ${lastError}`);
         await sb.from("push_outbox").update({ locked_at: null, last_error: lastError.slice(0, 300) }).in("id", ids);
         totals.failed += tokens.length;
       } else {

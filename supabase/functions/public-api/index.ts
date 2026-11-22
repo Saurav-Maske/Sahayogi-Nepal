@@ -5,6 +5,8 @@ import { serveApi } from "../_shared/rpc.ts";
 
 serveApi("public-api", {
   "map":                       { rpc: "map_markers",                 auth: "none" },
+  "district":                  { rpc: "get_district_config",           auth: "none" },
+  "device-token":              { rpc: "register_public_device_token", auth: "none", spec: { token: "text", platform: "text" } },
   "tracking":                  { rpc: "get_tracking",                auth: "none", spec: { ref: "text", token: "text" } },
   "tracking/otp":              { rpc: "requester_get_otp",           auth: "none", spec: { ref: "text", token: "text", purpose: "text" } },
   "tracking/pickup-qty":       { rpc: "requester_update_pickup_qty", auth: "none", spec: { ref: "text", token: "text", items: "array" } },
