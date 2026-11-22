@@ -17,7 +17,7 @@ Newest first. Anything that changes a payload, table, function or seed behaviour
 
 ## 2026-11-22 (function privileges clean-up)
 
-- **Migration `20261122000011_function_privileges.sql`:** closes issue 11. `audit_row_hash`, `fn_export_latest_audit_hash`, the four trigger functions (`fn_audit_logs_hash_chain`, `fn_audit_logs_append_only`, `fn_assignment_create_driver_location`, `auto_assign_request_district_id`) and any other non-RPC function in `public` (push and email OTP helpers included) are now `service_role` only. A sweep applies the rule to everything not on the client RPC list, and the migration fails and rolls back if `anon` or `authenticated` can still execute something outside its list.
+- **Migration `20261122000011_function_privileges.sql`:** closes issue 11. `audit_row_hash`, `fn_export_latest_audit_hash`, the four trigger functions (`fn_audit_logs_hash_chain`, `fn_audit_logs_append_only`, `fn_assignment_sync_driver_location`, `auto_assign_request_district_id`) and any other non-RPC function in `public` (push and email OTP helpers included) are now `service_role` only. A sweep applies the rule to everything not on the client RPC list, and the migration fails and rolls back if `anon` or `authenticated` can still execute something outside its list.
 - **`is_admin()` stays executable by `anon` and `authenticated` on purpose:** RLS policies and the volunteer-docs storage policy call it as the requesting role. It returns false for anon.
 - **No payload or behaviour change for the apps.** Contract stays v1.4.
 - **New `scripts/check_function_privileges.sql`:** query 1 returns only violations (zero rows = pass); run it after every `supabase db push`.

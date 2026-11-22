@@ -24,6 +24,12 @@ create index if not exists inventory_repositories_location_gix
 alter table public.inventory_repositories enable row level security;  -- no policies = deny
 revoke all on public.inventory_repositories from anon, authenticated;
 
+-- District 33 normally comes from supabase/seeds/nepal_districts.sql, but the seed runs after all migrations,
+-- so on an empty database the foreign key below would fail. Create the row here; the seed fills in the border later.
+insert into public.districts (id, name, province)
+values (33, 'KANCHANPUR', 'Sudurpashchim Province')
+on conflict do nothing;
+
 -- Seed the FWU-SOE inventory repository (district 33).
 -- Requires: public.inventory_repositories (previous migration) and a districts row with id 33.
 --

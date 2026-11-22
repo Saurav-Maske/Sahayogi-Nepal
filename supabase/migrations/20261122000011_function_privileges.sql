@@ -33,7 +33,7 @@ grant execute on function public.fn_export_latest_audit_hash() to service_role;
 -- so nobody needs a grant for the triggers to keep working.
 revoke all on function public.fn_audit_logs_hash_chain()            from public, anon, authenticated;
 revoke all on function public.fn_audit_logs_append_only()           from public, anon, authenticated;
-revoke all on function public.fn_assignment_create_driver_location() from public, anon, authenticated;
+revoke all on function public.fn_assignment_sync_driver_location()   from public, anon, authenticated;
 revoke all on function public.auto_assign_request_district_id()     from public, anon, authenticated;
 
 -- 4. Sweep: anything else in public that is not a client RPC (for example the push helpers
