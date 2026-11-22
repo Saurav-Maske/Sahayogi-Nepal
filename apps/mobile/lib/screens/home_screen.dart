@@ -31,7 +31,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _openExplore() {
     Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (_) => const ExploreScreen()),
+      MaterialPageRoute<void>(builder: (_) => ExploreScreen()),
     );
   }
 
@@ -61,7 +61,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _openMyRequests() {
     Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (_) => const MyRequestsScreen()),
+      MaterialPageRoute<void>(builder: (_) => MyRequestsScreen()),
     );
   }
 

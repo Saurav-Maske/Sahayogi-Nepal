@@ -1,24 +1,98 @@
 import 'package:material_ui/material_ui.dart';
+import 'package:intl/intl.dart';
 
+import '../core/api.dart';
+import '../core/app_home_navigation.dart';
 import '../core/app_colors.dart';
+import '../core/request_submission.dart';
 import '../models/request_summary.dart';
 import '../widgets/community_map_preview.dart';
 import 'explore_screen.dart';
 import 'volunteer_login_screen.dart';
 
-class RequestTrackingScreen extends StatelessWidget {
+class RequestTrackingScreen extends StatefulWidget {
   const RequestTrackingScreen({super.key, required this.request});
 
   final RequestSummaryData request;
 
-  int get _currentStep => switch (request.status) {
-        'Pending' => 0,
-        'In progress' => 2,
-        'Fulfilled' => 3,
-        _ => 0,
+  @override
+  State<RequestTrackingScreen> createState() => _RequestTrackingScreenState();
+}
+
+class _RequestTrackingScreenState extends State<RequestTrackingScreen> {
+  late RequestSummaryData _currentRequest;
+  Map<String, dynamic>? _tracking;
+  bool _refreshing = false;
+
+  RequestSummaryData get request => _currentRequest;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentRequest = widget.request;
+    _refreshTracking();
+  }
+
+  Future<void> _refreshTracking() async {
+    final token = request.trackingToken;
+    if (token == null || token.isEmpty) return;
+    setState(() => _refreshing = true);
+    final result = await Api.getRequestTracking(
+      reference: request.id,
+      token: token,
+    );
+    if (!mounted) return;
+    setState(() => _refreshing = false);
+    if (!result.ok || result.data == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(result.errorMessage ?? 'Could not refresh tracking.'),
+        ),
+      );
+      return;
+    }
+    final data = result.data!;
+    final rawStatus = '${data['status'] ?? request.serverStatus ?? ''}';
+    final items = (data['items'] as List? ?? const [])
+        .whereType<Map>()
+        .map((item) => Map<String, dynamic>.from(item))
+        .toList();
+    final quantities = items
+        .map((item) {
+          final quantity = item['donor_qty'] ??
+              item['approved_qty'] ??
+              item['requested_qty'] ??
+              '';
+          final unit = '${item['unit'] ?? ''}'.trim();
+          return '$quantity${unit.isEmpty ? '' : ' $unit'}';
+        })
+        .where((value) => value.isNotEmpty)
+        .join(', ');
+    setState(() {
+      _tracking = data;
+      _currentRequest = request.copyWith(
+        status: _displayTrackingStatus(rawStatus),
+        serverStatus: rawStatus,
+        requestSummary: quantities.isEmpty ? null : quantities,
+      );
+    });
+    await updateSavedRequestStatus(request.id, rawStatus);
+  }
+
+  int get _currentStep => switch (request.serverStatus) {
+        'approved' || 'awaiting_assignment' || 'assigned' => 1,
+        'in_progress' || 'partially_fulfilled' => 2,
+        'fulfilled' => 3,
+        _ => switch (request.status) {
+            'Pending' => 0,
+            'In progress' => 2,
+            'Fulfilled' => 3,
+            _ => 0,
+          },
       };
 
   List<_JourneyStep> get _steps {
+    if (_tracking != null) return _liveSteps;
     if (request.isDonation) {
       return switch (request.status) {
         'Pending' => const [
@@ -64,6 +138,54 @@ class RequestTrackingScreen extends StatelessWidget {
     };
   }
 
+  List<_JourneyStep> get _liveSteps {
+    final data = _tracking!;
+    String time(Object? value, String fallback) {
+      if (value is! String) return fallback;
+      final parsed = DateTime.tryParse(value)?.toLocal();
+      return parsed == null
+          ? fallback
+          : DateFormat('d MMM · HH:mm').format(parsed);
+    }
+
+    final assignments = (data['assignments'] as List? ?? const [])
+        .whereType<Map>()
+        .map((item) => Map<String, dynamic>.from(item))
+        .toList();
+    final acceptedAt = assignments
+        .map((item) => item['accepted_at'])
+        .whereType<String>()
+        .firstOrNull;
+    final completedAt = assignments
+        .map((item) => item['completed_at'])
+        .whereType<String>()
+        .firstOrNull;
+    final created = time(data['created_at'], 'Submitted');
+    final matched = time(data['approved_at'], 'Finding a match');
+    final progress = time(
+      acceptedAt ?? data['picked_up_at'],
+      'Awaiting a match',
+    );
+    final fulfilled =
+        time(data['fulfilled_at'] ?? completedAt, 'Awaiting delivery');
+    return request.isDonation
+        ? [
+            _JourneyStep('Donation shared', created),
+            _JourneyStep('Recipient matched', matched),
+            _JourneyStep(
+              data['picked_up_at'] == null ? 'Pickup coordinated' : 'Picked up',
+              time(data['picked_up_at'], 'Waiting for pickup'),
+            ),
+            _JourneyStep('Received', fulfilled),
+          ]
+        : [
+            _JourneyStep('Pending', created),
+            _JourneyStep('Matched', matched),
+            _JourneyStep('In Progress', progress),
+            _JourneyStep('Fulfilled', fulfilled),
+          ];
+  }
+
   @override
   Widget build(BuildContext context) => Scaffold(
         backgroundColor: appPaper,
@@ -92,10 +214,20 @@ class RequestTrackingScreen extends StatelessWidget {
                         ),
                       ),
                     ),
-                    const Icon(
-                      Icons.verified_user_outlined,
-                      color: appTeal,
-                      size: 20,
+                    IconButton(
+                      onPressed: _refreshing ? null : _refreshTracking,
+                      tooltip: 'Refresh tracking status',
+                      icon: _refreshing
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(
+                              Icons.refresh_rounded,
+                              color: appTeal,
+                              size: 20,
+                            ),
                     ),
                   ],
                 ),
@@ -173,16 +305,25 @@ class RequestTrackingScreen extends StatelessWidget {
           ),
         ),
         bottomNavigationBar: _TrackingNavigationBar(
-          onHome: () =>
-              Navigator.of(context).popUntil((route) => route.isFirst),
+          onHome: () => openRoleAwareHome(context),
           onExplore: () => Navigator.of(context).push(
-            MaterialPageRoute<void>(builder: (_) => const ExploreScreen()),
+            MaterialPageRoute<void>(builder: (_) => ExploreScreen()),
           ),
           onRequests: () => Navigator.of(context).pop(),
           onProfile: () => openVolunteerLogin(context),
         ),
       );
 }
+
+String _displayTrackingStatus(String status) => switch (status) {
+      'pending_admin_review' => 'Pending',
+      'approved' || 'awaiting_assignment' || 'assigned' => 'Matched',
+      'in_progress' || 'partially_fulfilled' => 'In progress',
+      'fulfilled' => 'Fulfilled',
+      'declined' => 'Declined',
+      'cancelled' => 'Cancelled',
+      _ => 'Pending',
+    };
 
 class _JourneyStep {
   const _JourneyStep(this.title, this.time);
@@ -200,6 +341,7 @@ class _StatusBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     final background = switch (status) {
       'Pending' => const Color(0xFFFFF7DE),
+      'Matched' => const Color(0xFFEAF0F5),
       'Fulfilled' => const Color(0xFFE8F5EC),
       _ => const Color(0xFFE9F0F5),
     };

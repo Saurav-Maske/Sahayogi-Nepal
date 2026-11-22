@@ -1,103 +1,112 @@
 import 'package:material_ui/material_ui.dart';
 
+import '../core/api.dart';
+import '../core/app_home_navigation.dart';
+import '../core/request_submission.dart';
 import '../core/app_colors.dart';
+import '../core/volunteer_auth_service.dart';
+import '../core/volunteer_session_guard.dart';
 import '../models/request_summary.dart';
 import 'explore_screen.dart';
 import 'request_tracking_screen.dart';
 import 'volunteer_login_screen.dart';
 
 class MyRequestsScreen extends StatefulWidget {
-  const MyRequestsScreen({super.key});
+  MyRequestsScreen({super.key, bool? requireVolunteerSession})
+      : requireVolunteerSession =
+            requireVolunteerSession ?? VolunteerAuthService.hasSession;
+
+  final bool requireVolunteerSession;
 
   @override
   State<MyRequestsScreen> createState() => _MyRequestsScreenState();
 }
 
 class _MyRequestsScreenState extends State<MyRequestsScreen> {
-  static const _records = <RequestSummaryData>[
-    RequestSummaryData(
-      id: 'SN-2048',
-      title: 'Drinking water for 24 people',
-      trackingTitle: 'Drinking water',
-      amountAndLocation: '60 litres · Melamchi, Sindhupalchok',
-      requestSummary: '60 litres · 24 people',
-      location: 'Melamchi, Sindhupalchok',
-      submittedAt: '20 Nov 2026, 08:40 NPT',
-      referenceLine: 'Submitted 20 Nov, 08:40',
-      status: 'In progress',
-    ),
-    RequestSummaryData(
-      id: 'SN-2054',
-      title: 'First-aid supplies for 8 people',
-      trackingTitle: 'First-aid supplies',
-      amountAndLocation: '8 first-aid kits · Melamchi, Sindhupalchok',
-      requestSummary: '8 kits · 8 people',
-      location: 'Melamchi, Sindhupalchok',
-      submittedAt: '20 Nov 2026, 09:41 NPT',
-      referenceLine: 'Submitted 20 Nov, 09:41',
-      status: 'Pending',
-    ),
-    RequestSummaryData(
-      id: 'SN-2031',
-      title: 'Family food kits for 6 families',
-      trackingTitle: 'Family food kits',
-      amountAndLocation: '6 kits · Melamchi, Sindhupalchok',
-      requestSummary: '6 kits · 6 families',
-      location: 'Melamchi, Sindhupalchok',
-      submittedAt: '19 Nov 2026, 10:15 NPT',
-      referenceLine: 'Delivered 19 Nov, 16:30',
-      status: 'Fulfilled',
-    ),
-    RequestSummaryData(
-      id: 'SD-3012',
-      title: 'Winter blankets for 12 families',
-      trackingTitle: 'Winter blankets',
-      amountAndLocation: '12 blankets · Pickup, Balaju',
-      requestSummary: '12 blankets · 12 families',
-      location: 'Balaju, Kathmandu',
-      submittedAt: '21 Nov 2026, 08:20 NPT',
-      referenceLine: 'Pickup scheduled 22 Nov, 11:00',
-      status: 'In progress',
-      isDonation: true,
-    ),
-    RequestSummaryData(
-      id: 'SD-3008',
-      title: 'Family food kits for 10 families',
-      trackingTitle: 'Family food kits',
-      amountAndLocation: '10 food kits · Pickup, Boudha',
-      requestSummary: '10 kits · 10 families',
-      location: 'Boudha, Kathmandu',
-      submittedAt: '19 Nov 2026, 09:10 NPT',
-      referenceLine: 'Received 20 Nov, 15:35',
-      status: 'Fulfilled',
-      isDonation: true,
-    ),
-  ];
+  List<RequestSummaryData> _records = [];
+  bool _loading = true;
 
   String _selectedFilter = 'All';
 
+  @override
+  void initState() {
+    super.initState();
+    _loadRequests();
+  }
+
+  Future<void> _loadRequests() async {
+    final saved = await loadSavedRequests();
+    if (!mounted) return;
+    setState(() {
+      _records = saved.map(RequestSummaryData.fromSavedSubmission).toList();
+      _loading = false;
+    });
+
+    final trackable = saved
+        .where((record) =>
+            record['public_ref'] is String &&
+            record['tracking_token'] is String &&
+            (record['tracking_token'] as String).isNotEmpty)
+        .take(20)
+        .toList();
+    final results = await Future.wait(
+      trackable.map((record) => Api.getRequestTracking(
+            reference: record['public_ref'] as String,
+            token: record['tracking_token'] as String,
+          )),
+    );
+    final updatedStatuses = <String, String>{};
+    for (var index = 0; index < results.length; index++) {
+      final result = results[index];
+      final status = result.data?['status'];
+      if (result.ok && status is String && status.isNotEmpty) {
+        updatedStatuses[trackable[index]['public_ref'] as String] = status;
+      }
+    }
+    if (updatedStatuses.isEmpty) return;
+    await updateSavedRequestStatuses(updatedStatuses);
+    if (!mounted) return;
+    setState(() {
+      _records = saved.map((record) {
+        final status = updatedStatuses[record['public_ref']];
+        return RequestSummaryData.fromSavedSubmission({
+          ...record,
+          if (status != null) 'status': status,
+        });
+      }).toList();
+    });
+  }
+
+  bool _isActive(RequestSummaryData request) =>
+      !{'Fulfilled', 'Declined', 'Cancelled'}.contains(request.status);
+
   List<RequestSummaryData> get _visibleRequests => switch (_selectedFilter) {
-        'Active' =>
-          _records.where((request) => request.status == 'In progress').toList(),
+        'Active' => _records.where(_isActive).toList(),
         'Fulfilled' =>
           _records.where((request) => request.status == 'Fulfilled').toList(),
         _ => _records,
       };
 
   void _openExplore() => Navigator.of(context).push(
-        MaterialPageRoute<void>(builder: (_) => const ExploreScreen()),
+        MaterialPageRoute<void>(
+          builder: (_) => ExploreScreen(
+            requireVolunteerSession: widget.requireVolunteerSession,
+          ),
+        ),
       );
 
-  void _showRequest(RequestSummaryData request) {
-    Navigator.of(context).push(
+  Future<void> _showRequest(RequestSummaryData request) async {
+    await Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => RequestTrackingScreen(request: request),
       ),
     );
+    await _loadRequests();
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
+  Widget build(BuildContext context) {
+    final screen = Scaffold(
         backgroundColor: appPaper,
         body: SafeArea(
           bottom: false,
@@ -123,6 +132,11 @@ class _MyRequestsScreenState extends State<MyRequestsScreen> {
                           fontWeight: FontWeight.w700,
                         ),
                       ),
+                    ),
+                    IconButton(
+                      onPressed: _loading ? null : _loadRequests,
+                      tooltip: 'Refresh requests',
+                      icon: const Icon(Icons.refresh_rounded, color: appTeal),
                     ),
                     const Icon(
                       Icons.verified_user_outlined,
@@ -153,12 +167,7 @@ class _MyRequestsScreenState extends State<MyRequestsScreen> {
                           _filterChip('All', _records.length),
                           const SizedBox(width: 8),
                           _filterChip(
-                            'Active',
-                            _records
-                                .where((request) =>
-                                    request.status == 'In progress')
-                                .length,
-                          ),
+                              'Active', _records.where(_isActive).length),
                           const SizedBox(width: 8),
                           _filterChip(
                             'Fulfilled',
@@ -171,13 +180,26 @@ class _MyRequestsScreenState extends State<MyRequestsScreen> {
                       ),
                     ),
                     const SizedBox(height: 20),
-                    if (_visibleRequests.isEmpty)
+                    if (_loading)
                       const Center(
                         child: Padding(
-                          padding: EdgeInsets.symmetric(vertical: 32),
+                          padding: EdgeInsets.all(32),
+                          child: CircularProgressIndicator(),
+                        ),
+                      )
+                    else if (_visibleRequests.isEmpty)
+                      Center(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 32),
                           child: Text(
-                            'No requests in this category.',
-                            style: TextStyle(color: appMuted, fontSize: 14),
+                            _records.isEmpty
+                                ? 'Requests you submit from this device will appear here.'
+                                : 'No requests in this category.',
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              color: appMuted,
+                              fontSize: 14,
+                            ),
                           ),
                         ),
                       )
@@ -198,12 +220,17 @@ class _MyRequestsScreenState extends State<MyRequestsScreen> {
           ),
         ),
         bottomNavigationBar: _RequestsNavigationBar(
-          onHome: () =>
-              Navigator.of(context).popUntil((route) => route.isFirst),
+          onHome: () => openRoleAwareHome(context),
           onExplore: _openExplore,
           onProfile: () => openVolunteerLogin(context),
         ),
       );
+    if (!widget.requireVolunteerSession) return screen;
+    return VolunteerSessionGuard(
+      onUnauthorized: () => openVolunteerLogin(context),
+      child: screen,
+    );
+  }
 
   Widget _filterChip(String label, int count) {
     final selected = _selectedFilter == label;
@@ -328,7 +355,8 @@ class _RequestCard extends StatelessWidget {
           ),
         ),
       );
-}
+  }
+
 
 class _RequestsNavigationBar extends StatelessWidget {
   const _RequestsNavigationBar({

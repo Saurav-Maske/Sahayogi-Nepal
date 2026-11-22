@@ -3,6 +3,8 @@ import 'package:latlong2/latlong.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../core/app_colors.dart';
+import '../core/api.dart';
+import '../core/request_submission.dart';
 import 'explore_screen.dart';
 import 'location_picker_screen.dart';
 import 'my_requests_screen.dart';
@@ -22,6 +24,7 @@ class _RequestHelpScreenState extends State<RequestHelpScreen> {
   ];
   final _affectedPeopleController = TextEditingController();
   final _contactController = TextEditingController();
+  final _requesterNameController = TextEditingController();
   final List<String?> _resourceCategories = [null];
   final List<bool> _categoryErrors = [false];
   LatLng? _location;
@@ -29,6 +32,7 @@ class _RequestHelpScreenState extends State<RequestHelpScreen> {
   bool _locationAllowed = false;
   bool _locationServiceEnabled = true;
   bool _locationError = false;
+  bool _isSubmitting = false;
 
   static const _categoryOptions = [
     'Food',
@@ -106,6 +110,7 @@ class _RequestHelpScreenState extends State<RequestHelpScreen> {
     }
     _affectedPeopleController.dispose();
     _contactController.dispose();
+    _requesterNameController.dispose();
     super.dispose();
   }
 
@@ -169,7 +174,7 @@ class _RequestHelpScreenState extends State<RequestHelpScreen> {
     if (value != null && mounted) onSelected(value);
   }
 
-  void _submitRequest() {
+  Future<void> _submitRequest() async {
     final fieldsValid = _formKey.currentState!.validate();
     final categoriesValid = _resourceCategories.every((value) => value != null);
     final locationValid = _location != null;
@@ -180,9 +185,36 @@ class _RequestHelpScreenState extends State<RequestHelpScreen> {
       _locationError = !locationValid;
     });
     if (!fieldsValid || !categoriesValid || !locationValid) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Request submission is not connected yet.')),
-    );
+    setState(() => _isSubmitting = true);
+    final items = List.generate(_resourceCategories.length, (index) {
+      final quantity = parseQuantityAndUnit(_quantityControllers[index].text)!;
+      return {
+        'item_type': resourceItemType(_resourceCategories[index]!)!,
+        ...quantity,
+      };
+    });
+    final payload = <String, dynamic>{
+      'kind': 'resource_request',
+      'requester_name': _requesterNameController.text.trim(),
+      'requester_phone': normalizeNepalPhone(_contactController.text)!,
+      'lat': _location!.latitude,
+      'lng': _location!.longitude,
+      'urgency': 'normal',
+      'notes':
+          'Estimated affected people: ${_affectedPeopleController.text.trim()}',
+      'items': items,
+    };
+    final result = await Api.submitRequest(payload);
+    if (!mounted) return;
+    setState(() => _isSubmitting = false);
+    if (!result.ok || result.data == null) {
+      showSubmissionError(context, result);
+      return;
+    }
+    await saveSubmittedRequest(response: result.data!, payload: payload);
+    if (!mounted) return;
+    await showSubmissionSuccessDialog(context, result.data!);
+    if (mounted) Navigator.of(context).pop();
   }
 
   @override
@@ -271,18 +303,15 @@ class _RequestHelpScreenState extends State<RequestHelpScreen> {
                     controller: _contactController,
                     hint: 'Phone number for responders to reach you',
                     keyboardType: TextInputType.phone,
-                    validator: (value) {
-                      final contact = value?.trim() ?? '';
-                      if (contact.isEmpty) {
-                        return 'Enter a contact phone number';
-                      }
-                      final digitCount =
-                          contact.replaceAll(RegExp(r'\D'), '').length;
-                      if (digitCount < 7) {
-                        return 'Enter a valid contact phone number';
-                      }
-                      return null;
-                    },
+                    validator: validateNepalPhone,
+                  ),
+                  const SizedBox(height: 16),
+                  _fieldLabel('Requester name'),
+                  const SizedBox(height: 8),
+                  _textField(
+                    controller: _requesterNameController,
+                    hint: 'Your full name',
+                    validator: validateRequesterName,
                   ),
                   const SizedBox(height: 30),
                   ...List.generate(
@@ -342,10 +371,12 @@ class _RequestHelpScreenState extends State<RequestHelpScreen> {
                           _textField(
                             controller: _quantityControllers[index],
                             hint: 'e.g. 8 kits',
-                            validator: (value) =>
-                                value == null || value.trim().isEmpty
-                                    ? 'Enter the required quantity'
-                                    : null,
+                            validator: (value) => parseQuantityAndUnit(
+                                      value ?? '',
+                                    ) ==
+                                    null
+                                ? 'Enter a quantity, for example 8 kits'
+                                : null,
                           ),
                         ],
                       ),
@@ -438,10 +469,11 @@ class _RequestHelpScreenState extends State<RequestHelpScreen> {
                     width: double.infinity,
                     height: 52,
                     child: FilledButton.icon(
-                      onPressed: _submitRequest,
+                      onPressed: _isSubmitting ? null : _submitRequest,
                       iconAlignment: IconAlignment.end,
                       icon: const Icon(Icons.arrow_forward_rounded, size: 20),
-                      label: const Text('Submit request'),
+                      label: Text(
+                          _isSubmitting ? 'Submitting…' : 'Submit request'),
                       style: FilledButton.styleFrom(
                         backgroundColor: appNavy,
                         foregroundColor: Colors.white,
@@ -591,7 +623,7 @@ Widget _requestNavigationBar(BuildContext context) => Container(
                 selected: false,
                 onTap: () => Navigator.of(context).push(
                   MaterialPageRoute<void>(
-                    builder: (_) => const ExploreScreen(),
+                    builder: (_) => ExploreScreen(),
                   ),
                 ),
               ),
@@ -601,7 +633,7 @@ Widget _requestNavigationBar(BuildContext context) => Container(
                 selected: true,
                 onTap: () => Navigator.of(context).push(
                   MaterialPageRoute<void>(
-                    builder: (_) => const MyRequestsScreen(),
+                    builder: (_) => MyRequestsScreen(),
                   ),
                 ),
               ),
