@@ -691,7 +691,7 @@ class _OpportunityCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
+                const Row(
                   children: [
                     const Icon(Icons.location_on_outlined, color: appTeal, size: 17),
                     const SizedBox(width: 8),

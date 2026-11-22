@@ -1,7 +1,3 @@
-// Deno resolves this URL at runtime. The editor's TypeScript server cannot (TS2307), so the check is skipped for this one line.
-// @ts-ignore
-import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
-
 declare const Deno: {
   env: { get(name: string): string | undefined };
   serve(handler: (req: Request) => Response | Promise<Response>): void;
@@ -20,18 +16,18 @@ const COPY: Record<OtpPurpose, { subject: string; lead: string }> = {
   },
 };
 
-// Sends the 6-digit code through Gmail SMTP (port 465, TLS). Returns false if it could not be sent.
-// Local development without SMTP: set OTP_DEV_LOG=true and read the code in the `functions serve` terminal.
+// Sends the 6-digit code through the Resend HTTP API. Returns false if it could not be sent.
+// Local development without Resend: set OTP_DEV_LOG=true and read the code in the `functions serve` terminal.
 export async function sendOtpEmail(to: string, code: string, purpose: OtpPurpose, ttlMin: number): Promise<boolean> {
-  const user = Deno.env.get("GMAIL_ADDRESS");
-  const pass = Deno.env.get("GMAIL_APP_PASSWORD");
+  const apiKey = Deno.env.get("RESEND_API_KEY");
+  const fromAddress = Deno.env.get("MAIL_FROM_ADDRESS");
 
-  if (!user || !pass) {
+  if (!apiKey || !fromAddress) {
     if (Deno.env.get("OTP_DEV_LOG") === "true") {
       console.log(`[OTP_DEV_LOG] ${purpose} code for ${to}: ${code}`);
       return true;
     }
-    console.error("sendOtpEmail: GMAIL_ADDRESS / GMAIL_APP_PASSWORD not set");
+    console.error("sendOtpEmail: RESEND_API_KEY / MAIL_FROM_ADDRESS not set");
     return false;
   }
 
@@ -45,27 +41,29 @@ export async function sendOtpEmail(to: string, code: string, purpose: OtpPurpose
 </div>`;
   const text = `${lead}\n\nYour code: ${code}\n\nIt expires in ${ttlMin} minutes. If you did not ask for it, ignore this email.`;
 
-  const client = new SMTPClient({
-    connection: {
-      hostname: Deno.env.get("SMTP_HOST") ?? "smtp.gmail.com",
-      port: Number(Deno.env.get("SMTP_PORT") ?? "465"),
-      tls: true,
-      auth: { username: user, password: pass },
-    },
-  });
   try {
-    await client.send({
-      from: `${Deno.env.get("MAIL_FROM_NAME") ?? "Sahayogi Nepal"} <${user}>`,
-      to,
-      subject,
-      content: text,
-      html,
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from: `${Deno.env.get("MAIL_FROM_NAME") ?? "Sahayogi Nepal"} <${fromAddress}>`,
+        to: [to],
+        subject,
+        html,
+        text,
+      }),
+      signal: AbortSignal.timeout(10_000),
     });
+    if (!res.ok) {
+      console.error("sendOtpEmail failed:", res.status, await res.text());
+      return false;
+    }
     return true;
   } catch (e) {
     console.error("sendOtpEmail failed:", (e as Error).message);
     return false;
-  } finally {
-    try { await client.close(); } catch { /* ignore */ }
   }
 }

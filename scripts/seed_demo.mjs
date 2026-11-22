@@ -41,7 +41,7 @@ const district = cfg.district ?? {
 // ignoreDuplicates => never overwrites a value already set on the project.
 const missingSettings = [
   ...(cfg.district ? [] : [{ key: 'district', value: { name: 'Kathmandu', ...district, zoom: 11 } }]),
-  ...(cfg.central_inventory ? [] : [{ key: 'central_inventory', value: { name: 'Central Inventory Hub', lat: 27.705, lng: 85.32, address_note: 'Placeholder hub location' } }]),
+  ...(cfg.central_inventory ? [] : [{ key: 'central_inventory', value: { name: 'FWU-SOE', lat: 28.954657907336678, lng: 80.17888176615499, address_note: 'FWU-SOE central inventory, Kanchanpur' } }]),
 ];
 if (missingSettings.length) must(await sb.from('app_settings').upsert(missingSettings, { onConflict: 'key', ignoreDuplicates: true }), 'ensure app_settings rows');
 

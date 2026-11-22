@@ -90,7 +90,7 @@ Call with the SDK: `supabase.rpc('<name>', { ...args })`. Unlike Edge Functions,
 **Admin (`is_admin()` inside; anyone else gets `forbidden`)**
 
 - `admin_list_requests(p_status text = null, p_kind text = null)` returns an array, critical urgency first then oldest first (max 500). Each row: `id, public_ref, kind, status, requester_name, requester_phone, urgency, notes, address_note, volunteers_needed, decline_reason, district, lat, lng, created_at, approved_at, picked_up_at, fulfilled_at, items[], assignments { total, open, claimed }`. Errors: `forbidden | invalid_status | invalid_kind`.
-- `admin_approve_request(p_id uuid, p_items jsonb = null)`: `p_items` is `[{ "item_id": uuid, "approved_qty": number }]`; items left out are approved at the requested quantity, and `approved_qty` cannot exceed `requested_qty`. For `resource_request` it reserves stock FIFO from `ready_to_ship` lots under row locks; if stock is short the whole call rolls back. Sets status `approved`. Errors: `forbidden | not_found | invalid_state | invalid_items | nothing_approved | insufficient_stock` (the error `details` holds the item type).
+- `admin_approve_request(p_id uuid, p_items jsonb = null)`: `p_items` is `[{ "item_id": uuid, "approved_qty": number }]`; items left out are approved at the requested quantity, and `approved_qty` cannot exceed `requested_qty`. For `resource_request` it reserves stock FIFO from `ready_to_ship` lots under row locks; if stock is short the whole call rolls back. It creates the request's assignments in the same transaction, sets status `awaiting_assignment`, and returns the assignment IDs. Errors: `forbidden | not_found | invalid_state | invalid_items | nothing_approved | insufficient_stock | hub_not_configured | nothing_to_deliver | invalid_volunteers_needed` (the `insufficient_stock` error details hold the item type).
 - `admin_decline_request(p_id uuid, p_reason text)`: reason 2-300 characters; only from `pending_admin_review`. Errors: `forbidden | not_found | invalid_state | invalid_reason`.
 - `admin_dashboard_counts()` returns `{ requests_by_status, assignments_by_state, open_offers, open_incidents, pending_applications, stock_available }`.
 - `create_assignments(p_id uuid)`: only from `approved`; sets status `awaiting_assignment`. What it creates per kind:
@@ -108,6 +108,7 @@ Call with the SDK: `supabase.rpc('<name>', { ...args })`. Unlike Edge Functions,
 **Volunteer (active volunteer; otherwise `forbidden`)**
 
 - `my_offers()` returns open offers the volunteer may take: not declined by them, request still `awaiting_assignment`. Tier A is visible to volunteers with exactly `{A}` until `escalate_at`, then to everyone holding A; tier B needs B; tier C needs C. Offers carry only `approx_lat` / `approx_lng` (2 decimals), `district`, `items`, `urgency`, no requester name or phone.
+- `nearby_offers(p_lat, p_lng, p_radius_km = 100)` returns eligible, redacted offers within the supplied radius (0.1–100 km), with `assignment_id` and rounded `distance_km` for map-based claiming. It applies active-volunteer, decline, assignment-state, one-volunteer-per-request and tier checks; callers claim the returned `assignment_id` using `claim_assignment`. Errors: `unauthorized | forbidden | invalid_location`. Edge route: `POST /functions/v1/volunteer-api/offers/nearby` with `{ lat, lng, radius_km? }`.
 - `my_assignment_detail(p_id)`: for your own assignment it adds `route`, and `requester { name, phone, lat, lng, address_note, notes }`. For an open eligible offer you get the redacted view. Anything else is `not_found`.
 - `claim_assignment(p_id)`: one atomic conditional update; returns the same detail as `my_assignment_detail`. A volunteer can hold only one assignment per request. Sets the request to `assigned` once no open slot is left. Errors: `already_claimed | not_eligible | not_found | already_on_request | not_available`.
 - `decline_assignment(p_id)` returns `{ id, released }`. Declining an open offer hides it from you. Declining your own `accepted` assignment releases it back to everyone else (`released: true`, request goes back to `awaiting_assignment`). Later states return `invalid_state`.
@@ -231,3 +232,12 @@ Everything below is still to build; the UI should mock it.
 | Who sees a general request in the first 60 s                                 | Built in `my_offers()`: exactly category A first, then everyone with A.                           |
 | Public map                                                                   | RPC `map_markers()`, not a view.                                                                |
 | Who reads the OTP                                                            | Donor for pickup, requester for delivery, both through `requester_get_otp`.                     |
+### Inventory repositories (migration `20261122120000_inventory_repository_sync.sql`)
+
+- Every lot, reservation and movement carries `inventory_repository_id`; it is NOT NULL. A reservation always has its lot's repository (trigger plus composite foreign key).
+- `admin_import_stock`: each row accepts optional `repository_id` (uuid, default FWU-SOE). Unknown id raises `invalid_repository`. Each returned lot includes `repository_id`.
+- `admin_move_lot`: a split keeps the source lot's repository. The audit detail includes `repository_id`.
+- `admin_approve_request`: reserves from repositories in the request's district first, then others, FIFO inside each group.
+- Donation pickups create lots in the repository nearest to the donation request (fallback FWU-SOE).
+- `admin_inventory_reconcile()` (admin, edge route `stock/reconcile`): `{ ok, issues[] }`. Issue types: `reserved_mismatch`, `stale_reservation`, `reservation_not_ready`.
+- View `inventory_available_by_repository` (service role / admin JWT through RLS): availability per repository and item type. `inventory_available` is unchanged.

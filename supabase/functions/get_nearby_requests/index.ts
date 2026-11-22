@@ -16,7 +16,7 @@ import { adminClient, readJson, requireUser } from "../_shared/auth.ts";
 const TABLE = "requests";
 const LOC_COLUMN = "loc";
 const KIND_COLUMN = "kind";
-const VISIBLE_STATUSES = ["open", "partially_fulfilled","awaiting_assignment"]; // add "in_progress" if wanted
+const VISIBLE_STATUSES = ["open", "partially_fulfilled",]; // add "in_progress" if wanted
 
 // role letter -> kinds only that role may see. Add a kind here to lock it down.
 const RESTRICTED_KINDS: Record<string, string[]> = {
@@ -24,8 +24,8 @@ const RESTRICTED_KINDS: Record<string, string[]> = {
   C: ["healthcare_request"],
 };
 
-const DEFAULT_RADIUS_KM = 10;
-const MAX_RADIUS_KM = 50;
+const DEFAULT_RADIUS_KM = 1000;
+const MAX_RADIUS_KM = 5000;
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 100;
 const MAX_SCAN = 1000; // open rows examined per call
@@ -108,7 +108,7 @@ Deno.serve(async (req) => {
   if (caller) {
     const { data: profile, error: profileErr } = await sb
       .from("profiles")
-      .select("role, account_status")
+      .select("categories, account_status")
       .eq("id", caller.user.id)
       .maybeSingle();
 
@@ -116,7 +116,7 @@ Deno.serve(async (req) => {
       console.error("profile lookup failed:", profileErr.message);
       return fail("profile_failed", "Could not verify your account.", 500);
     }
-    if (profile?.account_status === "active") roles = rolesOf(profile.role);
+    if (profile?.account_status === "active") roles = rolesOf(profile.categories);
   }
 
   const isAdmin = roles.includes("ADMIN");

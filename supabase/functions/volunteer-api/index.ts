@@ -4,6 +4,7 @@ import { serveApi } from "../_shared/rpc.ts";
 
 serveApi("volunteer-api", {
   "offers":               { rpc: "my_offers",              auth: "user" },
+  "offers/nearby":        { rpc: "nearby_offers",          auth: "user", spec: { lat: "num", lng: "num", radius_km: "num?" } },
   "stats":                { rpc: "my_stats",               auth: "user" },
   "device-token":         { rpc: "register_device_token",  auth: "user", spec: { token: "text", platform: "text" } },
 

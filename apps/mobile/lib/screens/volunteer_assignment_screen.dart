@@ -168,6 +168,7 @@ List<LatLng> _previewRoute = const [];
       'volunteer_active_assignment',
       jsonEncode(result.data!),
     );
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Task accepted.')),
     );
@@ -499,7 +500,7 @@ List<LatLng> _previewRoute = const [];
                                   ),
                                 ],
                               ),
-                            CurrentLocationLayer(),
+                            const CurrentLocationLayer(),
                             MarkerLayer(
                               markers: [
                                 for (var index = 0;
