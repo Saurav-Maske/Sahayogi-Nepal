@@ -120,9 +120,18 @@ Deno.serve(async (req) => {
       let lookupError: string | null = null;
       if (head.kind === "low_stock") {
         // Everyone who has the app: volunteers and normal users alike.
-        const { data: rec, error: recErr } = await sb.rpc("push_recipients_all");
-        if (recErr) lookupError = recErr.message;
-        else recipients = (rec ?? []) as Recipient[];
+        // PostgREST returns at most 1000 rows per call, so read the list page by page (ordered by token).
+        const PAGE = 1000;
+        for (let from = 0; ; from += PAGE) {
+          const { data: rec, error: recErr } = await sb.rpc("push_recipients_all").range(from, from + PAGE - 1);
+          if (recErr) {
+            lookupError = recErr.message;
+            break;
+          }
+          const page = (rec ?? []) as Recipient[];
+          recipients.push(...page);
+          if (page.length < PAGE) break;
+        }
       } else {
         for (const r of group) {
           const { data: rec, error: recErr } = await sb.rpc("push_recipients", { p_assignment: r.assignment_id, p_kind: r.kind });

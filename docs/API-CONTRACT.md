@@ -162,16 +162,14 @@ Call with the SDK: `supabase.rpc('<name>', { ...args })`. Unlike Edge Functions,
 
 ### Map and volunteer extras (migration `20261122000006_rpc_map_volunteer.sql`)
 
-- `map_markers()` (**anon-callable**): array of `{ key, layer, kind, urgency, lat, lng, item_types, at }`, newest first, max 500. No name, phone, id or `public_ref`; coordinates rounded to 2 decimals; `key` is a one-way hash so the app can diff markers. Each request is in exactly one layer:
+- `map_markers()` (**anon-callable**, migration `20261122160000_public_map_completed_only.sql`): the public Explore map for people who are not logged in. Array of `{ key, layer, kind, urgency, lat, lng, item_types, at }`, newest first, max 500. No name, phone, id or `public_ref`; coordinates rounded to 2 decimals; `key` is a one-way hash so the app can diff markers. Only completed work is returned, in two layers:
 
-| `layer` | Contains |
-| --- | --- |
-| `fulfilled` | Status `fulfilled`, `fulfilled_at` within the last 12 h |
-| `pickup` | Donation picked up within the last 6 h (and not yet `fulfilled`) |
-| `donation` | Approved donation still waiting for pickup |
-| `need` | Approved request of any other kind that is not finished |
+| `layer` | Colour | Contains | `at` |
+| --- | --- | --- | --- |
+| `pickup` | blue | `kind = donation_offer`, `picked_up_at` within the last 6 h (the driver has entered the donor's OTP). It stays here after the drop at the hub. | `picked_up_at` |
+| `fulfilled` | green | `kind = resource_request`, status `fulfilled` or `partially_fulfilled`, `fulfilled_at` within the last 12 h | `fulfilled_at` |
 
-  Pending, declined and cancelled requests are never shown. A donation that is fully delivered to the hub moves from `pickup` to `fulfilled` for 12 h, then drops off.
+  Everything else is never returned: pending, approved, open, being picked up or delivered, declined and cancelled requests, and every other kind (manpower, healthcare, transport). The old `donation` and `need` layers no longer exist.
 - `admin_map_markers()` (admin): `{ hub, requests[], volunteers[] }`. `hub` is the `central_inventory` setting. `requests[]` are exact positions of everything open (including `pending_admin_review` and `partially_fulfilled`) plus fulfilled in the last 12 h (max 1000): `{ id, public_ref, kind, status, urgency, requester_name, district, lat, lng, open_incidents, assignments { total, claimed }, created_at, updated_at }`. `volunteers[]` are in-progress assignments that reported a position in the last 30 minutes: `{ assignment_id, request_id, public_ref, assignment_type, state, volunteer_id, volunteer_name, volunteer_phone, lat, lng, updated_at }`. Errors: `forbidden`.
 - `update_my_location(p_id, p_lat, p_lng)` (volunteer): live position for one of your own assignments; one row per assignment (upsert). Returns `{ ok: true, updated_at }`. Allowed while the assignment is `accepted`, `en_route_to_pickup`, `picked_up` or `en_route_to_destination` and the request is `assigned` or `in_progress`. Coordinates must be inside Nepal's rough box (lat 26.3-30.5, lng 80.0-88.3). Not audited (called every few seconds). Requesters only see it through `get_tracking` while `en_route_*`. Errors: `unauthorized | forbidden | invalid_location | not_found | invalid_state`.
 - `my_stats()` (volunteer): `{ claimed_total, active, completed, disputed, completed_last_30_days, last_completed_at, completed_by_type, declined_offers }`. Counts are zero (and `last_completed_at` null) for a volunteer with no assignments. Errors: `unauthorized | forbidden`.

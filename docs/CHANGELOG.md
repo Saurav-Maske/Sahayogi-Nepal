@@ -2,6 +2,13 @@
 
 Newest first. Anything that changes a payload, table, function or seed behaviour gets a line here.
 
+## 2026-11-22 (public map shows completed work only)
+
+- **Migration `20261122160000_public_map_completed_only.sql`** replaces `map_markers()`. Layers are now only `pickup` (blue: donation received from a user, `picked_up_at` within 6 h) and `fulfilled` (green: resource request delivered, `fulfilled_at` within 12 h, `kind = resource_request` only). A donation dropped at the hub stays in `pickup` until 6 h after pickup (before, it jumped into `fulfilled`). The `donation` and `need` layers are removed, so nothing waiting for approval or still in progress is public. Output shape, rounding and privacy are unchanged. A delivery reported short (`partially_fulfilled`) still counts as delivered. Tested on a scratch PostgreSQL + PostGIS with 12 cases (not on the Supabase project).
+- **`send-push`:** the `low_stock` broadcast now reads `push_recipients_all()` page by page. PostgREST returns at most 1000 rows per call, so with more than 1000 devices the rest would never have been told.
+- **App:** the Explore screen must stop expecting `donation` and `need` markers and draw `pickup` as blue and `fulfilled` as green.
+- **Deploy:** `supabase db push`, then `supabase functions deploy send-push`. `public-api` needs no redeploy.
+
 ## 2026-11-22 (hub moved to Kanchanpur, reserve alerts)
 
 - **Hub:** migration `20261122140000_hub_to_fwu_soe.sql` upserts `app_settings` key `central_inventory` to FWU-SOE, Kanchanpur (28.954657907336678, 80.17888176615499), and rewrites the hub point inside `route_snapshot` of every unfinished assignment. The seed scripts, `docs/DEMO-SETUP.md` and `docs/REMOTE_SEED.md` no longer mention the Kathmandu placeholder. **Not yet run against a database.**
