@@ -21,7 +21,7 @@ Person 2 owns the canonical API contract and all migrations. Person 4 owns integ
 ## Tech stack
 
 Flutter (Dart) · Supabase (Postgres + PostGIS, Auth, Storage, Realtime, Edge Functions) ·
-React + Vite + TypeScript (admin) · Valhalla routing (via the `get-route` function) · Firebase Cloud Messaging (planned).
+React + Vite + TypeScript (admin) · Valhalla routing (via the `get-route` function) · Firebase Cloud Messaging (through the `send-push` function).
 
 ## Repository layout
 
@@ -116,11 +116,15 @@ approval and stock reservation, assignment and claim, delivery progress, OTP, re
 markers, volunteer location and stats, device tokens, inventory import and moves, incidents and the audit
 timeline (migrations `...000003` to `...000007`, each RPC granted explicitly).
 
-Push notifications are built (`send-push`, migration `...000009`); setup steps are in `docs/CHANGELOG.md` and the header of that migration.
-Not built yet: the `routes` table for
-`get-route` with `save: true`, and a clean-up migration that revokes the default public execute right on
-older helper functions. The admin app still calls a few RPC names that do not exist (see
-`docs/CHANGELOG.md`). Details: [`docs/API-CONTRACT.md`](docs/API-CONTRACT.md).
+Later migrations (through `20261123000300`, see `docs/CHANGELOG.md`) add: push notifications (`send-push`),
+approval that creates the driver offers, the hub flow (admin count, admin hub codes for donation drop-off and
+resource pickup, driver issue reporting, donor item edits), reserve levels with a low-stock push, kits as the only
+unit, the completed-work public map and a server-side route preview (`get-offer-route`).
+
+Still to do: the one-time push setup on each project (`docs/DEMO-SETUP.md` step 5, then run
+`scripts/check_push_setup.sql`), `supabase db push` and function deploys for the newest migrations, and the app
+screens that go with them (see the end of `docs/CHANGELOG.md` entries). The admin app still calls a few RPC names
+that do not exist (see `docs/CHANGELOG.md`). Details: [`docs/API-CONTRACT.md`](docs/API-CONTRACT.md).
 
 ## Working together
 

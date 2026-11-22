@@ -3,6 +3,51 @@
 
 Newest first. Anything that changes a payload, table, function or seed behaviour gets a line here.
 
+## 2026-11-23 (hub pickup code and refusal for resource requests, contract v1.6)
+
+- **Migration `20261123000300_hub_pickup_otp.sql`:** `admin_issue_otp` now picks the purpose from the job: a `delivery` job that is `accepted` or `en_route_to_pickup` gets a `hub_pickup` code (6 digits, hashed, 15 minutes, 5 attempts, 10 per hour). The driver enters it in `driver_verify_otp` (purpose `hub_pickup`) and only then is the job `picked_up`. `update_assignment_state` no longer allows `delivery` -> `picked_up` (`otp_required`). Stock stays reserved until the requester's delivery code.
+- **`driver_report_issue`** also works for a `delivery` job before `hub_pickup` (incident types `hub_pickup_refused`, `hub_items_mismatch`). The job is released with that driver excluded and the request goes back to `awaiting_assignment`. **Decision (c):** the reserved stock is kept, because another driver still has to deliver it; the admin can decline the request from the incident to release it.
+- **Tested** on a scratch PostgreSQL with a reduced schema (no PostGIS); not on the Supabase project.
+- **Deploy:** `supabase db push`, then `supabase functions deploy admin-api volunteer-api`. **Apps:** driver app needs a `hub_pickup` code entry step and the report-issue screen for delivery jobs; admin app shows the code once.
+
+## 2026-11-23 (hub drop-off code)
+
+- **Migration `20261123000200_hub_dropoff_otp.sql`:** `otp_challenges.purpose` allows `hub_dropoff`. New RPC `admin_issue_otp(p_id)` (edge route `admin-api/assignments/issue-otp`): after the hub count the admin gets a 6-digit code (hashed, 15 minutes, 5 attempts, 10 per hour, shown once) and reads it to the driver. `driver_verify_otp` (purpose `hub_dropoff`) then sets the job `delivered` and the donation request `fulfilled`. The driver can no longer mark a pickup job delivered (`update_assignment_state` answers `otp_required`). Before the count the admin gets `not_received`. Donations picked up before the hub count existed keep their lots and count as counted.
+
+## 2026-11-23 (hub count, stock from the count)
+
+- **Migration `20261123000100_hub_receive_count.sql`:** **behaviour change.** The pickup OTP no longer creates inventory lots; it records `confirmed_qty` and the job is `picked_up` (in transit). New RPC `admin_receive_donation(p_id, p_items)` (edge route `admin-api/assignments/receive`) takes the counted whole kits per item, creates the `received` lots plus movements (reason `hub receipt`), runs the reserve check and opens a `hub_shortfall` incident when a count differs from what the driver confirmed. Once per job; old-flow donations with lots are refused with `already_received`. **Decision (b):** donated stock counts from the hub count.
+- **`get_tracking`** returns `hub_received_at` so the donor sees "delivered to hub".
+- **Audit:** new actions `hub_received`, `hub_pickup_confirmed`, `hub_dropoff_completed`.
+- **Tested** on a scratch PostgreSQL with a reduced schema; not on the Supabase project.
+- **Apps:** admin count screen; donor screen shows the new step.
+
+## 2026-11-22 (driver issue reporting)
+
+- **Migration `20261122191000_driver_report_issue.sql`:** new `driver_report_issue(p_id, p_type, p_note)` (edge route `volunteer-api/assignments/report-issue`). `p_type` is `pickup_refused` or `items_mismatch`, note 2-500 characters. It opens an incident that keeps the reporting driver, releases the job back to offers with that driver excluded and sets the request back to `awaiting_assignment`. `admin_list_incidents` shows the driver. Donation pickups only (resource requests were added by `20261123000300`). **Not tested against real data.**
+
+## 2026-11-22 (donor can raise and add items)
+
+- **Migration `20261122190000_donor_edit_items.sql`:** `requester_update_pickup_qty` now lets the donor lower, raise, remove (qty 0) and add items (`{ item_type, qty >= 1 }`) until the driver enters the pickup OTP. A raised or added item differs from the approved quantity, so the driver must confirm it (`quantity_changed`). New error `invalid_quantity`. **Decision (d).** Not tested against real data.
+
+## 2026-11-22 (kits only)
+
+- **Migration `20261122181000_kit_units_whole_numbers.sql`:** every unit is `kit` and every quantity a whole number, on `request_items` and `inventory_lots` (check constraints plus trigger `fn_enforce_whole_kits`). Other units sent become `kit`; fractions are refused with `invalid_quantity`. Existing fractional rows are **rounded by the migration**: check hosted data first, because rounding changes stock numbers. `submit-request` now requires a whole-number `qty` and no longer needs `unit`.
+
+## 2026-11-22 (reserve counts approvable stock, district config, reserve re-alert)
+
+- **Migration `20261122183000_reserve_counts_ready_to_ship.sql` (E6):** the low-stock check counts only `ready_to_ship` stock minus reserved (same rule as approval and `inventory_available`). This **replaces** the rule in the 2026-11-22 reserve alerts entry below (received, processing and ready_to_ship). Flags are reset without sending an alert. Counted hub stock joins the reserve once the admin moves it to `ready_to_ship`.
+- **Migration `20261122182000_district_public_and_reserve_realert.sql`:** E4: `get_district_config()` (anon-callable) and route `public-api/district` replace direct reads of `app_settings`, which stopped being public with `settings_public_read` dropped in `20261122113715`. E7: `admin_set_reserve_level` resets the alert flag when the level changes, so a category already below its new level alerts once straight away.
+- **New `scripts/check_push_setup.sql`** (E5): read-only check of the one-time push setup (vault entries, `pg_net`, `pg_cron`, cron jobs, device and outbox counts).
+
+## 2026-11-22 (one driver-location system)
+
+- **Migration `20261122180000_cleanup_driver_location_and_nearby.sql` (E2, E3):** `update_my_location` (`volunteer_locations`) is the only driver-location system; `driver_latest_location`, its view and trigger are dropped. **Delete** the Edge Functions `update-driver-location`, `get-driver-location` and `get_nearby_requests` (folders and deployed copies). `nearby_offers` (`volunteer-api/offers/nearby`) replaces the last one.
+
+## 2026-11-22 (approval creates driver offers)
+
+- **Migration `20261122150000_approval_assignments_nearby_offers.sql`:** `admin_approve_request` calls `create_assignments` in the same transaction, so drivers see an approved request (and get a push) without a separate Assign step. `requests/assign` stays for re-creating offers. Adds `nearby_offers(p_lat, p_lng, p_radius_km)` (edge route `volunteer-api/offers/nearby`). **Decision (a).** Not tested against real data.
+
 ## 2026-11-22 (server-side route preview for offers)
 
 - **Why:** before a driver accepts, `my_offers` and `assignments/detail` show only an approximate position and never the hub, so the app could not preview the full route. The preview is now built on the server from exact points.
