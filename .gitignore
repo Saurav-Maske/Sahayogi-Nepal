@@ -18,3 +18,4 @@ key.properties
 .DS_Store
 supabase/functions/node_modules
 scripts/tests/last-run.json
+reports/

@@ -1,0 +1,4850 @@
+{
+  "info": {
+    "name": "Sahayogi Nepal - Flows (OTP, incidents, pickup, declines)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Run folders 0 to 4 in order. Each flow submits its own request, so it does not depend on the other collections. Needs base_url, anon_key, admin_email, volunteer_email and password in the environment. Adds requests and 50 litres of drinking water to the demo project on every run."
+  },
+  "item": [
+    {
+      "name": "0 - Setup (run first)",
+      "description": "Logs in the three roles and puts drinking water in stock so the delivery flows can be approved.",
+      "item": [
+        {
+          "name": "Admin login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let j = {}; try { j = pm.response.json(); } catch (e) {}",
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('no error', () => pm.expect(j.error).to.eql(null));",
+                  "const d = j.data || {};",
+                  "pm.test('token saved', () => pm.expect(d.session && d.session.access_token).to.be.a('string'));",
+                  "if (d.session) { pm.environment.set('admin_token', d.session.access_token); }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{admin_email}}\",\n  \"password\": \"{{password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/admin-login",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "admin-login"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Driver login (driver1, A+B)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let j = {}; try { j = pm.response.json(); } catch (e) {}",
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('no error', () => pm.expect(j.error).to.eql(null));",
+                  "const d = j.data || {};",
+                  "pm.test('token saved', () => pm.expect(d.session && d.session.access_token).to.be.a('string'));",
+                  "if (d.session) { pm.environment.set('volunteer_token', d.session.access_token); }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{volunteer_email}}\",\n  \"password\": \"{{password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/volunteer-login",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "volunteer-login"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Helper login (general, A only)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let j = {}; try { j = pm.response.json(); } catch (e) {}",
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('no error', () => pm.expect(j.error).to.eql(null));",
+                  "const d = j.data || {};",
+                  "pm.test('token saved', () => pm.expect(d.session && d.session.access_token).to.be.a('string'));",
+                  "if (d.session) { pm.environment.set('helper_token', d.session.access_token); }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"general@demo.test\",\n  \"password\": \"{{password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/volunteer-login",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "volunteer-login"
+              ]
+            }
+          }
+        },
+        {
+          "name": "admin imports 50 litres of drinking water",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let j = {}; try { j = pm.response.json(); } catch (e) {}",
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('no error', () => pm.expect(j.error).to.eql(null));",
+                  "const d = j.data || {};"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [\n    {\n      \"item_type\": \"drinking_water\",\n      \"qty\": 50,\n      \"unit\": \"litre\",\n      \"phase\": \"ready_to_ship\",\n      \"provider_name\": \"Postman Flow Test\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/admin-api/stock/import",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "admin-api",
+                "stock",
+                "import"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "1 - Delivery with OTP",
+      "description": "Resource request from submit to delivered, with every OTP rule on the way.",
+      "item": [
+        {
+          "name": "submit resource request",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.environment.set('phone', '98' + String(Math.floor(10000000 + Math.random() * 89999999)));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let j = {}; try { j = pm.response.json(); } catch (e) {}",
+                  "pm.test('status is 201', () => pm.response.to.have.status(201));",
+                  "pm.test('no error', () => pm.expect(j.error).to.eql(null));",
+                  "const d = j.data || {};",
+                  "pm.environment.set('flow_request_id', d.request_id);",
+                  "pm.environment.set('flow_ref', d.public_ref);",
+                  "pm.environment.set('flow_token', d.tracking_token);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"kind\": \"resource_request\",\n  \"requester_name\": \"Postman Flow\",\n  \"requester_phone\": \"{{phone}}\",\n  \"lat\": 27.71,\n  \"lng\": 85.32,\n  \"urgency\": \"normal\",\n  \"items\": [\n    {\n      \"item_type\": \"drinking_water\",\n      \"qty\": 2,\n      \"unit\": \"litre\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/submit-request",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "submit-request"
+              ]
+            }
+          }
+        },
+        {
+          "name": "admin approves",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let j = {}; try { j = pm.response.json(); } catch (e) {}",
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('no error', () => pm.expect(j.error).to.eql(null));",
+                  "const d = j.data || {};"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"{{flow_request_id}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/admin-api/requests/approve",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "admin-api",
+                "requests",
+                "approve"
+              ]
+            }
+          }
+        },
+        {
+          "name": "admin creates assignments",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let j = {}; try { j = pm.response.json(); } catch (e) {}",
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('no error', () => pm.expect(j.error).to.eql(null));",
+                  "const d = j.data || {};",
+                  "pm.test('one assignment returned', () => pm.expect((d.assignments || []).length).to.eql(1));",
+                  "if (d.assignments) { pm.environment.set('flow_assignment_id', d.assignments[0].id); }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"{{flow_request_id}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/admin-api/requests/assign",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "admin-api",
+                "requests",
+                "assign"
+              ]
+            }
+          }
+        },
+        {
+          "name": "driver claims",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let j = {}; try { j = pm.response.json(); } catch (e) {}",
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('no error', () => pm.expect(j.error).to.eql(null));",
+                  "const d = j.data || {};"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{volunteer_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"{{flow_assignment_id}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/volunteer-api/assignments/claim",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "volunteer-api",
+                "assignments",
+                "claim"
+              ]
+            }
+          }
+        },
+        {
+          "name": "requester OTP too early (409 otp_not_available)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let j = {}; try { j = pm.response.json(); } catch (e) {}",
+                  "pm.test('status is 409', () => pm.response.to.have.status(409));",
+                  "pm.test('error code is otp_not_available', () => pm.expect((j.error || {}).code).to.eql('otp_not_available'));",
+                  "const d = j.data || {};"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ref\": \"{{flow_ref}}\",\n  \"token\": \"{{flow_token}}\",\n  \"purpose\": \"delivery\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/public-api/tracking/otp",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "public-api",
+                "tracking",
+                "otp"
+              ]
+            }
+          }
+        },
+        {
+          "name": "requester OTP bad purpose (400 invalid_purpose)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let j = {}; try { j = pm.response.json(); } catch (e) {}",
+                  "pm.test('status is 400', () => pm.response.to.have.status(400));",
+                  "pm.test('error code is invalid_purpose', () => pm.expect((j.error || {}).code).to.eql('invalid_purpose'));",
+                  "const d = j.data || {};"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ref\": \"{{flow_ref}}\",\n  \"token\": \"{{flow_token}}\",\n  \"purpose\": \"bogus\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/public-api/tracking/otp",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "public-api",
+                "tracking",
+                "otp"
+              ]
+            }
+          }
+        },
+        {
+          "name": "skip OTP early: delivered from accepted (409 otp_required or invalid_transition)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let j = {}; try { j = pm.response.json(); } catch (e) {}",
+                  "pm.test('status is 409', () => pm.response.to.have.status(409));",
+                  "pm.test('no error', () => pm.expect(j.error).to.eql(null));",
+                  "const d = j.data || {};",
+                  "pm.test('refused with a transition code', () => pm.expect(['otp_required','invalid_transition']).to.include((j.error || {}).code));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{volunteer_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"{{flow_assignment_id}}\",\n  \"state\": \"delivered\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/volunteer-api/assignments/state",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "volunteer-api",
+                "assignments",
+                "state"
+              ]
+            }
+          }
+        },
+        {
+          "name": "driver moves to en_route_to_pickup",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let j = {}; try { j = pm.response.json(); } catch (e) {}",
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('no error', () => pm.expect(j.error).to.eql(null));",
+                  "const d = j.data || {};",
+                  "pm.test('state is en_route_to_pickup', () => pm.expect(d.state).to.eql('en_route_to_pickup'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{volunteer_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"{{flow_assignment_id}}\",\n  \"state\": \"en_route_to_pickup\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/volunteer-api/assignments/state",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "volunteer-api",
+                "assignments",
+                "state"
+              ]
+            }
+          }
+        },
+        {
+          "name": "driver moves to picked_up",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let j = {}; try { j = pm.response.json(); } catch (e) {}",
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('no error', () => pm.expect(j.error).to.eql(null));",
+                  "const d = j.data || {};",
+                  "pm.test('state is picked_up', () => pm.expect(d.state).to.eql('picked_up'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{volunteer_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"{{flow_assignment_id}}\",\n  \"state\": \"picked_up\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/volunteer-api/assignments/state",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "volunteer-api",
+                "assignments",
+                "state"
+              ]
+            }
+          }
+        },
+        {
+          "name": "driver moves to en_route_to_destination",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let j = {}; try { j = pm.response.json(); } catch (e) {}",
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('no error', () => pm.expect(j.error).to.eql(null));",
+                  "const d = j.data || {};",
+                  "pm.test('state is en_route_to_destination', () => pm.expect(d.state).to.eql('en_route_to_destination'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{volunteer_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"{{flow_assignment_id}}\",\n  \"state\": \"en_route_to_destination\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/volunteer-api/assignments/state",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "volunteer-api",
+                "assignments",
+                "state"
+              ]
+            }
+          }
+        },
+        {
+          "name": "skip OTP: delivered without code (409 otp_required)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let j = {}; try { j = pm.response.json(); } catch (e) {}",
+                  "pm.test('status is 409', () => pm.response.to.have.status(409));",
+                  "pm.test('error code is otp_required', () => pm.expect((j.error || {}).code).to.eql('otp_required'));",
+                  "const d = j.data || {};"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{volunteer_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"{{flow_assignment_id}}\",\n  \"state\": \"delivered\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/volunteer-api/assignments/state",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "volunteer-api",
+                "assignments",
+                "state"
+              ]
+            }
+          }
+        },
+        {
+          "name": "tracking shows delivery OTP is due",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let j = {}; try { j = pm.response.json(); } catch (e) {}",
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('no error', () => pm.expect(j.error).to.eql(null));",
+                  "const d = j.data || {};",
+                  "pm.test('otp_purpose is delivery', () => pm.expect(d.otp_purpose).to.eql('delivery'));",
+                  "pm.test('no phone in the response', () => pm.expect(pm.response.text()).to.not.include(pm.environment.get('phone')));",
+                  "pm.test('no requester_phone field', () => pm.expect(pm.response.text()).to.not.include('requester_phone'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ref\": \"{{flow_ref}}\",\n  \"token\": \"{{flow_token}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/public-api/tracking",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "public-api",
+                "tracking"
+              ]
+            }
+          }
+        },
+        {
+          "name": "requester gets the delivery OTP",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let j = {}; try { j = pm.response.json(); } catch (e) {}",
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('no error', () => pm.expect(j.error).to.eql(null));",
+                  "const d = j.data || {};",
+                  "pm.test('code is six digits', () => pm.expect(d.code).to.match(/^\\d{6}$/));",
+                  "pm.test('purpose echoed', () => pm.expect(d.purpose).to.eql('delivery'));",
+                  "pm.environment.set('flow_otp', d.code);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ref\": \"{{flow_ref}}\",\n  \"token\": \"{{flow_token}}\",\n  \"purpose\": \"delivery\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/public-api/tracking/otp",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "public-api",
+                "tracking",
+                "otp"
+              ]
+            }
+          }
+        },
+        {
+          "name": "driver sends a wrong code",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.environment.set('flow_wrong_otp', pm.environment.get('flow_otp') === '000000' ? '111111' : '000000');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let j = {}; try { j = pm.response.json(); } catch (e) {}",
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('no error', () => pm.expect(j.error).to.eql(null));",
+                  "const d = j.data || {};",
+                  "pm.test('ok is false', () => pm.expect(d.ok).to.eql(false));",
+                  "pm.test('reason is invalid_otp', () => pm.expect(d.reason).to.eql('invalid_otp'));",
+                  "pm.test('four attempts left', () => pm.expect(d.attempts_left).to.eql(4));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{volunteer_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"{{flow_assignment_id}}\",\n  \"purpose\": \"delivery\",\n  \"code\": \"{{flow_wrong_otp}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/volunteer-api/assignments/verify-otp",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "volunteer-api",
+                "assignments",
+                "verify-otp"
+              ]
+            }
+          }
+        },
+        {
+          "name": "driver uses the pickup purpose on a delivery (400 invalid_purpose)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let j = {}; try { j = pm.response.json(); } catch (e) {}",
+                  "pm.test('status is 400', () => pm.response.to.have.status(400));",
+                  "pm.test('error code is invalid_purpose', () => pm.expect((j.error || {}).code).to.eql('invalid_purpose'));",
+                  "const d = j.data || {};"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{volunteer_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"{{flow_assignment_id}}\",\n  \"purpose\": \"pickup\",\n  \"code\": \"{{flow_otp}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/volunteer-api/assignments/verify-otp",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "volunteer-api",
+                "assignments",
+                "verify-otp"
+              ]
+            }
+          }
+        },
+        {
+          "name": "another volunteer cannot verify (404 not_found)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let j = {}; try { j = pm.response.json(); } catch (e) {}",
+                  "pm.test('status is 404', () => pm.response.to.have.status(404));",
+                  "pm.test('error code is not_found', () => pm.expect((j.error || {}).code).to.eql('not_found'));",
+                  "const d = j.data || {};"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{helper_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"{{flow_assignment_id}}\",\n  \"purpose\": \"delivery\",\n  \"code\": \"{{flow_otp}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/volunteer-api/assignments/verify-otp",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "volunteer-api",
+                "assignments",
+                "verify-otp"
+              ]
+            }
+          }
+        },
+        {
+          "name": "driver sends the right code",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let j = {}; try { j = pm.response.json(); } catch (e) {}",
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('no error', () => pm.expect(j.error).to.eql(null));",
+                  "const d = j.data || {};",
+                  "pm.test('ok is true', () => pm.expect(d.ok).to.eql(true));",
+                  "pm.test('state is delivered', () => pm.expect(d.state).to.eql('delivered'));",
+                  "pm.test('request is fulfilled', () => pm.expect(d.request_status).to.eql('fulfilled'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{volunteer_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"{{flow_assignment_id}}\",\n  \"purpose\": \"delivery\",\n  \"code\": \"{{flow_otp}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/volunteer-api/assignments/verify-otp",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "volunteer-api",
+                "assignments",
+                "verify-otp"
+              ]
+            }
+          }
+        },
+        {
+          "name": "replay of the same code (409 invalid_state)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let j = {}; try { j = pm.response.json(); } catch (e) {}",
+                  "pm.test('status is 409', () => pm.response.to.have.status(409));",
+                  "pm.test('error code is invalid_state', () => pm.expect((j.error || {}).code).to.eql('invalid_state'));",
+                  "const d = j.data || {};"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{volunteer_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"{{flow_assignment_id}}\",\n  \"purpose\": \"delivery\",\n  \"code\": \"{{flow_otp}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/volunteer-api/assignments/verify-otp",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "volunteer-api",
+                "assignments",
+                "verify-otp"
+              ]
+            }
+          }
+        },
+        {
+          "name": "tracking shows fulfilled",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let j = {}; try { j = pm.response.json(); } catch (e) {}",
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('no error', () => pm.expect(j.error).to.eql(null));",
+                  "const d = j.data || {};",
+                  "pm.test('status is fulfilled', () => pm.expect(d.status).to.eql('fulfilled'));",
+                  "pm.test('no OTP due any more', () => pm.expect(d.otp_purpose || null).to.eql(null));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ref\": \"{{flow_ref}}\",\n  \"token\": \"{{flow_token}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/public-api/tracking",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "public-api",
+                "tracking"
+              ]
+            }
+          }
+        },
+        {
+          "name": "confirm delivery without full (400 invalid_input)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let j = {}; try { j = pm.response.json(); } catch (e) {}",
+                  "pm.test('status is 400', () => pm.response.to.have.status(400));",
+                  "pm.test('error code is invalid_input', () => pm.expect((j.error || {}).code).to.eql('invalid_input'));",
+                  "const d = j.data || {};"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ref\": \"{{flow_ref}}\",\n  \"token\": \"{{flow_token}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/public-api/tracking/confirm-delivery",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "public-api",
+                "tracking",
+                "confirm-delivery"
+              ]
+            }
+          }
+        },
+        {
+          "name": "confirm delivery with wrong token (404 not_found)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let j = {}; try { j = pm.response.json(); } catch (e) {}",
+                  "pm.test('status is 404', () => pm.response.to.have.status(404));",
+                  "pm.test('error code is not_found', () => pm.expect((j.error || {}).code).to.eql('not_found'));",
+                  "const d = j.data || {};"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ref\": \"{{flow_ref}}\",\n  \"token\": \"wrong\",\n  \"full\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/public-api/tracking/confirm-delivery",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "public-api",
+                "tracking",
+                "confirm-delivery"
+              ]
+            }
+          }
+        },
+        {
+          "name": "requester confirms everything arrived",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let j = {}; try { j = pm.response.json(); } catch (e) {}",
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('no error', () => pm.expect(j.error).to.eql(null));",
+                  "const d = j.data || {};",
+                  "pm.test('confirmed is true', () => pm.expect(d.confirmed).to.eql(true));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ref\": \"{{flow_ref}}\",\n  \"token\": \"{{flow_token}}\",\n  \"full\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/public-api/tracking/confirm-delivery",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "public-api",
+                "tracking",
+                "confirm-delivery"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2 - Short delivery and incident",
+      "description": "Requester reports a short delivery, admin works the incident to resolved.",
+      "item": [
+        {
+          "name": "submit resource request",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.environment.set('phone', '98' + String(Math.floor(10000000 + Math.random() * 89999999)));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let j = {}; try { j = pm.response.json(); } catch (e) {}",
+                  "pm.test('status is 201', () => pm.response.to.have.status(201));",
+                  "pm.test('no error', () => pm.expect(j.error).to.eql(null));",
+                  "const d = j.data || {};",
+                  "pm.environment.set('flow_request_id', d.request_id);",
+                  "pm.environment.set('flow_ref', d.public_ref);",
+                  "pm.environment.set('flow_token', d.tracking_token);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"kind\": \"resource_request\",\n  \"requester_name\": \"Postman Flow\",\n  \"requester_phone\": \"{{phone}}\",\n  \"lat\": 27.71,\n  \"lng\": 85.32,\n  \"urgency\": \"normal\",\n  \"items\": [\n    {\n      \"item_type\": \"drinking_water\",\n      \"qty\": 2,\n      \"unit\": \"litre\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/submit-request",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "submit-request"
+              ]
+            }
+          }
+        },
+        {
+          "name": "admin approves",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let j = {}; try { j = pm.response.json(); } catch (e) {}",
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('no error', () => pm.expect(j.error).to.eql(null));",
+                  "const d = j.data || {};"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"{{flow_request_id}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/admin-api/requests/approve",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "admin-api",
+                "requests",
+                "approve"
+              ]
+            }
+          }
+        },
+        {
+          "name": "admin creates assignments",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let j = {}; try { j = pm.response.json(); } catch (e) {}",
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('no error', () => pm.expect(j.error).to.eql(null));",
+                  "const d = j.data || {};",
+                  "pm.test('one assignment returned', () => pm.expect((d.assignments || []).length).to.eql(1));",
+                  "if (d.assignments) { pm.environment.set('flow_assignment_id', d.assignments[0].id); }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"{{flow_request_id}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/admin-api/requests/assign",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "admin-api",
+                "requests",
+                "assign"
+              ]
+            }
+          }
+        },
+        {
+          "name": "driver claims",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let j = {}; try { j = pm.response.json(); } catch (e) {}",
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('no error', () => pm.expect(j.error).to.eql(null));",
+                  "const d = j.data || {};"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{volunteer_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"{{flow_assignment_id}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/volunteer-api/assignments/claim",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "volunteer-api",
+                "assignments",
+                "claim"
+              ]
+            }
+          }
+        },
+        {
+          "name": "driver moves to en_route_to_pickup",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let j = {}; try { j = pm.response.json(); } catch (e) {}",
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('no error', () => pm.expect(j.error).to.eql(null));",
+                  "const d = j.data || {};",
+                  "pm.test('state is en_route_to_pickup', () => pm.expect(d.state).to.eql('en_route_to_pickup'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{volunteer_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"{{flow_assignment_id}}\",\n  \"state\": \"en_route_to_pickup\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/volunteer-api/assignments/state",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "volunteer-api",
+                "assignments",
+                "state"
+              ]
+            }
+          }
+        },
+        {
+          "name": "driver moves to picked_up",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let j = {}; try { j = pm.response.json(); } catch (e) {}",
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('no error', () => pm.expect(j.error).to.eql(null));",
+                  "const d = j.data || {};",
+                  "pm.test('state is picked_up', () => pm.expect(d.state).to.eql('picked_up'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{volunteer_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"{{flow_assignment_id}}\",\n  \"state\": \"picked_up\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/volunteer-api/assignments/state",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "volunteer-api",
+                "assignments",
+                "state"
+              ]
+            }
+          }
+        },
+        {
+          "name": "driver moves to en_route_to_destination",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let j = {}; try { j = pm.response.json(); } catch (e) {}",
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('no error', () => pm.expect(j.error).to.eql(null));",
+                  "const d = j.data || {};",
+                  "pm.test('state is en_route_to_destination', () => pm.expect(d.state).to.eql('en_route_to_destination'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{volunteer_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"{{flow_assignment_id}}\",\n  \"state\": \"en_route_to_destination\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/volunteer-api/assignments/state",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "volunteer-api",
+                "assignments",
+                "state"
+              ]
+            }
+          }
+        },
+        {
+          "name": "requester gets the delivery OTP",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let j = {}; try { j = pm.response.json(); } catch (e) {}",
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('no error', () => pm.expect(j.error).to.eql(null));",
+                  "const d = j.data || {};",
+                  "pm.test('code is six digits', () => pm.expect(d.code).to.match(/^\\d{6}$/));",
+                  "pm.test('purpose echoed', () => pm.expect(d.purpose).to.eql('delivery'));",
+                  "pm.environment.set('flow_otp', d.code);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ref\": \"{{flow_ref}}\",\n  \"token\": \"{{flow_token}}\",\n  \"purpose\": \"delivery\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/public-api/tracking/otp",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "public-api",
+                "tracking",
+                "otp"
+              ]
+            }
+          }
+        },
+        {
+          "name": "driver delivers with the right code",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let j = {}; try { j = pm.response.json(); } catch (e) {}",
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('no error', () => pm.expect(j.error).to.eql(null));",
+                  "const d = j.data || {};",
+                  "pm.test('ok is true', () => pm.expect(d.ok).to.eql(true));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{volunteer_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"{{flow_assignment_id}}\",\n  \"purpose\": \"delivery\",\n  \"code\": \"{{flow_otp}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/volunteer-api/assignments/verify-otp",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "volunteer-api",
+                "assignments",
+                "verify-otp"
+              ]
+            }
+          }
+        },
+        {
+          "name": "read the item id",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let j = {}; try { j = pm.response.json(); } catch (e) {}",
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('no error', () => pm.expect(j.error).to.eql(null));",
+                  "const d = j.data || {};",
+                  "pm.environment.set('flow_item_id', (d.items || [])[0] && d.items[0].id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ref\": \"{{flow_ref}}\",\n  \"token\": \"{{flow_token}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/public-api/tracking",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "public-api",
+                "tracking"
+              ]
+            }
+          }
+        },
+        {
+          "name": "short report without a note (400 invalid_note)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let j = {}; try { j = pm.response.json(); } catch (e) {}",
+                  "pm.test('status is 400', () => pm.response.to.have.status(400));",
+                  "pm.test('error code is invalid_note', () => pm.expect((j.error || {}).code).to.eql('invalid_note'));",
+                  "const d = j.data || {};"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ref\": \"{{flow_ref}}\",\n  \"token\": \"{{flow_token}}\",\n  \"full\": false\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/public-api/tracking/confirm-delivery",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "public-api",
+                "tracking",
+                "confirm-delivery"
+              ]
+            }
+          }
+        },
+        {
+          "name": "short report with qty above approved (400 invalid_items)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let j = {}; try { j = pm.response.json(); } catch (e) {}",
+                  "pm.test('status is 400', () => pm.response.to.have.status(400));",
+                  "pm.test('error code is invalid_items', () => pm.expect((j.error || {}).code).to.eql('invalid_items'));",
+                  "const d = j.data || {};"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ref\": \"{{flow_ref}}\",\n  \"token\": \"{{flow_token}}\",\n  \"full\": false,\n  \"note\": \"Only part arrived\",\n  \"shortfall\": [\n    {\n      \"item_id\": \"{{flow_item_id}}\",\n      \"received_qty\": 99\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/public-api/tracking/confirm-delivery",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "public-api",
+                "tracking",
+                "confirm-delivery"
+              ]
+            }
+          }
+        },
+        {
+          "name": "requester reports a short delivery",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let j = {}; try { j = pm.response.json(); } catch (e) {}",
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('no error', () => pm.expect(j.error).to.eql(null));",
+                  "const d = j.data || {};",
+                  "pm.test('confirmed is false', () => pm.expect(d.confirmed).to.eql(false));",
+                  "pm.test('request is partially_fulfilled', () => pm.expect(d.request_status).to.eql('partially_fulfilled'));",
+                  "pm.environment.set('flow_incident_id', d.incident_id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ref\": \"{{flow_ref}}\",\n  \"token\": \"{{flow_token}}\",\n  \"full\": false,\n  \"note\": \"Only 1 litre arrived\",\n  \"shortfall\": [\n    {\n      \"item_id\": \"{{flow_item_id}}\",\n      \"received_qty\": 1\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/public-api/tracking/confirm-delivery",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "public-api",
+                "tracking",
+                "confirm-delivery"
+              ]
+            }
+          }
+        },
+        {
+          "name": "second short report (409 already_reported)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let j = {}; try { j = pm.response.json(); } catch (e) {}",
+                  "pm.test('status is 409', () => pm.response.to.have.status(409));",
+                  "pm.test('error code is already_reported', () => pm.expect((j.error || {}).code).to.eql('already_reported'));",
+                  "const d = j.data || {};"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ref\": \"{{flow_ref}}\",\n  \"token\": \"{{flow_token}}\",\n  \"full\": false,\n  \"note\": \"Only 1 litre arrived\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/public-api/tracking/confirm-delivery",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "public-api",
+                "tracking",
+                "confirm-delivery"
+              ]
+            }
+          }
+        },
+        {
+          "name": "full confirmation after a dispute (409 already_reported)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let j = {}; try { j = pm.response.json(); } catch (e) {}",
+                  "pm.test('status is 409', () => pm.response.to.have.status(409));",
+                  "pm.test('error code is already_reported', () => pm.expect((j.error || {}).code).to.eql('already_reported'));",
+                  "const d = j.data || {};"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ref\": \"{{flow_ref}}\",\n  \"token\": \"{{flow_token}}\",\n  \"full\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/public-api/tracking/confirm-delivery",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "public-api",
+                "tracking",
+                "confirm-delivery"
+              ]
+            }
+          }
+        },
+        {
+          "name": "tracking shows the dispute",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let j = {}; try { j = pm.response.json(); } catch (e) {}",
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('no error', () => pm.expect(j.error).to.eql(null));",
+                  "const d = j.data || {};",
+                  "pm.test('status is partially_fulfilled', () => pm.expect(d.status).to.eql('partially_fulfilled'));",
+                  "pm.test('incident is open', () => pm.expect(d.incident_status).to.eql('open'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ref\": \"{{flow_ref}}\",\n  \"token\": \"{{flow_token}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/public-api/tracking",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "public-api",
+                "tracking"
+              ]
+            }
+          }
+        },
+        {
+          "name": "admin lists open incidents",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let j = {}; try { j = pm.response.json(); } catch (e) {}",
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('no error', () => pm.expect(j.error).to.eql(null));",
+                  "const d = j.data || {};",
+                  "pm.test('new incident is listed', () => pm.expect(pm.response.text()).to.include(pm.environment.get('flow_incident_id')));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"open\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/admin-api/incidents/list",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "admin-api",
+                "incidents",
+                "list"
+              ]
+            }
+          }
+        },
+        {
+          "name": "resolve needs a resolution (400 invalid_resolution)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let j = {}; try { j = pm.response.json(); } catch (e) {}",
+                  "pm.test('status is 400', () => pm.response.to.have.status(400));",
+                  "pm.test('error code is invalid_resolution', () => pm.expect((j.error || {}).code).to.eql('invalid_resolution'));",
+                  "const d = j.data || {};"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"{{flow_incident_id}}\",\n  \"status\": \"resolved\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/admin-api/incidents/resolve",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "admin-api",
+                "incidents",
+                "resolve"
+              ]
+            }
+          }
+        },
+        {
+          "name": "resolve with unknown status (400 invalid_status)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let j = {}; try { j = pm.response.json(); } catch (e) {}",
+                  "pm.test('status is 400', () => pm.response.to.have.status(400));",
+                  "pm.test('error code is invalid_status', () => pm.expect((j.error || {}).code).to.eql('invalid_status'));",
+                  "const d = j.data || {};"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"{{flow_incident_id}}\",\n  \"status\": \"bogus\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/admin-api/incidents/resolve",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "admin-api",
+                "incidents",
+                "resolve"
+              ]
+            }
+          }
+        },
+        {
+          "name": "resolve with unknown id (404 not_found)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let j = {}; try { j = pm.response.json(); } catch (e) {}",
+                  "pm.test('status is 404', () => pm.response.to.have.status(404));",
+                  "pm.test('error code is not_found', () => pm.expect((j.error || {}).code).to.eql('not_found'));",
+                  "const d = j.data || {};"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"00000000-0000-0000-0000-000000000000\",\n  \"status\": \"under_review\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/admin-api/incidents/resolve",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "admin-api",
+                "incidents",
+                "resolve"
+              ]
+            }
+          }
+        },
+        {
+          "name": "volunteer cannot resolve (403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let j = {}; try { j = pm.response.json(); } catch (e) {}",
+                  "pm.test('status is 403', () => pm.response.to.have.status(403));",
+                  "pm.test('error code is forbidden', () => pm.expect((j.error || {}).code).to.eql('forbidden'));",
+                  "const d = j.data || {};"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{volunteer_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"{{flow_incident_id}}\",\n  \"status\": \"under_review\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/admin-api/incidents/resolve",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "admin-api",
+                "incidents",
+                "resolve"
+              ]
+            }
+          }
+        },
+        {
+          "name": "admin moves incident to under_review",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let j = {}; try { j = pm.response.json(); } catch (e) {}",
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('no error', () => pm.expect(j.error).to.eql(null));",
+                  "const d = j.data || {};"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"{{flow_incident_id}}\",\n  \"status\": \"under_review\",\n  \"notes\": \"Checking with the driver\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/admin-api/incidents/resolve",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "admin-api",
+                "incidents",
+                "resolve"
+              ]
+            }
+          }
+        },
+        {
+          "name": "admin resolves the incident",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let j = {}; try { j = pm.response.json(); } catch (e) {}",
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('no error', () => pm.expect(j.error).to.eql(null));",
+                  "const d = j.data || {};"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"{{flow_incident_id}}\",\n  \"status\": \"resolved\",\n  \"resolution\": \"Replacement water sent\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/admin-api/incidents/resolve",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "admin-api",
+                "incidents",
+                "resolve"
+              ]
+            }
+          }
+        },
+        {
+          "name": "closed incident cannot change (409 invalid_state)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let j = {}; try { j = pm.response.json(); } catch (e) {}",
+                  "pm.test('status is 409', () => pm.response.to.have.status(409));",
+                  "pm.test('error code is invalid_state', () => pm.expect((j.error || {}).code).to.eql('invalid_state'));",
+                  "const d = j.data || {};"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"{{flow_incident_id}}\",\n  \"status\": \"dismissed\",\n  \"resolution\": \"Changed my mind\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/admin-api/incidents/resolve",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "admin-api",
+                "incidents",
+                "resolve"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3 - Donation pickup with lowered quantity",
+      "description": "Donor lowers the quantity, driver must confirm it before the pickup OTP counts.",
+      "item": [
+        {
+          "name": "submit donation offer",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.environment.set('phone', '98' + String(Math.floor(10000000 + Math.random() * 89999999)));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let j = {}; try { j = pm.response.json(); } catch (e) {}",
+                  "pm.test('status is 201', () => pm.response.to.have.status(201));",
+                  "pm.test('no error', () => pm.expect(j.error).to.eql(null));",
+                  "const d = j.data || {};",
+                  "pm.environment.set('flow_request_id', d.request_id);",
+                  "pm.environment.set('flow_ref', d.public_ref);",
+                  "pm.environment.set('flow_token', d.tracking_token);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"kind\": \"donation_offer\",\n  \"requester_name\": \"Postman Flow\",\n  \"requester_phone\": \"{{phone}}\",\n  \"lat\": 27.71,\n  \"lng\": 85.32,\n  \"urgency\": \"normal\",\n  \"items\": [\n    {\n      \"item_type\": \"cloth\",\n      \"qty\": 10,\n      \"unit\": \"piece\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/submit-request",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "submit-request"
+              ]
+            }
+          }
+        },
+        {
+          "name": "admin approves",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let j = {}; try { j = pm.response.json(); } catch (e) {}",
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('no error', () => pm.expect(j.error).to.eql(null));",
+                  "const d = j.data || {};"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"{{flow_request_id}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/admin-api/requests/approve",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "admin-api",
+                "requests",
+                "approve"
+              ]
+            }
+          }
+        },
+        {
+          "name": "admin creates assignments",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let j = {}; try { j = pm.response.json(); } catch (e) {}",
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('no error', () => pm.expect(j.error).to.eql(null));",
+                  "const d = j.data || {};",
+                  "pm.test('one assignment returned', () => pm.expect((d.assignments || []).length).to.eql(1));",
+                  "if (d.assignments) { pm.environment.set('flow_assignment_id', d.assignments[0].id); }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"{{flow_request_id}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/admin-api/requests/assign",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "admin-api",
+                "requests",
+                "assign"
+              ]
+            }
+          }
+        },
+        {
+          "name": "driver claims",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let j = {}; try { j = pm.response.json(); } catch (e) {}",
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('no error', () => pm.expect(j.error).to.eql(null));",
+                  "const d = j.data || {};"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{volunteer_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"{{flow_assignment_id}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/volunteer-api/assignments/claim",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "volunteer-api",
+                "assignments",
+                "claim"
+              ]
+            }
+          }
+        },
+        {
+          "name": "read the item id",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let j = {}; try { j = pm.response.json(); } catch (e) {}",
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('no error', () => pm.expect(j.error).to.eql(null));",
+                  "const d = j.data || {};",
+                  "pm.environment.set('flow_item_id', (d.items || [])[0] && d.items[0].id);",
+                  "pm.test('donor may still change the quantity', () => pm.expect(d.can_update_pickup_qty).to.eql(true));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ref\": \"{{flow_ref}}\",\n  \"token\": \"{{flow_token}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/public-api/tracking",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "public-api",
+                "tracking"
+              ]
+            }
+          }
+        },
+        {
+          "name": "donor raises qty above approved (400 invalid_items)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let j = {}; try { j = pm.response.json(); } catch (e) {}",
+                  "pm.test('status is 400', () => pm.response.to.have.status(400));",
+                  "pm.test('error code is invalid_items', () => pm.expect((j.error || {}).code).to.eql('invalid_items'));",
+                  "const d = j.data || {};"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ref\": \"{{flow_ref}}\",\n  \"token\": \"{{flow_token}}\",\n  \"items\": [\n    {\n      \"item_id\": \"{{flow_item_id}}\",\n      \"qty\": 999\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/public-api/tracking/pickup-qty",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "public-api",
+                "tracking",
+                "pickup-qty"
+              ]
+            }
+          }
+        },
+        {
+          "name": "donor sends an empty list (400 invalid_items)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let j = {}; try { j = pm.response.json(); } catch (e) {}",
+                  "pm.test('status is 400', () => pm.response.to.have.status(400));",
+                  "pm.test('error code is invalid_items', () => pm.expect((j.error || {}).code).to.eql('invalid_items'));",
+                  "const d = j.data || {};"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ref\": \"{{flow_ref}}\",\n  \"token\": \"{{flow_token}}\",\n  \"items\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/public-api/tracking/pickup-qty",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "public-api",
+                "tracking",
+                "pickup-qty"
+              ]
+            }
+          }
+        },
+        {
+          "name": "donor lowers qty to 6",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let j = {}; try { j = pm.response.json(); } catch (e) {}",
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('no error', () => pm.expect(j.error).to.eql(null));",
+                  "const d = j.data || {};",
+                  "pm.test('qty is 6', () => pm.expect(((d.items || [])[0] || {}).qty).to.eql(6));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ref\": \"{{flow_ref}}\",\n  \"token\": \"{{flow_token}}\",\n  \"items\": [\n    {\n      \"item_id\": \"{{flow_item_id}}\",\n      \"qty\": 6\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/public-api/tracking/pickup-qty",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "public-api",
+                "tracking",
+                "pickup-qty"
+              ]
+            }
+          }
+        },
+        {
+          "name": "requester gets the pickup OTP",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let j = {}; try { j = pm.response.json(); } catch (e) {}",
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('no error', () => pm.expect(j.error).to.eql(null));",
+                  "const d = j.data || {};",
+                  "pm.test('code is six digits', () => pm.expect(d.code).to.match(/^\\d{6}$/));",
+                  "pm.test('purpose echoed', () => pm.expect(d.purpose).to.eql('pickup'));",
+                  "pm.environment.set('flow_otp', d.code);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ref\": \"{{flow_ref}}\",\n  \"token\": \"{{flow_token}}\",\n  \"purpose\": \"pickup\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/public-api/tracking/otp",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "public-api",
+                "tracking",
+                "otp"
+              ]
+            }
+          }
+        },
+        {
+          "name": "pickup without confirming the new qty",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let j = {}; try { j = pm.response.json(); } catch (e) {}",
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('no error', () => pm.expect(j.error).to.eql(null));",
+                  "const d = j.data || {};",
+                  "pm.test('ok is false', () => pm.expect(d.ok).to.eql(false));",
+                  "pm.test('reason is quantity_changed', () => pm.expect(d.reason).to.eql('quantity_changed'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{volunteer_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"{{flow_assignment_id}}\",\n  \"purpose\": \"pickup\",\n  \"code\": \"{{flow_otp}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/volunteer-api/assignments/verify-otp",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "volunteer-api",
+                "assignments",
+                "verify-otp"
+              ]
+            }
+          }
+        },
+        {
+          "name": "pickup after confirming the new qty",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let j = {}; try { j = pm.response.json(); } catch (e) {}",
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('no error', () => pm.expect(j.error).to.eql(null));",
+                  "const d = j.data || {};",
+                  "pm.test('ok is true', () => pm.expect(d.ok).to.eql(true));",
+                  "pm.test('state is picked_up', () => pm.expect(d.state).to.eql('picked_up'));",
+                  "pm.test('quantity_changed is true', () => pm.expect(d.quantity_changed).to.eql(true));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{volunteer_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"{{flow_assignment_id}}\",\n  \"purpose\": \"pickup\",\n  \"code\": \"{{flow_otp}}\",\n  \"confirmed\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/volunteer-api/assignments/verify-otp",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "volunteer-api",
+                "assignments",
+                "verify-otp"
+              ]
+            }
+          }
+        },
+        {
+          "name": "donor changes qty after pickup (409 invalid_state)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let j = {}; try { j = pm.response.json(); } catch (e) {}",
+                  "pm.test('status is 409', () => pm.response.to.have.status(409));",
+                  "pm.test('error code is invalid_state', () => pm.expect((j.error || {}).code).to.eql('invalid_state'));",
+                  "const d = j.data || {};"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ref\": \"{{flow_ref}}\",\n  \"token\": \"{{flow_token}}\",\n  \"items\": [\n    {\n      \"item_id\": \"{{flow_item_id}}\",\n      \"qty\": 5\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/public-api/tracking/pickup-qty",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "public-api",
+                "tracking",
+                "pickup-qty"
+              ]
+            }
+          }
+        },
+        {
+          "name": "driver heads to the hub",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let j = {}; try { j = pm.response.json(); } catch (e) {}",
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('no error', () => pm.expect(j.error).to.eql(null));",
+                  "const d = j.data || {};",
+                  "pm.test('state is en_route_to_destination', () => pm.expect(d.state).to.eql('en_route_to_destination'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{volunteer_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"{{flow_assignment_id}}\",\n  \"state\": \"en_route_to_destination\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/volunteer-api/assignments/state",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "volunteer-api",
+                "assignments",
+                "state"
+              ]
+            }
+          }
+        },
+        {
+          "name": "driver marks delivered at the hub",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let j = {}; try { j = pm.response.json(); } catch (e) {}",
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('no error', () => pm.expect(j.error).to.eql(null));",
+                  "const d = j.data || {};",
+                  "pm.test('request is fulfilled', () => pm.expect(d.request_status).to.eql('fulfilled'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{volunteer_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"{{flow_assignment_id}}\",\n  \"state\": \"delivered\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/volunteer-api/assignments/state",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "volunteer-api",
+                "assignments",
+                "state"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4 - Declines",
+      "description": "Admin declines a request; drivers decline an open offer and release a claimed one.",
+      "item": [
+        {
+          "name": "submit transport request A",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.environment.set('phone', '98' + String(Math.floor(10000000 + Math.random() * 89999999)));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let j = {}; try { j = pm.response.json(); } catch (e) {}",
+                  "pm.test('status is 201', () => pm.response.to.have.status(201));",
+                  "pm.test('no error', () => pm.expect(j.error).to.eql(null));",
+                  "const d = j.data || {};",
+                  "pm.environment.set('flow_request_id', d.request_id);",
+                  "pm.environment.set('flow_ref', d.public_ref);",
+                  "pm.environment.set('flow_token', d.tracking_token);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"kind\": \"transport_request\",\n  \"requester_name\": \"Postman Flow\",\n  \"requester_phone\": \"{{phone}}\",\n  \"lat\": 27.71,\n  \"lng\": 85.32,\n  \"urgency\": \"normal\",\n  \"volunteers_needed\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/submit-request",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "submit-request"
+              ]
+            }
+          }
+        },
+        {
+          "name": "decline without a reason (400 invalid_input)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let j = {}; try { j = pm.response.json(); } catch (e) {}",
+                  "pm.test('status is 400', () => pm.response.to.have.status(400));",
+                  "pm.test('error code is invalid_input', () => pm.expect((j.error || {}).code).to.eql('invalid_input'));",
+                  "const d = j.data || {};"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"{{flow_request_id}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/admin-api/requests/decline",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "admin-api",
+                "requests",
+                "decline"
+              ]
+            }
+          }
+        },
+        {
+          "name": "decline with a one-letter reason (400 invalid_reason)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let j = {}; try { j = pm.response.json(); } catch (e) {}",
+                  "pm.test('status is 400', () => pm.response.to.have.status(400));",
+                  "pm.test('error code is invalid_reason', () => pm.expect((j.error || {}).code).to.eql('invalid_reason'));",
+                  "const d = j.data || {};"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"{{flow_request_id}}\",\n  \"reason\": \"x\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/admin-api/requests/decline",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "admin-api",
+                "requests",
+                "decline"
+              ]
+            }
+          }
+        },
+        {
+          "name": "decline unknown id (404 not_found)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let j = {}; try { j = pm.response.json(); } catch (e) {}",
+                  "pm.test('status is 404', () => pm.response.to.have.status(404));",
+                  "pm.test('error code is not_found', () => pm.expect((j.error || {}).code).to.eql('not_found'));",
+                  "const d = j.data || {};"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"00000000-0000-0000-0000-000000000000\",\n  \"reason\": \"Not a real request\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/admin-api/requests/decline",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "admin-api",
+                "requests",
+                "decline"
+              ]
+            }
+          }
+        },
+        {
+          "name": "volunteer cannot decline (403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let j = {}; try { j = pm.response.json(); } catch (e) {}",
+                  "pm.test('status is 403', () => pm.response.to.have.status(403));",
+                  "pm.test('error code is forbidden', () => pm.expect((j.error || {}).code).to.eql('forbidden'));",
+                  "const d = j.data || {};"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{volunteer_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"{{flow_request_id}}\",\n  \"reason\": \"Not allowed\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/admin-api/requests/decline",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "admin-api",
+                "requests",
+                "decline"
+              ]
+            }
+          }
+        },
+        {
+          "name": "admin declines the request",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let j = {}; try { j = pm.response.json(); } catch (e) {}",
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('no error', () => pm.expect(j.error).to.eql(null));",
+                  "const d = j.data || {};"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"{{flow_request_id}}\",\n  \"reason\": \"Duplicate of an earlier request\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/admin-api/requests/decline",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "admin-api",
+                "requests",
+                "decline"
+              ]
+            }
+          }
+        },
+        {
+          "name": "decline again (409 invalid_state)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let j = {}; try { j = pm.response.json(); } catch (e) {}",
+                  "pm.test('status is 409', () => pm.response.to.have.status(409));",
+                  "pm.test('error code is invalid_state', () => pm.expect((j.error || {}).code).to.eql('invalid_state'));",
+                  "const d = j.data || {};"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"{{flow_request_id}}\",\n  \"reason\": \"Duplicate of an earlier request\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/admin-api/requests/decline",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "admin-api",
+                "requests",
+                "decline"
+              ]
+            }
+          }
+        },
+        {
+          "name": "assign a declined request (409 invalid_state)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let j = {}; try { j = pm.response.json(); } catch (e) {}",
+                  "pm.test('status is 409', () => pm.response.to.have.status(409));",
+                  "pm.test('error code is invalid_state', () => pm.expect((j.error || {}).code).to.eql('invalid_state'));",
+                  "const d = j.data || {};"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"{{flow_request_id}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/admin-api/requests/assign",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "admin-api",
+                "requests",
+                "assign"
+              ]
+            }
+          }
+        },
+        {
+          "name": "requester sees the decline",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let j = {}; try { j = pm.response.json(); } catch (e) {}",
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('no error', () => pm.expect(j.error).to.eql(null));",
+                  "const d = j.data || {};",
+                  "pm.test('status is declined', () => pm.expect(d.status).to.eql('declined'));",
+                  "pm.test('reason is shown', () => pm.expect(d.decline_reason).to.eql('Duplicate of an earlier request'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ref\": \"{{flow_ref}}\",\n  \"token\": \"{{flow_token}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/public-api/tracking",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "public-api",
+                "tracking"
+              ]
+            }
+          }
+        },
+        {
+          "name": "submit transport request B",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.environment.set('phone', '98' + String(Math.floor(10000000 + Math.random() * 89999999)));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let j = {}; try { j = pm.response.json(); } catch (e) {}",
+                  "pm.test('status is 201', () => pm.response.to.have.status(201));",
+                  "pm.test('no error', () => pm.expect(j.error).to.eql(null));",
+                  "const d = j.data || {};",
+                  "pm.environment.set('flow_request_id', d.request_id);",
+                  "pm.environment.set('flow_ref', d.public_ref);",
+                  "pm.environment.set('flow_token', d.tracking_token);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"kind\": \"transport_request\",\n  \"requester_name\": \"Postman Flow\",\n  \"requester_phone\": \"{{phone}}\",\n  \"lat\": 27.71,\n  \"lng\": 85.32,\n  \"urgency\": \"normal\",\n  \"volunteers_needed\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/submit-request",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "submit-request"
+              ]
+            }
+          }
+        },
+        {
+          "name": "admin approves",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let j = {}; try { j = pm.response.json(); } catch (e) {}",
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('no error', () => pm.expect(j.error).to.eql(null));",
+                  "const d = j.data || {};"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"{{flow_request_id}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/admin-api/requests/approve",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "admin-api",
+                "requests",
+                "approve"
+              ]
+            }
+          }
+        },
+        {
+          "name": "admin creates assignments",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let j = {}; try { j = pm.response.json(); } catch (e) {}",
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('no error', () => pm.expect(j.error).to.eql(null));",
+                  "const d = j.data || {};",
+                  "pm.test('one assignment returned', () => pm.expect((d.assignments || []).length).to.eql(1));",
+                  "if (d.assignments) { pm.environment.set('flow_assignment_id', d.assignments[0].id); }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"{{flow_request_id}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/admin-api/requests/assign",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "admin-api",
+                "requests",
+                "assign"
+              ]
+            }
+          }
+        },
+        {
+          "name": "decline with a malformed id (400 invalid_input)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let j = {}; try { j = pm.response.json(); } catch (e) {}",
+                  "pm.test('status is 400', () => pm.response.to.have.status(400));",
+                  "pm.test('error code is invalid_input', () => pm.expect((j.error || {}).code).to.eql('invalid_input'));",
+                  "const d = j.data || {};"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{volunteer_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"nope\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/volunteer-api/assignments/decline",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "volunteer-api",
+                "assignments",
+                "decline"
+              ]
+            }
+          }
+        },
+        {
+          "name": "ineligible helper declines tier B offer (404 not_found)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let j = {}; try { j = pm.response.json(); } catch (e) {}",
+                  "pm.test('status is 404', () => pm.response.to.have.status(404));",
+                  "pm.test('error code is not_found', () => pm.expect((j.error || {}).code).to.eql('not_found'));",
+                  "const d = j.data || {};"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{helper_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"{{flow_assignment_id}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/volunteer-api/assignments/decline",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "volunteer-api",
+                "assignments",
+                "decline"
+              ]
+            }
+          }
+        },
+        {
+          "name": "driver declines an open offer",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let j = {}; try { j = pm.response.json(); } catch (e) {}",
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('no error', () => pm.expect(j.error).to.eql(null));",
+                  "const d = j.data || {};",
+                  "pm.test('nothing was released', () => pm.expect(d.released).to.eql(false));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{volunteer_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"{{flow_assignment_id}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/volunteer-api/assignments/decline",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "volunteer-api",
+                "assignments",
+                "decline"
+              ]
+            }
+          }
+        },
+        {
+          "name": "driver declines the same offer again (404 not_found)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let j = {}; try { j = pm.response.json(); } catch (e) {}",
+                  "pm.test('status is 404', () => pm.response.to.have.status(404));",
+                  "pm.test('error code is not_found', () => pm.expect((j.error || {}).code).to.eql('not_found'));",
+                  "const d = j.data || {};"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{volunteer_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"{{flow_assignment_id}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/volunteer-api/assignments/decline",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "volunteer-api",
+                "assignments",
+                "decline"
+              ]
+            }
+          }
+        },
+        {
+          "name": "submit transport request C",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.environment.set('phone', '98' + String(Math.floor(10000000 + Math.random() * 89999999)));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let j = {}; try { j = pm.response.json(); } catch (e) {}",
+                  "pm.test('status is 201', () => pm.response.to.have.status(201));",
+                  "pm.test('no error', () => pm.expect(j.error).to.eql(null));",
+                  "const d = j.data || {};",
+                  "pm.environment.set('flow_request_id', d.request_id);",
+                  "pm.environment.set('flow_ref', d.public_ref);",
+                  "pm.environment.set('flow_token', d.tracking_token);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"kind\": \"transport_request\",\n  \"requester_name\": \"Postman Flow\",\n  \"requester_phone\": \"{{phone}}\",\n  \"lat\": 27.71,\n  \"lng\": 85.32,\n  \"urgency\": \"normal\",\n  \"volunteers_needed\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/submit-request",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "submit-request"
+              ]
+            }
+          }
+        },
+        {
+          "name": "admin approves",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let j = {}; try { j = pm.response.json(); } catch (e) {}",
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('no error', () => pm.expect(j.error).to.eql(null));",
+                  "const d = j.data || {};"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"{{flow_request_id}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/admin-api/requests/approve",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "admin-api",
+                "requests",
+                "approve"
+              ]
+            }
+          }
+        },
+        {
+          "name": "admin creates assignments",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let j = {}; try { j = pm.response.json(); } catch (e) {}",
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('no error', () => pm.expect(j.error).to.eql(null));",
+                  "const d = j.data || {};",
+                  "pm.test('one assignment returned', () => pm.expect((d.assignments || []).length).to.eql(1));",
+                  "if (d.assignments) { pm.environment.set('flow_assignment_id', d.assignments[0].id); }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"{{flow_request_id}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/admin-api/requests/assign",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "admin-api",
+                "requests",
+                "assign"
+              ]
+            }
+          }
+        },
+        {
+          "name": "driver claims",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let j = {}; try { j = pm.response.json(); } catch (e) {}",
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('no error', () => pm.expect(j.error).to.eql(null));",
+                  "const d = j.data || {};"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{volunteer_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"{{flow_assignment_id}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/volunteer-api/assignments/claim",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "volunteer-api",
+                "assignments",
+                "claim"
+              ]
+            }
+          }
+        },
+        {
+          "name": "driver releases a claimed assignment",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let j = {}; try { j = pm.response.json(); } catch (e) {}",
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('no error', () => pm.expect(j.error).to.eql(null));",
+                  "const d = j.data || {};",
+                  "pm.test('assignment was released', () => pm.expect(d.released).to.eql(true));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{volunteer_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"{{flow_assignment_id}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/volunteer-api/assignments/decline",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "volunteer-api",
+                "assignments",
+                "decline"
+              ]
+            }
+          }
+        },
+        {
+          "name": "release again (404 not_found)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let j = {}; try { j = pm.response.json(); } catch (e) {}",
+                  "pm.test('status is 404', () => pm.response.to.have.status(404));",
+                  "pm.test('error code is not_found', () => pm.expect((j.error || {}).code).to.eql('not_found'));",
+                  "const d = j.data || {};"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{volunteer_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"{{flow_assignment_id}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/volunteer-api/assignments/decline",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "volunteer-api",
+                "assignments",
+                "decline"
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

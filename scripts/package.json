@@ -6,11 +6,17 @@
     "seed": "node --env-file=../.env seed_demo.mjs && node --env-file=../.env seed_extra.mjs",
     "reset:remote": "node --env-file=../.env reset_demo_remote.mjs",
     "test:matrix": "node --env-file=../.env tests/matrix.mjs",
-    "test:matrix:fast": "node --env-file=../.env tests/matrix.mjs --skip=timer"
+    "test:matrix:fast": "node --env-file=../.env tests/matrix.mjs --skip=timer",
+    "test:api": "node --env-file=../.env run-api-tests.mjs",
+    "coverage:api": "node api-coverage.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",
     "dotenv": "^16.4.5",
     "bcryptjs": "^2.4.3"
+  },
+  "devDependencies": {
+    "newman": "^6.2.1",
+    "newman-reporter-htmlextra": "^1.23.1"
   }
 }
