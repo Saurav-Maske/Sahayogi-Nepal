@@ -1,41 +1,12 @@
 {
   "info": {
-    "name": "Sahayogi Nepal - backend",
+    "name": "Sahayogi Nepal - Edge API (admin-api, volunteer-api, public-api)",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-    "description": "Run folders top to bottom. Select the 'Sahayogi local' environment first and paste anon_key into it (supabase status)."
+    "description": "Run folders in order: 0, 1, 2, 3, 4. Uses the variables in postman/demo.postman_environment.json (or local.postman_environment.json plus helper_token, request_id, assignment_id, lot_id). The phone in folder 0 is randomised for you. The OTP and short-delivery flows are covered by scripts/tests/matrix.mjs, not here."
   },
   "item": [
     {
-      "name": "0 - Sanity",
-      "item": [
-        {
-          "name": "Districts seeded? (expect 77 rows when unlimited)",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "apikey",
-                "value": "{{anon_key}}"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/rest/v1/districts?select=id,name,province&order=id&limit=5",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "rest",
-                "v1",
-                "districts?select=id,name,province&order=id&limit=5"
-              ]
-            },
-            "description": "Needs only the anon key. Empty array = seed did not run."
-          }
-        }
-      ]
-    },
-    {
-      "name": "1 - Auth",
+      "name": "0 - Setup (run first)",
       "item": [
         {
           "name": "Admin login",
@@ -51,10 +22,6 @@
                 "value": "application/json"
               }
             ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"email\": \"{{admin_email}}\",\n  \"password\": \"{{password}}\"\n}"
-            },
             "url": {
               "raw": "{{base_url}}/functions/v1/admin-login",
               "host": [
@@ -66,7 +33,10 @@
                 "admin-login"
               ]
             },
-            "description": ""
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{admin_email}}\",\n  \"password\": \"{{password}}\"\n}"
+            }
           },
           "event": [
             {
@@ -74,16 +44,16 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
                   "const j = pm.response.json();",
-                  "pm.test('200 + session', () => { pm.response.to.have.status(200); pm.expect(j.data.session.access_token).to.be.a('string'); });",
-                  "if (j.data) { pm.environment.set('admin_token', j.data.session.access_token); pm.environment.set('admin_refresh', j.data.session.refresh_token); pm.environment.set('admin_user_id', j.data.profile.id); }"
+                  "if (j.data) { pm.environment.set('admin_token', j.data.session.access_token); }"
                 ]
               }
             }
           ]
         },
         {
-          "name": "Volunteer login (driver1)",
+          "name": "Driver login (driver1, A+B)",
           "request": {
             "method": "POST",
             "header": [
@@ -96,10 +66,6 @@
                 "value": "application/json"
               }
             ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"email\": \"{{volunteer_email}}\",\n  \"password\": \"{{password}}\"\n}"
-            },
             "url": {
               "raw": "{{base_url}}/functions/v1/volunteer-login",
               "host": [
@@ -111,52 +77,10 @@
                 "volunteer-login"
               ]
             },
-            "description": ""
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "const j = pm.response.json();",
-                  "pm.test('200 + session', () => { pm.response.to.have.status(200); pm.expect(j.data.session.access_token).to.be.a('string'); });",
-                  "if (j.data) { pm.environment.set('volunteer_token', j.data.session.access_token); pm.environment.set('volunteer_refresh', j.data.session.refresh_token); pm.environment.set('volunteer_user_id', j.data.profile.id); }"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Volunteer on admin portal (must be 401)",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "apikey",
-                "value": "{{anon_key}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"email\": \"{{volunteer_email}}\",\n  \"password\": \"{{password}}\"\n}"
-            },
-            "url": {
-              "raw": "{{base_url}}/functions/v1/admin-login",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "functions",
-                "v1",
-                "admin-login"
-              ]
-            },
-            "description": ""
+            }
           },
           "event": [
             {
@@ -164,15 +88,120 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('status 401', () => pm.response.to.have.status(401));",
-                  "console.log(pm.response.text());"
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "const j = pm.response.json();",
+                  "if (j.data) { pm.environment.set('volunteer_token', j.data.session.access_token); }"
                 ]
               }
             }
           ]
         },
         {
-          "name": "auth-me (admin)",
+          "name": "Helper login (general, A only)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/functions/v1/volunteer-login",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "volunteer-login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"general@demo.test\",\n  \"password\": \"{{password}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "const j = pm.response.json();",
+                  "if (j.data) { pm.environment.set('helper_token', j.data.session.access_token); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Submit transport request (new random phone each run)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/functions/v1/submit-request",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "submit-request"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"kind\": \"transport_request\",\n  \"requester_name\": \"Postman Test\",\n  \"requester_phone\": \"{{phone}}\",\n  \"lat\": 27.71,\n  \"lng\": 85.32,\n  \"urgency\": \"normal\",\n  \"volunteers_needed\": 1\n}"
+            },
+            "description": "The pre-request script sets {{phone}} to a fresh 98xxxxxxxx number, so the 5-per-phone-per-hour limit is not hit."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.environment.set('phone', '98' + String(Math.floor(10000000 + Math.random() * 89999999)));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 201', () => pm.response.to.have.status(201));",
+                  "const j = pm.response.json();",
+                  "if (j.data) { pm.environment.set('request_id', j.data.request_id); pm.environment.set('public_ref', j.data.public_ref); pm.environment.set('tracking_token', j.data.tracking_token); }"
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "description": "Logs in the three roles and creates one request to work on."
+    },
+    {
+      "name": "1 - admin-api (admin token)",
+      "item": [
+        {
+          "name": "dashboard",
           "request": {
             "method": "POST",
             "header": [
@@ -189,22 +218,22 @@
                 "value": "Bearer {{admin_token}}"
               }
             ],
+            "url": {
+              "raw": "{{base_url}}/functions/v1/admin-api/dashboard",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "admin-api",
+                "dashboard"
+              ]
+            },
             "body": {
               "mode": "raw",
               "raw": "{}"
-            },
-            "url": {
-              "raw": "{{base_url}}/functions/v1/auth-me",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "functions",
-                "v1",
-                "auth-me"
-              ]
-            },
-            "description": ""
+            }
           },
           "event": [
             {
@@ -212,15 +241,14 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('status 200', () => pm.response.to.have.status(200));",
-                  "console.log(pm.response.text());"
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));"
                 ]
               }
             }
           ]
         },
         {
-          "name": "auth-me (volunteer)",
+          "name": "map (exact points)",
           "request": {
             "method": "POST",
             "header": [
@@ -234,25 +262,25 @@
               },
               {
                 "key": "Authorization",
-                "value": "Bearer {{volunteer_token}}"
+                "value": "Bearer {{admin_token}}"
               }
             ],
+            "url": {
+              "raw": "{{base_url}}/functions/v1/admin-api/map",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "admin-api",
+                "map"
+              ]
+            },
             "body": {
               "mode": "raw",
               "raw": "{}"
-            },
-            "url": {
-              "raw": "{{base_url}}/functions/v1/auth-me",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "functions",
-                "v1",
-                "auth-me"
-              ]
-            },
-            "description": ""
+            }
           },
           "event": [
             {
@@ -260,15 +288,14 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('status 200', () => pm.response.to.have.status(200));",
-                  "console.log(pm.response.text());"
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));"
                 ]
               }
             }
           ]
         },
         {
-          "name": "Forgot password 1 - email me a code",
+          "name": "requests/list",
           "request": {
             "method": "POST",
             "header": [
@@ -279,24 +306,29 @@
               {
                 "key": "Content-Type",
                 "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
               }
             ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"email\": \"{{volunteer_email}}\"\n}"
-            },
             "url": {
-              "raw": "{{base_url}}/functions/v1/request-password-reset",
+              "raw": "{{base_url}}/functions/v1/admin-api/requests/list",
               "host": [
                 "{{base_url}}"
               ],
               "path": [
                 "functions",
                 "v1",
-                "request-password-reset"
+                "admin-api",
+                "requests",
+                "list"
               ]
             },
-            "description": "Always 200, same body for unknown emails. Code is valid 10 min. Local without Gmail: set OTP_DEV_LOG=true in supabase/functions/.env and read the code in the `supabase functions serve` terminal. Put it into the environment variable reset_otp."
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"pending_admin_review\"\n}"
+            }
           },
           "event": [
             {
@@ -304,15 +336,14 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('status 200', () => pm.response.to.have.status(200));",
-                  "console.log(pm.response.text());"
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));"
                 ]
               }
             }
           ]
         },
         {
-          "name": "Forgot password 2 - verify code",
+          "name": "requests/approve",
           "request": {
             "method": "POST",
             "header": [
@@ -323,24 +354,29 @@
               {
                 "key": "Content-Type",
                 "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
               }
             ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"email\": \"{{volunteer_email}}\",\n  \"otp\": \"{{reset_otp}}\"\n}"
-            },
             "url": {
-              "raw": "{{base_url}}/functions/v1/verify-reset-otp",
+              "raw": "{{base_url}}/functions/v1/admin-api/requests/approve",
               "host": [
                 "{{base_url}}"
               ],
               "path": [
                 "functions",
                 "v1",
-                "verify-reset-otp"
+                "admin-api",
+                "requests",
+                "approve"
               ]
             },
-            "description": "Set reset_otp in the environment first. A wrong code returns 400 invalid_otp with attempts_left; the 5th wrong code is 429 otp_locked."
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"{{request_id}}\"\n}"
+            }
           },
           "event": [
             {
@@ -348,16 +384,112 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "requests/approve again (409 invalid_state)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/functions/v1/admin-api/requests/approve",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "admin-api",
+                "requests",
+                "approve"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"{{request_id}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 409', () => pm.response.to.have.status(409));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "requests/assign",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/functions/v1/admin-api/requests/assign",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "admin-api",
+                "requests",
+                "assign"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"{{request_id}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
                   "const j = pm.response.json();",
-                  "if (j.data) pm.environment.set('reset_token', j.data.reset_token);"
+                  "if (j.data) pm.environment.set('assignment_id', j.data.assignments[0].id);"
                 ]
               }
             }
           ]
         },
         {
-          "name": "Forgot password 3 - set new password",
+          "name": "requests/assign again (409 already_assigned)",
           "request": {
             "method": "POST",
             "header": [
@@ -368,24 +500,29 @@
               {
                 "key": "Content-Type",
                 "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
               }
             ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"email\": \"{{volunteer_email}}\",\n  \"reset_token\": \"{{reset_token}}\",\n  \"new_password\": \"{{new_password}}\"\n}"
-            },
             "url": {
-              "raw": "{{base_url}}/functions/v1/reset-password",
+              "raw": "{{base_url}}/functions/v1/admin-api/requests/assign",
               "host": [
                 "{{base_url}}"
               ],
               "path": [
                 "functions",
                 "v1",
-                "reset-password"
+                "admin-api",
+                "requests",
+                "assign"
               ]
             },
-            "description": "Uses reset_token from step 2 (single use, 10 min). new_password needs 10+ chars with upper, lower, digit and symbol. Sets the password of the demo user, so use the same value as DEMO_PASSWORD to keep the other requests working."
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"{{request_id}}\"\n}"
+            }
           },
           "event": [
             {
@@ -393,14 +530,14 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('status 200', () => pm.response.to.have.status(200));"
+                  "pm.test('status is 409', () => pm.response.to.have.status(409));"
                 ]
               }
             }
           ]
         },
         {
-          "name": "Forgot password - replay token (must be 400)",
+          "name": "stock/import",
           "request": {
             "method": "POST",
             "header": [
@@ -411,24 +548,29 @@
               {
                 "key": "Content-Type",
                 "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
               }
             ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"email\": \"{{volunteer_email}}\",\n  \"reset_token\": \"{{reset_token}}\",\n  \"new_password\": \"{{new_password}}\"\n}"
-            },
             "url": {
-              "raw": "{{base_url}}/functions/v1/reset-password",
+              "raw": "{{base_url}}/functions/v1/admin-api/stock/import",
               "host": [
                 "{{base_url}}"
               ],
               "path": [
                 "functions",
                 "v1",
-                "reset-password"
+                "admin-api",
+                "stock",
+                "import"
               ]
             },
-            "description": "Run right after step 3: the token is already spent."
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [\n    {\n      \"item_type\": \"food\",\n      \"qty\": 10,\n      \"unit\": \"pack\",\n      \"phase\": \"ready_to_ship\",\n      \"provider_name\": \"Postman Test\"\n    }\n  ]\n}"
+            }
           },
           "event": [
             {
@@ -436,7 +578,249 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('status 400 invalid_token', () => { pm.response.to.have.status(400); pm.expect(pm.response.json().error.code).to.eql('invalid_token'); });"
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "const j = pm.response.json();",
+                  "if (j.data) pm.environment.set('lot_id', j.data.lots[0].id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "stock/move-lot (partial)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/functions/v1/admin-api/stock/move-lot",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "admin-api",
+                "stock",
+                "move-lot"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"{{lot_id}}\",\n  \"phase\": \"processing\",\n  \"qty\": 4\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "incidents/list",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/functions/v1/admin-api/incidents/list",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "admin-api",
+                "incidents",
+                "list"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "audit/list",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/functions/v1/admin-api/audit/list",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "admin-api",
+                "audit",
+                "list"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"limit\": 20\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "bad uuid (400 invalid_input)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/functions/v1/admin-api/requests/approve",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "admin-api",
+                "requests",
+                "approve"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"nope\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 400', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "unknown id (404 not_found)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/functions/v1/admin-api/requests/approve",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "admin-api",
+                "requests",
+                "approve"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"00000000-0000-0000-0000-000000000000\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 404', () => pm.response.to.have.status(404));"
                 ]
               }
             }
@@ -445,10 +829,10 @@
       ]
     },
     {
-      "name": "2 - Public requests (no login)",
+      "name": "2 - Role checks (all must pass)",
       "item": [
         {
-          "name": "Resource request (Kathmandu)",
+          "name": "admin-api, no token (401)",
           "request": {
             "method": "POST",
             "header": [
@@ -461,22 +845,22 @@
                 "value": "application/json"
               }
             ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"kind\": \"resource_request\",\n  \"requester_name\": \"Postman Tester\",\n  \"requester_phone\": \"9801234567\",\n  \"lat\": 27.7172,\n  \"lng\": 85.324,\n  \"urgency\": \"high\",\n  \"address_note\": \"Near the ward office\",\n  \"notes\": \"Postman test\",\n  \"items\": [\n    {\n      \"item_type\": \"drinking_water\",\n      \"qty\": 100,\n      \"unit\": \"litre\"\n    },\n    {\n      \"item_type\": \"food\",\n      \"qty\": 20,\n      \"unit\": \"pack\"\n    }\n  ]\n}"
-            },
             "url": {
-              "raw": "{{base_url}}/functions/v1/submit-request",
+              "raw": "{{base_url}}/functions/v1/admin-api/dashboard",
               "host": [
                 "{{base_url}}"
               ],
               "path": [
                 "functions",
                 "v1",
-                "submit-request"
+                "admin-api",
+                "dashboard"
               ]
             },
-            "description": ""
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            }
           },
           "event": [
             {
@@ -484,105 +868,14 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "const j = pm.response.json();",
-                  "pm.test('201 + district resolved by PostGIS', () => { pm.response.to.have.status(201); pm.expect(j.data.district).to.be.a('string'); });",
-                  "if (j.data) { pm.environment.set('public_ref', j.data.public_ref); pm.environment.set('tracking_token', j.data.tracking_token); }",
-                  "console.log(j);"
+                  "pm.test('status is 401', () => pm.response.to.have.status(401));"
                 ]
               }
             }
           ]
         },
         {
-          "name": "Donation offer (Pokhara)",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "apikey",
-                "value": "{{anon_key}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"kind\": \"donation_offer\",\n  \"requester_name\": \"Postman Donor\",\n  \"requester_phone\": \"9812345678\",\n  \"lat\": 27.6588,\n  \"lng\": 85.3247,\n  \"items\": [\n    {\n      \"item_type\": \"cloth\",\n      \"qty\": 40,\n      \"unit\": \"piece\"\n    }\n  ]\n}"
-            },
-            "url": {
-              "raw": "{{base_url}}/functions/v1/submit-request",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "functions",
-                "v1",
-                "submit-request"
-              ]
-            },
-            "description": ""
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('status 201', () => pm.response.to.have.status(201));",
-                  "console.log(pm.response.text());"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Manpower request (3 volunteers)",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "apikey",
-                "value": "{{anon_key}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"kind\": \"manpower_request\",\n  \"requester_name\": \"Postman Tester\",\n  \"requester_phone\": \"9801234567\",\n  \"lat\": 27.7172,\n  \"lng\": 85.324,\n  \"urgency\": \"critical\",\n  \"volunteers_needed\": 3,\n  \"notes\": \"Clear debris\"\n}"
-            },
-            "url": {
-              "raw": "{{base_url}}/functions/v1/submit-request",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "functions",
-                "v1",
-                "submit-request"
-              ]
-            },
-            "description": ""
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('status 201', () => pm.response.to.have.status(201));",
-                  "console.log(pm.response.text());"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Volunteer-prefilled (name/phone from profile)",
+          "name": "admin-api, volunteer token (403)",
           "request": {
             "method": "POST",
             "header": [
@@ -599,22 +892,22 @@
                 "value": "Bearer {{volunteer_token}}"
               }
             ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"kind\": \"resource_request\",\n  \"lat\": 27.7,\n  \"lng\": 85.31,\n  \"items\": [\n    {\n      \"item_type\": \"food\",\n      \"qty\": 5,\n      \"unit\": \"pack\"\n    }\n  ]\n}"
-            },
             "url": {
-              "raw": "{{base_url}}/functions/v1/submit-request",
+              "raw": "{{base_url}}/functions/v1/admin-api/dashboard",
               "host": [
                 "{{base_url}}"
               ],
               "path": [
                 "functions",
                 "v1",
-                "submit-request"
+                "admin-api",
+                "dashboard"
               ]
             },
-            "description": "Name and phone are omitted on purpose: they come from the logged-in volunteer's profile."
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            }
           },
           "event": [
             {
@@ -622,15 +915,62 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('status 201', () => pm.response.to.have.status(201));",
-                  "console.log(pm.response.text());"
+                  "pm.test('status is 403', () => pm.response.to.have.status(403));"
                 ]
               }
             }
           ]
         },
         {
-          "name": "Bad phone (must be 400)",
+          "name": "admin-api audit/list, helper token (403)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{helper_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/functions/v1/admin-api/audit/list",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "admin-api",
+                "audit",
+                "list"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 403', () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "volunteer-api, no token (401)",
           "request": {
             "method": "POST",
             "header": [
@@ -643,22 +983,22 @@
                 "value": "application/json"
               }
             ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"kind\": \"resource_request\",\n  \"requester_name\": \"X Y\",\n  \"requester_phone\": \"12345\",\n  \"lat\": 27.7,\n  \"lng\": 85.3,\n  \"items\": [\n    {\n      \"item_type\": \"food\",\n      \"qty\": 1,\n      \"unit\": \"pack\"\n    }\n  ]\n}"
-            },
             "url": {
-              "raw": "{{base_url}}/functions/v1/submit-request",
+              "raw": "{{base_url}}/functions/v1/volunteer-api/offers",
               "host": [
                 "{{base_url}}"
               ],
               "path": [
                 "functions",
                 "v1",
-                "submit-request"
+                "volunteer-api",
+                "offers"
               ]
             },
-            "description": ""
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            }
           },
           "event": [
             {
@@ -666,15 +1006,109 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('status 400', () => pm.response.to.have.status(400));",
-                  "console.log(pm.response.text());"
+                  "pm.test('status is 401', () => pm.response.to.have.status(401));"
                 ]
               }
             }
           ]
         },
         {
-          "name": "Outside Nepal (must be 400)",
+          "name": "volunteer-api, admin token (401 or 403)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/functions/v1/volunteer-api/offers",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "volunteer-api",
+                "offers"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('401 or 403', () => pm.expect([401,403]).to.include(pm.response.code));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "helper claims tier B offer (400 not_eligible)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{helper_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/functions/v1/volunteer-api/assignments/claim",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "volunteer-api",
+                "assignments",
+                "claim"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"{{assignment_id}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 400', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "public-api tracking, wrong token (404)",
           "request": {
             "method": "POST",
             "header": [
@@ -687,22 +1121,22 @@
                 "value": "application/json"
               }
             ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"kind\": \"resource_request\",\n  \"requester_name\": \"X Y\",\n  \"requester_phone\": \"9801234567\",\n  \"lat\": 51.5,\n  \"lng\": -0.12,\n  \"items\": [\n    {\n      \"item_type\": \"food\",\n      \"qty\": 1,\n      \"unit\": \"pack\"\n    }\n  ]\n}"
-            },
             "url": {
-              "raw": "{{base_url}}/functions/v1/submit-request",
+              "raw": "{{base_url}}/functions/v1/public-api/tracking",
               "host": [
                 "{{base_url}}"
               ],
               "path": [
                 "functions",
                 "v1",
-                "submit-request"
+                "public-api",
+                "tracking"
               ]
             },
-            "description": ""
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ref\": \"{{public_ref}}\",\n  \"token\": \"wrong\"\n}"
+            }
           },
           "event": [
             {
@@ -710,468 +1144,63 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('status 400', () => pm.response.to.have.status(400));",
-                  "console.log(pm.response.text());"
+                  "pm.test('status is 404', () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "public-api tracking, wrong ref (404)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/functions/v1/public-api/tracking",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "public-api",
+                "tracking"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ref\": \"ZZZZZZZZ\",\n  \"token\": \"{{tracking_token}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 404', () => pm.response.to.have.status(404));"
                 ]
               }
             }
           ]
         }
-      ]
+      ],
+      "description": "Run after folder 1 so {{assignment_id}} exists."
     },
     {
-      "name": "3 - Volunteer application",
+      "name": "3 - volunteer-api (driver token)",
       "item": [
         {
-          "name": "0a. Send sign-up code",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "apikey",
-                "value": "{{anon_key}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"email\": \"postman.driver@example.com\"\n}"
-            },
-            "url": {
-              "raw": "{{base_url}}/functions/v1/send-signup-otp",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "functions",
-                "v1",
-                "send-signup-otp"
-              ]
-            },
-            "description": "Code goes to the email (local without Gmail: printed in the functions serve terminal when OTP_DEV_LOG=true). Put it into signup_otp. A second call within 60 s is 429 resend_too_soon."
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('status 200', () => pm.response.to.have.status(200));",
-                  "console.log(pm.response.text());"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "0b. Verify sign-up code",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "apikey",
-                "value": "{{anon_key}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"email\": \"postman.driver@example.com\",\n  \"otp\": \"{{signup_otp}}\"\n}"
-            },
-            "url": {
-              "raw": "{{base_url}}/functions/v1/verify-signup-otp",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "functions",
-                "v1",
-                "verify-signup-otp"
-              ]
-            },
-            "description": "Stores email_verification_token (valid 30 min, single use) for step 2."
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('status 200', () => pm.response.to.have.status(200));",
-                  "const j = pm.response.json();",
-                  "if (j.data) pm.environment.set('email_verification_token', j.data.email_verification_token);"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "1. Get upload URLs (driver)",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "apikey",
-                "value": "{{anon_key}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"volunteer_type\": \"driver\",\n  \"files\": [\n    {\n      \"kind\": \"citizenship\",\n      \"content_type\": \"image/jpeg\"\n    },\n    {\n      \"kind\": \"license\",\n      \"content_type\": \"image/jpeg\"\n    }\n  ]\n}"
-            },
-            "url": {
-              "raw": "{{base_url}}/functions/v1/create-upload-urls",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "functions",
-                "v1",
-                "create-upload-urls"
-              ]
-            },
-            "description": "Saves citizenship_path and license_path. Uploading the actual image needs the signed token (works from Flutter/supabase-js). In Postman, easiest is Studio -> Storage -> volunteer-docs -> upload any jpg into docs/ and rename it to <uuid>.jpg, then put that path in the next request."
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "const j = pm.response.json();",
-                  "pm.test('200', () => pm.response.to.have.status(200));",
-                  "if (j.data) { j.data.uploads.forEach(u => pm.environment.set(u.kind + '_path', u.path)); }",
-                  "console.log(j);"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "2. Submit application (driver)",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "apikey",
-                "value": "{{anon_key}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"full_name\": \"Postman Driver\",\n  \"email\": \"postman.driver@example.com\",\n  \"email_verification_token\": \"{{email_verification_token}}\",\n  \"phone\": \"9801112233\",\n  \"volunteer_type\": \"driver\",\n  \"citizenship_no\": \"12-34-56-78901\",\n  \"citizenship_photo_path\": \"{{citizenship_path}}\",\n  \"license_no\": \"01-06-00123456\",\n  \"license_photo_path\": \"{{license_path}}\"\n}"
-            },
-            "url": {
-              "raw": "{{base_url}}/functions/v1/submit-volunteer-application",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "functions",
-                "v1",
-                "submit-volunteer-application"
-              ]
-            },
-            "description": "Needs email_verification_token from step 0b. Without it: 403 email_not_verified."
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "const j = pm.response.json();",
-                  "if (j.data) pm.environment.set('application_id', j.data.application_id);",
-                  "console.log(j);"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Doctor without service card (must be 400)",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "apikey",
-                "value": "{{anon_key}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"full_name\": \"No Card\",\n  \"email\": \"nocard@example.com\",\n  \"phone\": \"9801112244\",\n  \"volunteer_type\": \"doctor\",\n  \"citizenship_no\": \"12-34-56-78901\",\n  \"citizenship_photo_path\": \"docs/00000000-0000-0000-0000-000000000000.jpg\"\n}"
-            },
-            "url": {
-              "raw": "{{base_url}}/functions/v1/submit-volunteer-application",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "functions",
-                "v1",
-                "submit-volunteer-application"
-              ]
-            },
-            "description": ""
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('status 400', () => pm.response.to.have.status(400));",
-                  "console.log(pm.response.text());"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Submit without email token (must be 403)",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "apikey",
-                "value": "{{anon_key}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"full_name\": \"No Token\",\n  \"email\": \"notoken@example.com\",\n  \"phone\": \"9801112244\",\n  \"volunteer_type\": \"manpower\",\n  \"citizenship_no\": \"12-34-56-78901\",\n  \"citizenship_photo_path\": \"docs/00000000-0000-0000-0000-000000000000.jpg\"\n}"
-            },
-            "url": {
-              "raw": "{{base_url}}/functions/v1/submit-volunteer-application",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "functions",
-                "v1",
-                "submit-volunteer-application"
-              ]
-            },
-            "description": "The token check comes before any database write."
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('status 403 email_not_verified', () => { pm.response.to.have.status(403); pm.expect(pm.response.json().error.code).to.eql('email_not_verified'); });"
-                ]
-              }
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "name": "4 - Admin",
-      "item": [
-        {
-          "name": "Application queue",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "apikey",
-                "value": "{{anon_key}}"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{admin_token}}"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/rest/v1/volunteer_applications?select=id,full_name,email,volunteer_type,review_status&review_status=eq.submitted&order=created_at",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "rest",
-                "v1",
-                "volunteer_applications?select=id,full_name,email,volunteer_type,review_status&review_status=eq.submitted&order=created_at"
-              ]
-            },
-            "description": ""
-          }
-        },
-        {
-          "name": "Requests with district_id (admin)",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "apikey",
-                "value": "{{anon_key}}"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{admin_token}}"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/rest/v1/requests?select=public_ref,kind,status,requester_name,district_id,volunteers_needed,request_items(item_type,requested_qty,unit)&order=created_at.desc&limit=10",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "rest",
-                "v1",
-                "requests?select=public_ref,kind,status,requester_name,district_id,volunteers_needed,request_items(item_type,requested_qty,unit)&order=created_at.desc&limit=10"
-              ]
-            },
-            "description": ""
-          }
-        },
-        {
-          "name": "Requests as anon (must be empty/blocked)",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "apikey",
-                "value": "{{anon_key}}"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/rest/v1/requests?select=id&limit=5",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "rest",
-                "v1",
-                "requests?select=id&limit=5"
-              ]
-            },
-            "description": ""
-          }
-        },
-        {
-          "name": "Decline application",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "apikey",
-                "value": "{{anon_key}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{admin_token}}"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"application_id\": \"{{application_id}}\",\n  \"decision\": \"decline\",\n  \"note\": \"Documents unreadable\"\n}"
-            },
-            "url": {
-              "raw": "{{base_url}}/functions/v1/approve-volunteer",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "functions",
-                "v1",
-                "approve-volunteer"
-              ]
-            },
-            "description": ""
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('status 200', () => pm.response.to.have.status(200));",
-                  "console.log(pm.response.text());"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Approve application",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "apikey",
-                "value": "{{anon_key}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{admin_token}}"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"application_id\": \"{{application_id}}\",\n  \"decision\": \"approve\",\n  \"note\": \"Verified\"\n}"
-            },
-            "url": {
-              "raw": "{{base_url}}/functions/v1/approve-volunteer",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "functions",
-                "v1",
-                "approve-volunteer"
-              ]
-            },
-            "description": "Needs SET_PASSWORD_URL in supabase/functions/.env. Local invite mail lands in Inbucket (http://127.0.0.1:54324)."
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('status 200', () => pm.response.to.have.status(200));",
-                  "console.log(pm.response.text());"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Volunteer token on admin function (must be 403)",
+          "name": "offers",
           "request": {
             "method": "POST",
             "header": [
@@ -1188,22 +1217,22 @@
                 "value": "Bearer {{volunteer_token}}"
               }
             ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"application_id\": \"00000000-0000-0000-0000-000000000000\",\n  \"decision\": \"approve\"\n}"
-            },
             "url": {
-              "raw": "{{base_url}}/functions/v1/approve-volunteer",
+              "raw": "{{base_url}}/functions/v1/volunteer-api/offers",
               "host": [
                 "{{base_url}}"
               ],
               "path": [
                 "functions",
                 "v1",
-                "approve-volunteer"
+                "volunteer-api",
+                "offers"
               ]
             },
-            "description": ""
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            }
           },
           "event": [
             {
@@ -1211,15 +1240,14 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('status 403', () => pm.response.to.have.status(403));",
-                  "console.log(pm.response.text());"
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));"
                 ]
               }
             }
           ]
         },
         {
-          "name": "Suspend volunteer",
+          "name": "stats",
           "request": {
             "method": "POST",
             "header": [
@@ -1233,25 +1261,25 @@
               },
               {
                 "key": "Authorization",
-                "value": "Bearer {{admin_token}}"
+                "value": "Bearer {{volunteer_token}}"
               }
             ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"user_id\": \"{{volunteer_user_id}}\",\n  \"status\": \"suspended\",\n  \"reason\": \"Postman test\"\n}"
-            },
             "url": {
-              "raw": "{{base_url}}/functions/v1/admin-set-account-status",
+              "raw": "{{base_url}}/functions/v1/volunteer-api/stats",
               "host": [
                 "{{base_url}}"
               ],
               "path": [
                 "functions",
                 "v1",
-                "admin-set-account-status"
+                "volunteer-api",
+                "stats"
               ]
             },
-            "description": ""
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            }
           },
           "event": [
             {
@@ -1259,15 +1287,14 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('status 200', () => pm.response.to.have.status(200));",
-                  "console.log(pm.response.text());"
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));"
                 ]
               }
             }
           ]
         },
         {
-          "name": "Re-activate volunteer",
+          "name": "device-token",
           "request": {
             "method": "POST",
             "header": [
@@ -1281,25 +1308,25 @@
               },
               {
                 "key": "Authorization",
-                "value": "Bearer {{admin_token}}"
+                "value": "Bearer {{volunteer_token}}"
               }
             ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"user_id\": \"{{volunteer_user_id}}\",\n  \"status\": \"active\"\n}"
-            },
             "url": {
-              "raw": "{{base_url}}/functions/v1/admin-set-account-status",
+              "raw": "{{base_url}}/functions/v1/volunteer-api/device-token",
               "host": [
                 "{{base_url}}"
               ],
               "path": [
                 "functions",
                 "v1",
-                "admin-set-account-status"
+                "volunteer-api",
+                "device-token"
               ]
             },
-            "description": ""
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"demo-postman-device-token-0001\",\n  \"platform\": \"android\"\n}"
+            }
           },
           "event": [
             {
@@ -1307,40 +1334,434 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('status 200', () => pm.response.to.have.status(200));",
-                  "console.log(pm.response.text());"
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));"
                 ]
               }
             }
           ]
         },
         {
-          "name": "Audit log",
+          "name": "assignments/claim",
           "request": {
-            "method": "GET",
+            "method": "POST",
             "header": [
               {
                 "key": "apikey",
                 "value": "{{anon_key}}"
               },
               {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
                 "key": "Authorization",
-                "value": "Bearer {{admin_token}}"
+                "value": "Bearer {{volunteer_token}}"
               }
             ],
             "url": {
-              "raw": "{{base_url}}/rest/v1/audit_logs?select=action,entity,created_at&order=id.desc&limit=10",
+              "raw": "{{base_url}}/functions/v1/volunteer-api/assignments/claim",
               "host": [
                 "{{base_url}}"
               ],
               "path": [
-                "rest",
+                "functions",
                 "v1",
-                "audit_logs?select=action,entity,created_at&order=id.desc&limit=10"
+                "volunteer-api",
+                "assignments",
+                "claim"
               ]
             },
-            "description": ""
-          }
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"{{assignment_id}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "assignments/claim again (409 already_claimed)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{volunteer_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/functions/v1/volunteer-api/assignments/claim",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "volunteer-api",
+                "assignments",
+                "claim"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"{{assignment_id}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 409', () => pm.response.to.have.status(409));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "assignments/detail",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{volunteer_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/functions/v1/volunteer-api/assignments/detail",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "volunteer-api",
+                "assignments",
+                "detail"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"{{assignment_id}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "assignments/state en_route_to_destination",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{volunteer_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/functions/v1/volunteer-api/assignments/state",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "volunteer-api",
+                "assignments",
+                "state"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"{{assignment_id}}\",\n  \"state\": \"en_route_to_destination\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "assignments/location",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{volunteer_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/functions/v1/volunteer-api/assignments/location",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "volunteer-api",
+                "assignments",
+                "location"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"{{assignment_id}}\",\n  \"lat\": 27.71,\n  \"lng\": 85.32\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "assignments/state delivered (transport has no OTP)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{volunteer_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/functions/v1/volunteer-api/assignments/state",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "volunteer-api",
+                "assignments",
+                "state"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"{{assignment_id}}\",\n  \"state\": \"delivered\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "4 - public-api (no account)",
+      "item": [
+        {
+          "name": "map",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/functions/v1/public-api/map",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "public-api",
+                "map"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "tracking",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/functions/v1/public-api/tracking",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "public-api",
+                "tracking"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ref\": \"{{public_ref}}\",\n  \"token\": \"{{tracking_token}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "tracking/otp, wrong purpose or no active assignment (409 or 404)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/functions/v1/public-api/tracking/otp",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "functions",
+                "v1",
+                "public-api",
+                "tracking",
+                "otp"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ref\": \"{{public_ref}}\",\n  \"token\": \"{{tracking_token}}\",\n  \"purpose\": \"delivery\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('refused, not 200', () => pm.expect(pm.response.code).to.not.equal(200));"
+                ]
+              }
+            }
+          ]
         }
       ]
     }

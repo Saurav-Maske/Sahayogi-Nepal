@@ -129,12 +129,11 @@ export function serveApi(name: string, routes: Record<string, Route>) {
     if (route.auth === "none") {
       sb = anonClient();
     } else {
-      const caller = route.auth === "admin" ? await requireAdmin(req) : await requireUser(req);
-      if (!caller) {
-        return route.auth === "admin"
-          ? fail("forbidden", "Admin only.", 403)
-          : fail("unauthenticated", "Sign in required.", 401);
-      }
+      // No / invalid / expired token is always 401, so clients know to refresh or sign in again.
+      // A valid user who is not an admin is 403.
+      const user = await requireUser(req);
+      if (!user) return fail("unauthenticated", "Sign in required.", 401);
+      if (route.auth === "admin" && !(await requireAdmin(req))) return fail("forbidden", "Admin only.", 403);
       sb = userClient(bearer(req));
     }
 
