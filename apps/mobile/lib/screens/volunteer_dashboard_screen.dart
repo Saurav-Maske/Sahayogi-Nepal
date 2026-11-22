@@ -574,7 +574,7 @@ class _OpportunityCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
+                const Row(
                   children: [
                     Icon(Icons.inventory_2_outlined, color: appTeal, size: 17),
                     SizedBox(width: 8),
@@ -601,7 +601,7 @@ class _OpportunityCard extends StatelessWidget {
                 const SizedBox(height: 13),
                 Text(
                   _title,
-                  style: TextStyle(
+                  style: const TextStyle(
                     color: appNavy,
                     fontSize: 16,
                     fontWeight: FontWeight.w700,

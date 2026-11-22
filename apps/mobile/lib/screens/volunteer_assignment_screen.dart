@@ -85,6 +85,7 @@ class _VolunteerAssignmentScreenState extends State<VolunteerAssignmentScreen> {
       'volunteer_active_assignment',
       jsonEncode(result.data!),
     );
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Task accepted.')),
     );
@@ -391,7 +392,7 @@ class _VolunteerAssignmentScreenState extends State<VolunteerAssignmentScreen> {
                                   ),
                                 ],
                               ),
-                            CurrentLocationLayer(),
+                            const CurrentLocationLayer(),
                             MarkerLayer(
                               markers: [
                                 for (var index = 0; index < _route.length; index++)

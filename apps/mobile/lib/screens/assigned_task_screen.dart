@@ -70,11 +70,11 @@ class AssignedTaskScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 20),
-              _TaskCard(
+              const _TaskCard(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
+                    Text(
                       'VT-0142 · Blanket delivery',
                       style: TextStyle(
                         color: appNavy,
@@ -82,13 +82,13 @@ class AssignedTaskScreen extends StatelessWidget {
                         fontWeight: FontWeight.w700,
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    const Text(
+                    SizedBox(height: 8),
+                    Text(
                       '30 blankets for 6 families',
                       style: TextStyle(color: appTeal, fontSize: 14),
                     ),
-                    const SizedBox(height: 12),
-                    const Text(
+                    SizedBox(height: 12),
+                    Text(
                       'Coordinator: Aasha Tamang\n+977 9800 112 233',
                       style: TextStyle(
                         color: appMuted,
@@ -100,9 +100,9 @@ class AssignedTaskScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 20),
-              _TaskCard(
+              const _TaskCard(
                 child: Column(
-                  children: const [
+                  children: [
                     _StopRow(
                       icon: Icons.inventory_2_outlined,
                       number: '01',
@@ -372,12 +372,12 @@ class _AssignedTaskMapScreen extends StatelessWidget {
               ),
             ),
           ),
-          Positioned(
+          const Positioned(
             left: 16,
             right: 16,
             bottom: 16,
             child: _TaskCard(
-              child: const Row(
+              child: Row(
                 children: [
                   Icon(Icons.inventory_2_outlined, color: appNavy),
                   SizedBox(width: 12),
