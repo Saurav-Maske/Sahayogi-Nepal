@@ -35,5 +35,5 @@ export interface Donation {
 export interface DonationFilters {
   tab: DonationTab; q: string; districtId: number | null; itemType: string; from: string; to: string; page: number;
 }
-export interface DonationList { rows: Donation[]; total: number; allTotal: number; pendingTotal: number; demo: boolean }
-export interface DonationDetail { donation: Donation; demo: boolean }
+export interface DonationList { rows: Donation[]; total: number; allTotal: number; pendingTotal: number }
+export interface DonationDetail { donation: Donation }

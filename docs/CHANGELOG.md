@@ -2,6 +2,25 @@
 
 Newest first. Anything that changes a payload, table, function or seed behaviour gets a line here.
 
+## 2026-11-22 (volunteers with more than one type)
+
+- **Why:** one volunteer can now be both driver and doctor. Before, an application and a profile had a single `volunteer_type`, so a person could only get A+B or A+C.
+- **Migration `20261122000012_multi_volunteer_types.sql`:** `volunteer_applications.volunteer_types volunteer_type[]` (backfilled from `volunteer_type`). `volunteer_type` stays as the primary type. A before-insert/update trigger keeps the two columns consistent (empty list becomes `{volunteer_type}`, the primary type is always in the list), so seed scripts that only set `volunteer_type` keep working. The two unnamed document checks are replaced by named ones (`volunteer_applications_driver_docs_chk`, `_doctor_docs_chk`, `_types_chk`): a licence is required when the list holds `driver`, a service card when it holds `doctor`. The trigger function is `service_role` only. **Not yet run against a database.**
+- **`create-upload-urls`:** accepts `volunteer_types` (array) and allows the union of the document kinds. The single `volunteer_type` is still accepted.
+- **`submit-volunteer-application`:** accepts `volunteer_types` (array). Licence fields are required if `driver` is in it, service-card fields if `doctor` is in it. Stores the list and the primary type (doctor, then driver, then manpower). The single `volunteer_type` is still accepted; `volunteer_types` wins if both are sent. `invalid_type` is also returned for an empty list, a non-list or an unknown value.
+- **`approve-volunteer`:** `categories` is now the union over all types of the application, so driver + doctor gets `A, B, C`. Applications from before the migration are handled the same way (their list is just their one type). The audit entry now also records `volunteer_types`.
+- **New `supabase/functions/_shared/volunteer_types.ts`:** the type to category and document-kind rules, used by the three functions above (the category map moved out of `approve-volunteer`).
+- **No change** to `profiles` (still `volunteer_type` plus `categories`), the volunteer RPCs, `_tier_open_to` or the login and `auth-me` payloads: they already read `categories`. Contract is v1.5.
+- **Deploy:** `supabase db push`, then `supabase functions deploy create-upload-urls submit-volunteer-application approve-volunteer`. Run `scripts/check_function_privileges.sql` afterwards.
+- **Not done here:** admin app screens still show one type per volunteer, and the mobile registration screen does not call the API yet.
+
+## 2026-11-22 (first full run on the hosted demo project)
+
+- **Result:** `npm run test:api` against the hosted demo project passed: `sahayogi-edge-api` 37 requests / 0 failed, `sahayogi-flows` 86 requests / 0 failed. 28 of 43 Edge endpoints have a Postman request; the sign-up, password-reset, upload, route, driver-location, volunteer-approval and `send-push` functions are not covered yet.
+- **Behaviour:** `admin-api` now answers a missing, invalid or expired token with `401 unauthenticated` (it was `403 forbidden`). `403 forbidden` is only for a signed-in user who is not an admin. Same as `volunteer-api`. Clients should treat 401 as "refresh or sign in again". Change is in `supabase/functions/_shared/rpc.ts`.
+- **Tests:** device-token test now sends a token of at least 20 characters (the RPC requires 20-4096). Removed a contradictory `no error` assertion from the `skip OTP early` flow step (the expected result is a 409 `otp_required` error).
+- **Deploy note:** `submit-request` must be redeployed with the rest (`supabase functions deploy`, no names). A stale copy did not return `request_id`, which broke every flow step that uses it.
+
 ## 2026-11-22 (test runner and demo deploy)
 
 - **Tests:** `scripts/tests/matrix.mjs` (+ `lib.mjs`) runs the concurrency, RLS and role rows of `TEST-MATRIX.md` as real roles over HTTP. `npm run test:matrix` and `test:matrix:fast` in `scripts/`. Not yet run against a project.

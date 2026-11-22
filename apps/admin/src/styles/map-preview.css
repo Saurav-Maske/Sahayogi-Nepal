@@ -1,0 +1,31 @@
+.operations-map-preview {
+  position: relative;
+  height: 260px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #e9f0eb;
+}
+.operations-map-preview .leaflet-container { width: 100%; height: 100%; font: inherit; }
+.operations-map-preview__message {
+  display: grid;
+  min-height: 150px;
+  place-items: center;
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--muted);
+  font-size: 12px;
+  text-align: center;
+}
+.operations-map-preview__note {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  left: 8px;
+  padding: 5px 8px;
+  border-radius: 6px;
+  background: rgba(255,255,255,.92);
+  color: var(--muted);
+  font-size: 10px;
+}

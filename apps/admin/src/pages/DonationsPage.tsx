@@ -59,10 +59,9 @@ export default function DonationsPage() {
       <div className="page__head">
         <div>
           <h1>Donation management</h1>
-          <p className="crumbs">Sahayogi Nepal / Donations / Kathmandu district</p>
+          <p className="crumbs">Sahayogi Nepal / Donations / All districts</p>
         </div>
         <div className="page__actions">
-          {data?.demo && <span className="pill" title="Not signed in: showing demo data">Demo data</span>}
           <QuickAction />
         </div>
       </div>

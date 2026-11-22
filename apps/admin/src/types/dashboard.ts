@@ -43,5 +43,5 @@ export interface DashboardData {
   activity: ActivityItem[];
   attention: { quantityDiscrepancies: number; lowStock: LowStockAlert | null };
   updatedAt: string; // ISO
-  source: 'live' | 'demo';
+  source: 'live';
 }

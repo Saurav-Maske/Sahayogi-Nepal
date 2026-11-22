@@ -56,9 +56,9 @@ export default function VolunteerProfilePage() {
       <div className="page__head">
         <div>
           <h1>{title} · {v.fullName}</h1>
-          <p className="crumbs"><Link to="/volunteers">Volunteer Management</Link> / {v.fullName} / Kathmandu district</p>
+          <p className="crumbs"><Link to="/volunteers">Volunteer Management</Link> / {v.fullName} / All districts</p>
         </div>
-        <div className="page__actions">{data?.demo && <span className="pill">Demo data</span>}<QuickAction /></div>
+        <div className="page__actions"><QuickAction /></div>
       </div>
 
       <div className="review">
@@ -110,9 +110,9 @@ export default function VolunteerProfilePage() {
         <section className="card">
           <h2 className="card__title">Secure document preview</h2>
           <p className="card__sub">Restricted access · Short-lived link · No public download</p>
-          <DocumentCard title="Citizenship photograph" path={v.citizenshipPath} demo={!!data?.demo} />
-          {(v.licenseNo || v.licensePath) && <DocumentCard title="Driving licence photograph" path={v.licensePath} demo={!!data?.demo} />}
-          {(v.serviceCardNo || v.serviceCardPath) && <DocumentCard title="Service card photograph" path={v.serviceCardPath} demo={!!data?.demo} />}
+          <DocumentCard title="Citizenship photograph" path={v.citizenshipPath} />
+          {(v.licenseNo || v.licensePath) && <DocumentCard title="Driving licence photograph" path={v.licensePath} />}
+          {(v.serviceCardNo || v.serviceCardPath) && <DocumentCard title="Service card photograph" path={v.serviceCardPath} />}
         </section>
       </div>
     </>

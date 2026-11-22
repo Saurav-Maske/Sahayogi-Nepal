@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useRequest } from '../../hooks/useRequests';
+import OperationsMapPreview from '../map/OperationsMapPreview';
 import { buildHistory, fmtTime, isPending, itemLabel } from '../../utils/requests';
 import { fmtDate } from '../../utils/requests';
 
@@ -38,6 +39,9 @@ export default function RequestDrawer({ id, onClose }: Props) {
               </p>
             )}
             {r.notes && <p className="drawer__line">Notes: {r.notes}</p>}
+
+            <h3 className="drawer__sub">Request location and live operations</h3>
+            <OperationsMapPreview requestId={r.id} />
 
             <h3 className="drawer__sub">Request history</h3>
             <ul className="drawer__history">

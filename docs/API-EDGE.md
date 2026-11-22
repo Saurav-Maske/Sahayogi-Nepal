@@ -1,4 +1,3 @@
-
 # Edge API over the RPCs (v1)
 
 Three Edge Functions expose every RPC over plain HTTP, so Flutter and the admin web can use `{ data, error }` like the other functions instead of calling `supabase.rpc` directly.
@@ -7,7 +6,7 @@ Three Edge Functions expose every RPC over plain HTTP, so Flutter and the admin 
 Body fields are the RPC parameters without the `p_` prefix. Optional fields can be left out (the SQL default applies). Actions that take no body also accept GET.
 Responses: `{ "data": <rpc result>, "error": null }` or `{ "data": null, "error": { "code", "message" } }`.
 
-The caller's JWT is forwarded to Postgres, so `is_admin()`, category checks and ownership checks run inside the RPC exactly as before. The functions add only: auth guard (401/403), input type checks (`invalid_input`, 400), and error mapping.
+The caller's JWT is forwarded to Postgres, so `is_admin()`, category checks and ownership checks run inside the RPC exactly as before. The functions add only: auth guard (no, invalid or expired token = `401 unauthenticated`; signed in but wrong role = `403 forbidden`, on admin routes too), input type checks (`invalid_input`, 400), and error mapping.
 
 HTTP status for RPC error codes: `unauthorized` 401, `forbidden` 403, `not_found` 404, 409 for `already_claimed | already_on_request | already_assigned | already_reported | not_available | invalid_state | invalid_transition | otp_required | otp_not_available | lot_reserved | insufficient_stock`, `too_many_requests` 429, `hub_not_configured` 500, any other code 400. A non-code Postgres error becomes `db_error` 500 (logged, not shown).
 `driver_verify_otp` wrong codes are still HTTP 200 with `data.ok = false` (see API-CONTRACT.md); check `data.ok`.

@@ -1325,7 +1325,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"token\": \"demo-postman-token\",\n  \"platform\": \"android\"\n}"
+              "raw": "{\n  \"token\": \"demo-postman-device-token-0001\",\n  \"platform\": \"android\"\n}"
             }
           },
           "event": [

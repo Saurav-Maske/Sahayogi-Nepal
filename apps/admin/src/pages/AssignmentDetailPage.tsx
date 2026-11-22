@@ -1,0 +1,168 @@
+import { useEffect, useState } from "react";
+import { Link, useParams } from "react-router-dom";
+import QuickAction from "../components/dashboard/QuickAction";
+import { getAssignment } from "../services/assignmentsService";
+import type { AssignmentEvent } from "../services/assignmentsService";
+import "../styles/assignments.css";
+
+type Detail = Awaited<ReturnType<typeof getAssignment>>;
+const label = (s: string) =>
+  s.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase());
+const eventText = (e: AssignmentEvent) => label(e.type);
+export default function AssignmentDetailPage() {
+  const { id = "" } = useParams();
+  const [data, setData] = useState<Detail | null>(null),
+    [error, setError] = useState(""),
+    [loading, setLoading] = useState(true);
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    void getAssignment(id)
+      .then((x) => {
+        if (active) {
+          setData(x);
+          setError("");
+        }
+      })
+      .catch((e) => {
+        if (active) {
+          setData(null);
+          setError(
+            e instanceof Error ? e.message : "Could not load assignment",
+          );
+        }
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [id]);
+  if (loading) return <p className="empty">Loading assignment…</p>;
+  if (error || !data)
+    return (
+      <div>
+        <p className="assignment-error" role="alert">
+          {error || "Assignment not found."}
+        </p>
+        <Link className="btn" to="/assignments">
+          Back to assignments
+        </Link>
+      </div>
+    );
+  const active = [
+    "accepted",
+    "en_route_to_pickup",
+    "picked_up",
+    "en_route_to_destination",
+  ].includes(data.state);
+  const pickup = data.route[0]?.label ?? "—",
+    destination = data.route[data.route.length - 1]?.label ?? data.district;
+  return (
+    <div className="assignment-detail-page">
+      <header className="page__head">
+        <div>
+          <h1>Assignment detail · {data.id.slice(0, 8).toUpperCase()}</h1>
+          <p className="crumbs">
+            <Link to="/">Sahayogi Nepal</Link>&nbsp; / &nbsp;
+            <Link to="/assignments">Assignments</Link>&nbsp; / &nbsp;
+            {data.district}
+          </p>
+        </div>
+        <div className="page__actions">
+          <QuickAction />
+        </div>
+      </header>
+      <div className="assignment-detail-grid">
+        <section className="card assignment-resource">
+          <h2 className="card__title">
+            {label(data.assignmentType)} assignment
+          </h2>
+          <p className="card__sub">
+            <Link to={`/requests/${data.requestId}`}>{data.requestRef}</Link> ·{" "}
+            {data.volunteer ?? "Unclaimed"} · {label(data.state)}
+          </p>
+          <dl>
+            <div>
+              <dt>Pickup</dt>
+              <dd>{pickup}</dd>
+            </div>
+            <div>
+              <dt>Destination</dt>
+              <dd>{destination}</dd>
+            </div>
+            <div>
+              <dt>Items</dt>
+              <dd>
+                {data.items
+                  .map(
+                    (i) =>
+                      `${i.item_type.replace(/_/g, " ")} ${i.qty} ${i.unit}`,
+                  )
+                  .join(" · ") || "No item quantities"}
+              </dd>
+            </div>
+            <div>
+              <dt>Offered</dt>
+              <dd>{new Date(data.offeredAt).toLocaleString()}</dd>
+            </div>
+            <div>
+              <dt>Accepted</dt>
+              <dd>
+                {data.acceptedAt
+                  ? new Date(data.acceptedAt).toLocaleString()
+                  : "Awaiting acceptance"}
+              </dd>
+            </div>
+            <div>
+              <dt>Tier</dt>
+              <dd>{data.requiredTier}</dd>
+            </div>
+          </dl>
+          {active && (
+            <div className="location-note">
+              <strong>Live location sharing</strong>
+              <p>
+                Location appears on the authorised live map while the volunteer
+                sends recent updates.
+              </p>
+              <Link to="/map?layer=drivers">Open live map</Link>
+            </div>
+          )}
+        </section>
+        <section className="card assignment-events">
+          <h2 className="card__title">Pickup and delivery events</h2>
+          {data.events.length ? (
+            <ol className="event-list">
+              {data.events.map((e, i) => (
+                <li
+                  className={
+                    i === data.events.length - 1
+                      ? "event-current"
+                      : "event-done"
+                  }
+                  key={e.id}
+                >
+                  <span>{eventText(e)}</span>
+                  <p>
+                    {e.actor ? `Actor ${e.actor}` : ""}
+                    {e.payload ? ` · ${JSON.stringify(e.payload)}` : ""}
+                  </p>
+                  <time>{new Date(e.createdAt).toLocaleString()}</time>
+                </li>
+              ))}
+            </ol>
+          ) : (
+            <p className="empty">No assignment events recorded yet.</p>
+          )}
+          {data.completedAt && (
+            <p className="discrepancy">
+              Completed {new Date(data.completedAt).toLocaleString()}
+            </p>
+          )}
+        </section>
+      </div>
+    </div>
+  );
+}

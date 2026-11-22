@@ -5,7 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../core/app_colors.dart';
-import 'volunteer_dashboard_screen.dart';
+import '../core/volunteer_auth_service.dart';
 import 'terms_and_conditions_screen.dart';
 
 class VolunteerRegistrationScreen extends StatefulWidget {
@@ -22,12 +22,13 @@ class _VolunteerRegistrationScreenState
 
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
+  final _phoneController = TextEditingController();
   final _emailController = TextEditingController();
-  final _passwordController = TextEditingController();
-  final _confirmPasswordController = TextEditingController();
+  final _citizenshipNumberController = TextEditingController();
+  final _drivingLicenseNumberController = TextEditingController();
+  final _medicalLicenseNumberController = TextEditingController();
   final _imagePicker = ImagePicker();
-  bool _passwordVisible = false;
-  bool _confirmPasswordVisible = false;
+  bool _isSubmitting = false;
   bool _agreedToVolunteer = false;
   bool _transportManpowerSelected = false;
   bool _healthWorkerSelected = false;
@@ -42,10 +43,10 @@ class _VolunteerRegistrationScreenState
   bool _medicalLicenseError = false;
   bool _agreementError = false;
 
-  List<String> get _selectedRoles => [
-        'Human Manpower',
-        if (_transportManpowerSelected) 'Transport Manpower',
-        if (_healthWorkerSelected) 'Health Worker',
+  List<String> get _volunteerTypes => [
+        if (_transportManpowerSelected) 'driver',
+        if (_healthWorkerSelected) 'doctor',
+        if (!_transportManpowerSelected && !_healthWorkerSelected) 'manpower',
       ];
 
   Future<void> _pickDocumentImage({
@@ -141,13 +142,15 @@ class _VolunteerRegistrationScreenState
   @override
   void dispose() {
     _nameController.dispose();
+    _phoneController.dispose();
     _emailController.dispose();
-    _passwordController.dispose();
-    _confirmPasswordController.dispose();
+    _citizenshipNumberController.dispose();
+    _drivingLicenseNumberController.dispose();
+    _medicalLicenseNumberController.dispose();
     super.dispose();
   }
 
-  void _submit() {
+  Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     final missingNid = _nidImage == null;
     final missingAgreement = !_agreedToVolunteer;
@@ -170,15 +173,175 @@ class _VolunteerRegistrationScreenState
       );
       return;
     }
-    Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute<void>(
-        builder: (_) => VolunteerDashboardScreen(
-          volunteerName: _nameController.text.trim(),
-          roles: _selectedRoles,
+    setState(() => _isSubmitting = true);
+    try {
+      final email = _emailController.text.trim().toLowerCase();
+      await VolunteerAuthService.sendSignupOtp(email);
+      if (!mounted) return;
+      final verificationToken = await _requestEmailCode(email);
+      if (verificationToken == null || !mounted) return;
+
+      final documents = <VolunteerDocument>[
+        VolunteerDocument(
+          kind: 'citizenship',
+          bytes: _nidImageBytes!,
+          contentType: _contentType(_nidImage!),
         ),
+        if (_transportManpowerSelected)
+          VolunteerDocument(
+            kind: 'license',
+            bytes: _drivingLicenseImageBytes!,
+            contentType: _contentType(_drivingLicenseImage!),
+          ),
+        if (_healthWorkerSelected)
+          VolunteerDocument(
+            kind: 'service_card',
+            bytes: _medicalLicenseImageBytes!,
+            contentType: _contentType(_medicalLicenseImage!),
+          ),
+      ];
+      await VolunteerAuthService.submitApplication(
+        fullName: _nameController.text,
+        email: email,
+        phone: _phoneController.text,
+        volunteerTypes: _volunteerTypes,
+        citizenshipNumber: _citizenshipNumberController.text,
+        drivingLicenseNumber: _transportManpowerSelected
+            ? _drivingLicenseNumberController.text
+            : null,
+        medicalLicenseNumber:
+            _healthWorkerSelected ? _medicalLicenseNumberController.text : null,
+        emailVerificationToken: verificationToken,
+        documents: documents,
+      );
+      if (!mounted) return;
+      await _showApplicationSubmitted();
+    } on VolunteerAuthException catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(error.message)),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content:
+                Text('Could not submit your application. Please try again.'),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
+    }
+  }
+
+  String _contentType(XFile image) {
+    final extension = image.name.toLowerCase();
+    if (extension.endsWith('.png')) return 'image/png';
+    if (extension.endsWith('.webp')) return 'image/webp';
+    return 'image/jpeg';
+  }
+
+  Future<String?> _requestEmailCode(String email) async {
+    final controller = TextEditingController();
+    var verifying = false;
+    String? errorMessage;
+    try {
+      return await showDialog<String>(
+        context: context,
+        barrierDismissible: false,
+        builder: (dialogContext) => StatefulBuilder(
+          builder: (dialogContext, setDialogState) => AlertDialog(
+            title: const Text('Verify your email'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Enter the 6-digit code sent to $email.'),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: controller,
+                  autofocus: true,
+                  keyboardType: TextInputType.number,
+                  maxLength: 6,
+                  decoration: InputDecoration(
+                    labelText: 'Verification code',
+                    errorText: errorMessage,
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed:
+                    verifying ? null : () => Navigator.of(dialogContext).pop(),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: verifying
+                    ? null
+                    : () async {
+                        setDialogState(() {
+                          verifying = true;
+                          errorMessage = null;
+                        });
+                        try {
+                          final token =
+                              await VolunteerAuthService.verifySignupOtp(
+                            email: email,
+                            code: controller.text,
+                          );
+                          if (dialogContext.mounted) {
+                            Navigator.of(dialogContext).pop(token);
+                          }
+                        } on VolunteerAuthException catch (error) {
+                          setDialogState(() {
+                            verifying = false;
+                            errorMessage = error.message;
+                          });
+                        } catch (_) {
+                          setDialogState(() {
+                            verifying = false;
+                            errorMessage = 'Could not verify the code.';
+                          });
+                        }
+                      },
+                child: verifying
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Text('Verify code'),
+              ),
+            ],
+          ),
+        ),
+      );
+    } finally {
+      controller.dispose();
+    }
+  }
+
+  Future<void> _showApplicationSubmitted() async {
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Application submitted'),
+        content: const Text(
+          'Your application is awaiting review. If approved, you will receive an invitation to set your password and log in.',
+        ),
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Done'),
+          ),
+        ],
       ),
-      (route) => route.isFirst,
     );
+    if (mounted) Navigator.of(context).pop();
   }
 
   @override
@@ -252,6 +415,11 @@ class _VolunteerRegistrationScreenState
                     ),
                   ),
                   const SizedBox(height: 20),
+                  const Text(
+                    'Applications are reviewed before volunteer accounts are activated.',
+                    style: TextStyle(color: appMuted, fontSize: 12),
+                  ),
+                  const SizedBox(height: 16),
                   _formField(
                     label: 'Full name',
                     hint: 'John Dow',
@@ -259,6 +427,20 @@ class _VolunteerRegistrationScreenState
                     validator: (value) => value == null || value.trim().isEmpty
                         ? 'Enter your full name'
                         : null,
+                  ),
+                  const SizedBox(height: 18),
+                  _formField(
+                    label: 'Phone number',
+                    hint: '10-digit phone number',
+                    controller: _phoneController,
+                    keyboardType: TextInputType.phone,
+                    validator: (value) {
+                      final phone = value?.trim() ?? '';
+                      if (!RegExp(r'^\d{10}$').hasMatch(phone)) {
+                        return 'Enter a 10-digit phone number';
+                      }
+                      return null;
+                    },
                   ),
                   const SizedBox(height: 18),
                   _formField(
@@ -277,56 +459,13 @@ class _VolunteerRegistrationScreenState
                   ),
                   const SizedBox(height: 18),
                   _formField(
-                    label: 'Password',
-                    hint: 'Create a secure password',
-                    controller: _passwordController,
-                    obscureText: !_passwordVisible,
-                    suffixIcon: IconButton(
-                      onPressed: () => setState(
-                        () => _passwordVisible = !_passwordVisible,
-                      ),
-                      tooltip:
-                          _passwordVisible ? 'Hide password' : 'Show password',
-                      icon: Icon(
-                        _passwordVisible
-                            ? Icons.visibility_off_outlined
-                            : Icons.visibility_outlined,
-                        color: appMuted,
-                        size: 21,
-                      ),
-                    ),
-                    helperText:
-                        '8+ characters with uppercase, lowercase, number and symbol',
-                    validator: _validatePassword,
-                  ),
-                  const SizedBox(height: 18),
-                  _formField(
-                    label: 'Confirm password',
-                    hint: 'Re-enter your password',
-                    controller: _confirmPasswordController,
-                    obscureText: !_confirmPasswordVisible,
-                    suffixIcon: IconButton(
-                      onPressed: () => setState(
-                        () =>
-                            _confirmPasswordVisible = !_confirmPasswordVisible,
-                      ),
-                      tooltip: _confirmPasswordVisible
-                          ? 'Hide password'
-                          : 'Show password',
-                      icon: Icon(
-                        _confirmPasswordVisible
-                            ? Icons.visibility_off_outlined
-                            : Icons.visibility_outlined,
-                        color: appMuted,
-                        size: 21,
-                      ),
-                    ),
+                    label: 'Citizenship number',
+                    hint: 'Enter your citizenship number',
+                    controller: _citizenshipNumberController,
                     validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Confirm your password';
-                      }
-                      if (value != _passwordController.text) {
-                        return 'Passwords do not match';
+                      final number = value?.trim() ?? '';
+                      if (number.length < 4 || number.length > 30) {
+                        return 'Enter a valid citizenship number';
                       }
                       return null;
                     },
@@ -436,6 +575,16 @@ class _VolunteerRegistrationScreenState
                   ),
                   if (_transportManpowerSelected) ...[
                     const SizedBox(height: 16),
+                    _formField(
+                      label: 'Driving license number',
+                      hint: 'Enter your license number',
+                      controller: _drivingLicenseNumberController,
+                      validator: (value) =>
+                          value == null || value.trim().isEmpty
+                              ? 'Enter your driving license number'
+                              : null,
+                    ),
+                    const SizedBox(height: 12),
                     _documentUpload(
                       title: 'Driving license (required)',
                       image: _drivingLicenseImage,
@@ -451,6 +600,16 @@ class _VolunteerRegistrationScreenState
                   ],
                   if (_healthWorkerSelected) ...[
                     const SizedBox(height: 16),
+                    _formField(
+                      label: 'Medical license number',
+                      hint: 'Enter your medical license number',
+                      controller: _medicalLicenseNumberController,
+                      validator: (value) =>
+                          value == null || value.trim().isEmpty
+                              ? 'Enter your medical license number'
+                              : null,
+                    ),
+                    const SizedBox(height: 12),
                     _documentUpload(
                       title: 'Medical license (required)',
                       image: _medicalLicenseImage,
@@ -499,10 +658,19 @@ class _VolunteerRegistrationScreenState
                     width: double.infinity,
                     height: 52,
                     child: ElevatedButton.icon(
-                      onPressed: _submit,
+                      onPressed: _isSubmitting ? null : _submit,
                       iconAlignment: IconAlignment.end,
                       icon: const Icon(Icons.arrow_forward_rounded, size: 20),
-                      label: const Text('Create account'),
+                      label: _isSubmitting
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Text('Submit application'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: appNavy,
                         foregroundColor: Colors.white,
@@ -522,25 +690,6 @@ class _VolunteerRegistrationScreenState
           ),
         ),
       );
-
-  String? _validatePassword(String? value) {
-    final password = value ?? '';
-    if (password.isEmpty) return 'Enter a password';
-    if (password.length < 8) return 'Use at least 8 characters';
-    if (!RegExp(r'[A-Z]').hasMatch(password)) {
-      return 'Add at least one uppercase letter';
-    }
-    if (!RegExp(r'[a-z]').hasMatch(password)) {
-      return 'Add at least one lowercase letter';
-    }
-    if (!RegExp(r'\d').hasMatch(password)) {
-      return 'Add at least one number';
-    }
-    if (!RegExp(r'[^A-Za-z0-9]').hasMatch(password)) {
-      return 'Add at least one symbol';
-    }
-    return null;
-  }
 
   Widget _nidDocumentUpload() => Column(
         crossAxisAlignment: CrossAxisAlignment.start,

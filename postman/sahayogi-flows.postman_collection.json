@@ -573,7 +573,6 @@
                 "exec": [
                   "let j = {}; try { j = pm.response.json(); } catch (e) {}",
                   "pm.test('status is 409', () => pm.response.to.have.status(409));",
-                  "pm.test('no error', () => pm.expect(j.error).to.eql(null));",
                   "const d = j.data || {};",
                   "pm.test('refused with a transition code', () => pm.expect(['otp_required','invalid_transition']).to.include((j.error || {}).code));"
                 ]

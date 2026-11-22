@@ -4,6 +4,8 @@ import { HashRouter } from 'react-router-dom';
 import App from './App';
 import { AuthProvider } from './context/AuthContext';
 import './styles/admin.css';
+import './styles/brand-assets.css';
+import './styles/design-refresh.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
     <React.StrictMode>

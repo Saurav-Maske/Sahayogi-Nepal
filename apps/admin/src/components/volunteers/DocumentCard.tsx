@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import { getDocumentUrl } from '../../services/volunteersService';
 
-interface Props { title: string; path: string | null; demo: boolean }
+interface Props { title: string; path: string | null }
 
-export default function DocumentCard({ title, path, demo }: Props) {
+export default function DocumentCard({ title, path }: Props) {
   const [open, setOpen] = useState(false);
   const [url, setUrl] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -46,7 +46,6 @@ export default function DocumentCard({ title, path, demo }: Props) {
               {busy && <p className="empty">Requesting secure link…</p>}
               {err && <p className="auth-error" role="alert">{err}</p>}
               {url && <img src={url} alt={title} draggable={false} />}
-              {!busy && !err && !url && demo && <p className="doc__demo">REDACTED DEMO DOCUMENT</p>}
             </div>
             <p className="modal__foot">The link expires after 60 seconds. Do not share or save this document.</p>
           </div>
