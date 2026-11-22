@@ -14,9 +14,24 @@ const label = (s: string) =>
   s.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase());
 const eventText = (e: AssignmentEvent) => {
   if (e.type === "otp_verified") {
-    return e.payload?.purpose === "pickup"
-      ? "Inventory pickup verified"
-      : "Delivery OTP verified";
+    const purposeNames: Record<string, string> = {
+      pickup: "Donor pickup OTP verified",
+      hub_pickup: "Hub pickup OTP verified",
+      hub_dropoff: "Hub drop-off OTP verified",
+      delivery: "Requester delivery OTP verified",
+    };
+    return purposeNames[String(e.payload?.purpose)] ?? "OTP verified";
+  }
+  if (e.type === "hub_received") return "Hub quantity count recorded";
+  if (e.type === "incident_opened") {
+    const issueNames: Record<string, string> = {
+      hub_shortfall: "Hub count discrepancy reported",
+      hub_items_mismatch: "Driver reported items short at hub",
+      hub_pickup_refused: "Driver refused hub handoff",
+      pickup_refused: "Driver refused donation pickup",
+      items_mismatch: "Driver reported donation quantity mismatch",
+    };
+    return issueNames[String(e.payload?.type)] ?? "Issue reported";
   }
   const names: Record<string, string> = {
     accepted: "Assignment accepted",
@@ -105,6 +120,9 @@ export default function AssignmentDetailPage() {
     ["accepted", "en_route_to_pickup"].includes(data.state) && !!data.volunteerId;
   const canIssueHubDropoff = data.assignmentType === "pickup" && hubReceived &&
     ["picked_up", "en_route_to_destination"].includes(data.state) && !!data.volunteerId;
+  const hubIssueNote = data.assignmentType === "delivery"
+    ? "If the driver receives fewer kits than listed, they can report a handoff issue in the mobile app before entering this code. The report will appear in Incidents & Reports."
+    : "If the hub count is lower or higher than the driver's confirmed pickup, recording the count automatically opens an incident for review.";
 
   const runAction = async (action: () => Promise<void>) => {
     setActionBusy(true);
@@ -217,7 +235,7 @@ export default function AssignmentDetailPage() {
               <h3>Hub handoff</h3>
               {canCountDonation && (
                 <>
-                  <p>Count the whole kits received from the driver. Items left at zero are recorded as not received.</p>
+                  <p>Count the kits the driver brought to the hub against their confirmed pickup. Items left at zero are recorded as not received; any difference automatically opens an incident.</p>
                   {data.requestItems.map((item) => (
                     <label className="assignment-count-row" key={item.id}>
                       <span>{label(item.item_type)} <small>({item.unit})</small></span>
@@ -239,8 +257,9 @@ export default function AssignmentDetailPage() {
               {(canIssueHubPickup || canIssueHubDropoff) && (
                 <>
                   <p>{canIssueHubPickup
-                    ? "Issue the hub pickup code after handing the reserved items to the driver."
+                    ? "Issue the hub pickup code after handing the reserved kits to the driver. The driver must enter this code to confirm custody."
                     : "The donation count is recorded. Issue the hub drop-off code to complete the donation."}</p>
+                  {canIssueHubPickup && <p className="assignment-hub-issue-note">{hubIssueNote}</p>}
                   <button className="btn btn--primary" disabled={actionBusy} onClick={() => void issueOtp()}>
                     {actionBusy ? "Issuing code…" : canIssueHubPickup ? "Issue hub pickup code" : "Issue hub drop-off code"}
                   </button>
@@ -274,6 +293,14 @@ export default function AssignmentDetailPage() {
                 >
                   <span>{eventText(e)}</span>
                   <p>{data.volunteer ?? "Assignment activity recorded"}</p>
+                  {e.type === "hub_received" && Array.isArray(e.payload?.items) && (
+                    <p>{(e.payload.items as Array<Record<string, unknown>>).map((item) =>
+                      `${label(String(item.item_type ?? "item"))}: ${item.counted_qty ?? 0}/${item.expected_qty ?? 0} ${item.unit ?? "kit"}`,
+                    ).join(" · ")}</p>
+                  )}
+                  {e.type === "incident_opened" && typeof e.payload?.incident_id === "string" && (
+                    <Link to={`/incidents/${e.payload.incident_id}`}>Review incident →</Link>
+                  )}
                   <time>{dateTime(e.createdAt)}</time>
                 </li>
               ))}

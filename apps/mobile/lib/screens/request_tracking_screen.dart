@@ -534,26 +534,14 @@ class _RequestTrackingScreenState extends State<RequestTrackingScreen> {
                         ),
                       ),
                     ),
-                    IconButton(
-                      onPressed: _refreshing ? null : _refreshTracking,
-                      tooltip: 'Refresh tracking status',
-                      icon: _refreshing
-                          ? const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(
-                              Icons.refresh_rounded,
-                              color: appTeal,
-                              size: 20,
-                            ),
-                    ),
                   ],
                 ),
               ),
               Expanded(
-                child: ListView(
+                child: RefreshIndicator(
+                  onRefresh: () => _refreshTracking(),
+                  child: ListView(
+                    physics: const AlwaysScrollableScrollPhysics(),
                   padding: const EdgeInsets.fromLTRB(24, 10, 24, 24),
                   children: [
                     Row(
@@ -624,7 +612,7 @@ class _RequestTrackingScreenState extends State<RequestTrackingScreen> {
                       _TrackingMessage(
                         message: _refreshing
                             ? 'Loading tracking details from the server…'
-                            : 'Tracking details are unavailable. Use refresh to try again.',
+                            : 'Tracking details are unavailable. Pull down to try again.',
                       )
                     else
                       _JourneyCard(
@@ -647,6 +635,7 @@ class _RequestTrackingScreenState extends State<RequestTrackingScreen> {
                       isDonation: request.isDonation,
                     ),
                   ],
+                ),
                 ),
               ),
             ],
@@ -919,7 +908,7 @@ class _VolunteerLocationMap extends StatelessWidget {
         message = 'A tracking token is unavailable for this request.';
       } else if (!trackingLoaded) {
         message =
-            'Could not load live location. Refresh tracking to try again.';
+            'Could not load live location. Pull down to try again.';
       } else if (hasAssignedVolunteer) {
         message =
             'Waiting for the assigned volunteer to share a live location.';

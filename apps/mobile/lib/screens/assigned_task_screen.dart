@@ -78,28 +78,29 @@ class _AssignedTaskScreenState extends State<AssignedTaskScreen> {
                   elevation: 0,
                   title: const Text('Assigned task'),
                 ),
-                body: Center(
-                  child: _loading
-                      ? const CircularProgressIndicator()
-                      : Padding(
-                          padding: const EdgeInsets.all(24),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                _error ?? 'Could not load your assigned task.',
-                                textAlign: TextAlign.center,
-                                style: const TextStyle(color: appMuted),
-                              ),
-                              const SizedBox(height: 12),
-                              OutlinedButton.icon(
-                                onPressed: _loadAssignment,
-                                icon: const Icon(Icons.refresh_rounded),
-                                label: const Text('Try again'),
-                              ),
-                            ],
-                          ),
+                body: RefreshIndicator(
+                  onRefresh: _loadAssignment,
+                  child: ListView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    children: [
+                      SizedBox(
+                        height: MediaQuery.sizeOf(context).height * 0.65,
+                        child: Center(
+                          child: _loading
+                              ? const CircularProgressIndicator()
+                              : Padding(
+                                  padding: const EdgeInsets.all(24),
+                                  child: Text(
+                                    _error ??
+                                        'Could not load your assigned task.',
+                                    textAlign: TextAlign.center,
+                                    style: const TextStyle(color: appMuted),
+                                  ),
+                                ),
                         ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
       );
