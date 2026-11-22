@@ -1,6 +1,16 @@
+
 # Contract and backend changelog
 
 Newest first. Anything that changes a payload, table, function or seed behaviour gets a line here.
+
+## 2026-11-22 (server-side route preview for offers)
+
+- **Why:** before a driver accepts, `my_offers` and `assignments/detail` show only an approximate position and never the hub, so the app could not preview the full route. The preview is now built on the server from exact points.
+- **Migration `20261122170000_offer_route_points.sql`:** new `offer_route_points(p_user, p_id)`, **service role only** (revoked from anon and authenticated, because it returns exact coordinates). Same visibility rule as `my_assignment_detail`: an open eligible offer, or your own unfinished assignment; anything else is `not_found`. Returns `{ kind, assignment_type, points[] }` in driving order after the driver: donation donor then hub, resource request hub then requester, other kinds the requester. The hub is read live from `app_settings` `central_inventory`, not from `route_snapshot`, so it is correct even for offers created before the hub moved. Errors `unauthorized | forbidden | not_found | hub_not_configured`. Tested on a scratch PostgreSQL with 14 access cases. That test found and fixed a NULL bug: on an open offer `volunteer_id` is null, and an unguarded check let wrong-tier and declined volunteers through; the whole check is now wrapped in `coalesce(..., false)`.
+- **New Edge Function `get-offer-route`** (`POST`, volunteer JWT): body `{ id, lat, lng, costing? }`. Calls `offer_route_points`, sends driver + points to Valhalla, and returns only `{ kind, assignment_type, costing, shape_precision, summary, legs: [{ to, shape, length, time }] }`. No coordinates of the donor, requester or hub, no street names, no steps; nothing is saved; Valhalla's error text is never returned. Shape encoding is polyline precision 5, the same as `get-route`. Type-checked with Deno and run against a mocked database and routing service (11 cases).
+- **Unchanged:** `get-route`, `my_offers`, `my_assignment_detail`, `route_snapshot`, `scripts/check_function_privileges.sql` (a service-role-only function needs no allow-list entry).
+- **Deploy:** `supabase db push`, then `supabase functions deploy get-offer-route`. Uses the same `VALHALLA_URL`, `VALHALLA_CLIENT_ID` and `VALHALLA_PROXY_SECRET` as `get-route`. Run `scripts/check_function_privileges.sql` afterwards.
+- **App:** call it when the volunteer opens an offer, with the phone's GPS position, and draw every leg. Not rate limited beyond the Valhalla timeout.
 
 ## 2026-11-22 (public map shows completed work only)
 
