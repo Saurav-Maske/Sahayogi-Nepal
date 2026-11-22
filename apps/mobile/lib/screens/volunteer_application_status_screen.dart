@@ -128,10 +128,11 @@ class _VolunteerApplicationStatusScreenState
         ),
       ),
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(24, 28, 24, 24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+        child: RefreshIndicator(
+          onRefresh: _refreshStatus,
+          child: ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.fromLTRB(24, 28, 24, 24),
             children: [
               Container(
                 width: 76,
@@ -233,16 +234,6 @@ class _VolunteerApplicationStatusScreenState
                             height: 17,
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
-                        else if (!_isRejected && !_isApproved)
-                          IconButton(
-                            tooltip: 'Refresh status',
-                            onPressed: _refreshStatus,
-                            visualDensity: VisualDensity.compact,
-                            icon: const Icon(
-                              Icons.refresh_rounded,
-                              color: appTeal,
-                            ),
-                          ),
                       ],
                     ),
                     const Divider(height: 20),
@@ -263,7 +254,7 @@ class _VolunteerApplicationStatusScreenState
                   ],
                 ),
               ),
-              const Spacer(),
+              const SizedBox(height: 28),
               if (_isRejected)
                 SizedBox(
                   height: 52,
@@ -279,22 +270,6 @@ class _VolunteerApplicationStatusScreenState
                         borderRadius: BorderRadius.circular(15),
                       ),
                     ),
-                  ),
-                ),
-              if (!_isRejected && !_isApproved)
-                SizedBox(
-                  height: 52,
-                  child: OutlinedButton(
-                    onPressed: _isRefreshing ? null : _refreshStatus,
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: appNavy,
-                      backgroundColor: Colors.white,
-                      side: const BorderSide(color: Color(0xFFE0E6EC)),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(15),
-                      ),
-                    ),
-                    child: const Text('Check status'),
                   ),
                 ),
               if (_isApproved)

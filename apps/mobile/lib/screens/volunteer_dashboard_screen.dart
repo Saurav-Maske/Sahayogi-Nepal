@@ -230,7 +230,10 @@ class _VolunteerDashboardScreenState extends State<VolunteerDashboardScreen> {
         child: Scaffold(
           backgroundColor: appPaper,
           body: SafeArea(
-            child: ListView(
+            child: RefreshIndicator(
+              onRefresh: _loadDashboard,
+              child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
               padding: const EdgeInsets.fromLTRB(24, 18, 24, 24),
               children: [
                 Row(
@@ -349,7 +352,6 @@ class _VolunteerDashboardScreenState extends State<VolunteerDashboardScreen> {
                 if (_loadError != null) ...[
                   _DashboardMessage(
                     message: _loadError!,
-                    onRetry: _loadDashboard,
                   ),
                   const SizedBox(height: 12),
                 ],
@@ -395,6 +397,7 @@ class _VolunteerDashboardScreenState extends State<VolunteerDashboardScreen> {
                     style: const TextStyle(color: appMuted, fontSize: 11),
                   ),
               ],
+            ),
             ),
           ),
           bottomNavigationBar: _VolunteerNavigationBar(
@@ -525,10 +528,9 @@ class _NextMissionCard extends StatelessWidget {
 }
 
 class _DashboardMessage extends StatelessWidget {
-  const _DashboardMessage({required this.message, required this.onRetry});
+  const _DashboardMessage({required this.message});
 
   final String message;
-  final VoidCallback onRetry;
 
   @override
   Widget build(BuildContext context) => Container(
@@ -545,7 +547,6 @@ class _DashboardMessage extends StatelessWidget {
                 style: const TextStyle(color: appNavy, fontSize: 12),
               ),
             ),
-            TextButton(onPressed: onRetry, child: const Text('Retry')),
           ],
         ),
       );

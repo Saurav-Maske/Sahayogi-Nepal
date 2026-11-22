@@ -36,6 +36,7 @@ class _VolunteerAssignmentScreenState extends State<VolunteerAssignmentScreen> {
   bool _loading = true;
   bool _claiming = false;
   bool _loadingPreviewRoute = false;
+  DateTime? _lastPreviewRouteAt;
   List<LatLng> _previewRoute = const [];
   String? _error;
 
@@ -62,12 +63,19 @@ class _VolunteerAssignmentScreenState extends State<VolunteerAssignmentScreen> {
       }
     });
     await _syncLocationUpdates();
-    if (!_isMine) await _loadPreviewRoute();
+    if (!_isMine || _activeRouteLegIndex != null) {
+      await _loadPreviewRoute();
+    } else {
+      setState(() => _previewRoute = const []);
+    }
   }
 
   Future<void> _loadPreviewRoute() async {
+    final activeLegIndex = _isMine ? _activeRouteLegIndex : null;
     final destination = _previewDestination;
-    if (destination == null) return;
+    if (activeLegIndex == null && destination == null) return;
+    _lastPreviewRouteAt = DateTime.now();
+    if (mounted) setState(() => _previewRoute = const []);
     if (mounted) setState(() => _loadingPreviewRoute = true);
     try {
       if (!await Geolocator.isLocationServiceEnabled()) return;
@@ -81,18 +89,29 @@ class _VolunteerAssignmentScreenState extends State<VolunteerAssignmentScreen> {
           accuracy: LocationAccuracy.high,
         ),
       );
-      final result = await Api.getVolunteerRoutePreview(
-        originLatitude: origin.latitude,
-        originLongitude: origin.longitude,
-        destinationLatitude: destination.latitude,
-        destinationLongitude: destination.longitude,
-      );
+      final result = activeLegIndex != null
+          ? await Api.getVolunteerAssignmentRoute(
+              id: widget.assignmentId,
+              latitude: origin.latitude,
+              longitude: origin.longitude,
+            )
+          : await Api.getVolunteerRoutePreview(
+              originLatitude: origin.latitude,
+              originLongitude: origin.longitude,
+              destinationLatitude: destination!.latitude,
+              destinationLongitude: destination.longitude,
+            );
       if (!mounted || !result.ok || result.data == null) return;
       final precision = (result.data!['shape_precision'] as num?)?.toInt() ?? 6;
       final points = <LatLng>[];
       final legs = result.data!['legs'];
       if (legs is List && legs.isNotEmpty) {
-        for (final leg in legs.whereType<Map>()) {
+        final selectedLegs = activeLegIndex == null
+            ? legs.whereType<Map>()
+            : activeLegIndex < legs.length && legs[activeLegIndex] is Map
+                ? [legs[activeLegIndex] as Map]
+                : const <Map>[];
+        for (final leg in selectedLegs) {
           final shape = leg['shape']?.toString() ?? '';
           final legPoints = _decodePolyline(shape, precision: precision);
           if (points.isNotEmpty &&
@@ -207,6 +226,14 @@ class _VolunteerAssignmentScreenState extends State<VolunteerAssignmentScreen> {
   bool get _isPickup => _assignment['assignment_type'] == 'pickup';
   bool get _isDelivery => _assignment['assignment_type'] == 'delivery';
 
+  int? get _activeRouteLegIndex {
+    final state = '${_assignment['state'] ?? ''}';
+    if (!_isMine || (!_isDelivery && !_isPickup)) return null;
+    if (state == 'en_route_to_pickup') return 0;
+    if (state == 'picked_up' || state == 'en_route_to_destination') return 1;
+    return null;
+  }
+
   Future<void> _syncLocationUpdates() async {
     final state = '${_assignment['state'] ?? ''}';
     final isTravelling = _isMine &&
@@ -242,6 +269,14 @@ class _VolunteerAssignmentScreenState extends State<VolunteerAssignmentScreen> {
             longitude: position.longitude,
           ),
         );
+        final now = DateTime.now();
+        final lastRouteAt = _lastPreviewRouteAt;
+        if (_activeRouteLegIndex != null &&
+            !_loadingPreviewRoute &&
+            (lastRouteAt == null ||
+                now.difference(lastRouteAt) >= const Duration(seconds: 60))) {
+          unawaited(_loadPreviewRoute());
+        }
       });
     } catch (_) {
       // The assignment details and progress controls still work without GPS.
@@ -547,6 +582,9 @@ class _VolunteerAssignmentScreenState extends State<VolunteerAssignmentScreen> {
           .toList();
 
   List<LatLng> get _route {
+    if (_isMine && (_isDelivery || _isPickup)) {
+      return _activeRouteLegIndex != null ? _previewRoute : const [];
+    }
     final savedRoute = (_assignment['route'] as List? ?? const [])
         .whereType<Map>()
         .map((point) {
@@ -586,9 +624,9 @@ class _VolunteerAssignmentScreenState extends State<VolunteerAssignmentScreen> {
     final previewDestination = _previewDestination;
     final routePoints = _route.isNotEmpty
         ? _route
-        : previewDestination == null
-            ? const <LatLng>[]
-            : [previewDestination];
+        : !_isMine && previewDestination != null
+            ? [previewDestination]
+            : const <LatLng>[];
     final title = _title(type);
     final quantities = _items
         .map((item) {
@@ -620,18 +658,14 @@ class _VolunteerAssignmentScreenState extends State<VolunteerAssignmentScreen> {
           foregroundColor: appNavy,
           elevation: 0,
           title: Text(_isMine ? 'Assigned task' : 'Volunteer opportunity'),
-          actions: [
-            IconButton(
-              tooltip: 'Refresh task',
-              onPressed: _loading ? null : _refresh,
-              icon: const Icon(Icons.refresh_rounded),
-            ),
-          ],
         ),
         body: SafeArea(
           child: _loading && _assignment.isEmpty
               ? const Center(child: CircularProgressIndicator())
-              : ListView(
+              : RefreshIndicator(
+                  onRefresh: _refresh,
+                  child: ListView(
+                    physics: const AlwaysScrollableScrollPhysics(),
                   padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
                   children: [
                     if (_error != null)
@@ -684,10 +718,19 @@ class _VolunteerAssignmentScreenState extends State<VolunteerAssignmentScreen> {
                         border: true,
                       ),
                     ],
-                    if (routePoints.isNotEmpty) ...[
+                    if (routePoints.isNotEmpty ||
+                        (_isMine && _activeRouteLegIndex != null)) ...[
                       const SizedBox(height: 18),
                       Text(
-                        _isMine ? 'Task route' : 'Destination route preview',
+                        _isMine
+                            ? state == 'en_route_to_pickup'
+                                ? _isDelivery
+                                    ? 'Route to hub'
+                                    : 'Route to donor'
+                                : _isDelivery
+                                    ? 'Route to requested destination'
+                                    : 'Route to hub'
+                            : 'Destination route preview',
                         style: TextStyle(
                           color: appNavy,
                           fontSize: 18,
@@ -700,9 +743,10 @@ class _VolunteerAssignmentScreenState extends State<VolunteerAssignmentScreen> {
                           padding: EdgeInsets.only(bottom: 8),
                           child: LinearProgressIndicator(),
                         ),
-                      SizedBox(
-                        height: 220,
-                        child: ClipRRect(
+                      if (routePoints.isNotEmpty)
+                        SizedBox(
+                          height: 220,
+                          child: ClipRRect(
                           borderRadius: BorderRadius.circular(18),
                           child: FlutterMap(
                             mapController: _mapController,
@@ -750,8 +794,15 @@ class _VolunteerAssignmentScreenState extends State<VolunteerAssignmentScreen> {
                               ),
                             ],
                           ),
+                          ),
+                        )
+                      else
+                        _InfoBox(
+                          text: _loadingPreviewRoute
+                              ? 'Loading the next route from the server…'
+                              : 'Route preview is unavailable. Pull down to try again.',
+                          color: const Color(0xFFE8F0F4),
                         ),
-                      ),
                     ] else if (!_isMine) ...[
                       const SizedBox(height: 10),
                       Text(
@@ -783,6 +834,7 @@ class _VolunteerAssignmentScreenState extends State<VolunteerAssignmentScreen> {
                       _progressActions(state),
                   ],
                 ),
+              ),
         ),
       ),
     );
