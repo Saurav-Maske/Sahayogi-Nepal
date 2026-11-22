@@ -29,19 +29,12 @@ export interface ActivityItem {
   href: string;
 }
 
-export interface LowStockAlert {
-  item: string;
-  available: number;
-  threshold: number;
-  unit: string;
-}
-
 export interface DashboardData {
   stats: DashboardStats;
   byCategory: ChartPoint[];
   fulfilledOverTime: ChartPoint[];
   activity: ActivityItem[];
-  attention: { quantityDiscrepancies: number; lowStock: LowStockAlert | null };
+  attention: { quantityDiscrepancies: number };
   updatedAt: string; // ISO
   source: 'live';
 }

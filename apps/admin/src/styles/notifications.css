@@ -93,16 +93,6 @@
 .notification-copy strong { font-size: 12px; line-height: 18px; font-weight: 600; color: var(--navy); }
 .notification-detail { margin-top: 2px; font-size: 11px; line-height: 16px; color: var(--muted); }
 
-.notification-unread-dot {
-  flex: none;
-  width: 8px;
-  height: 8px;
-  margin: 6px 4px 0 auto;
-  border-radius: 50%;
-  background: var(--blue);
-}
-.notification-item.is-unread .notification-copy strong { font-weight: 700; }
-
 .notification-empty { padding: 24px 18px; font-size: 12px; color: var(--muted); }
 
 /* ---------- responsive (same breakpoints as admin) ---------- */

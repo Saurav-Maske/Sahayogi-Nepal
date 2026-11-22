@@ -62,7 +62,6 @@ export default function AnalyticsPage() {
         </div>
         <div className="page__actions">
           <button className="btn btn--ghost" onClick={() => exportCsv(data)}>Export CSV</button>
-          <button className="btn btn--ghost" onClick={reload}>Refresh</button>
           <QuickAction />
         </div>
       </div>
@@ -72,10 +71,10 @@ export default function AnalyticsPage() {
           note={`Across ${k.districtsCovered} districts`} />
         <StatCard to="/volunteers" label="Volunteer hours" value={k.volunteerHours ?? '—'}
           note={vh.note || (k.volunteerHours === null ? 'Not tracked yet' : 'All time')} tone={vh.tone} />
-        <StatCard to="/assignments" label="Delivery success" value={`${k.deliverySuccessPct}%`}
-          note={`Across ${k.completedJobs} completed jobs`} />
-        <StatCard to="/requests" label="Average approval" value={`${k.avgApprovalHours} hrs`}
-          note={ap.note || 'Request to approval'} tone={ap.tone} />
+        <StatCard to="/assignments" label="Delivery success" value={k.deliverySuccessPct === null ? '—' : `${k.deliverySuccessPct}%`}
+          note={k.deliverySuccessPct === null ? 'No delivery outcomes in backend data' : `Across ${k.completedJobs} completed or failed jobs`} />
+        <StatCard to="/requests" label="Average approval" value={k.avgApprovalHours === null ? '—' : `${k.avgApprovalHours} hrs`}
+          note={k.avgApprovalHours === null ? 'No approved requests in backend data' : ap.note || 'Request to approval'} tone={ap.tone} />
       </div>
 
       <div className="grid-charts">

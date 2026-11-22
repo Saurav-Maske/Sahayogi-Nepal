@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import QuickAction from '../components/dashboard/QuickAction';
+import AdminDialog from '../components/overlay/AdminDialog';
+import FeedbackDialog from '../components/overlay/FeedbackDialog';
 import StatusBadge from '../components/requests/StatusBadge';
 import { useRequest } from '../hooks/useRequests';
 import { reviewRequest } from '../services/requestsService';
@@ -50,10 +52,11 @@ export default function RequestReviewPage() {
 
   const [qtys, setQtys] = useState<Record<string, number>>({});
   const [notes, setNotes] = useState('');
-  const [declining, setDeclining] = useState(false);
+  const [confirming, setConfirming] = useState<'approve' | 'decline' | null>(null);
   const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<{ title: string; message: string } | null>(null);
 
   useEffect(() => {
     if (!r) return;
@@ -80,7 +83,8 @@ export default function RequestReviewPage() {
     setActionError(null);
     try {
       await reviewRequest(r.id, decision, r.items.map((i) => ({ item_id: i.id, qty: qtys[i.id] ?? 0 })), decision === 'decline' ? reason.trim() : notes.trim());
-      setDeclining(false);
+      setConfirming(null);
+      setFeedback({ title: decision === 'approve' ? 'Request approved' : 'Request declined', message: `${r.publicRef} · ${r.requesterName}. The request status has been updated.` });
       reload();
     } catch (e: any) {
       setActionError(e?.message ?? 'Something went wrong. Please try again.');
@@ -155,25 +159,11 @@ export default function RequestReviewPage() {
             <p>Reserve and record an inventory movement when an assignment is confirmed.</p>
           </div>
 
-          {declining && (
-            <label className="qty">
-              <span className="qty__title">Reason for declining (required)</span>
-              <textarea rows={2} value={reason} onChange={(e) => setReason(e.target.value)} autoFocus />
-            </label>
-          )}
-          {actionError && <p className="auth-error" role="alert">{actionError}</p>}
-
           <div className="review__actions">
-            {pending && !declining && (
+            {pending && (
               <>
-                <button className="btn btn--primary" disabled={busy || total <= 0} onClick={() => run('approve')}>{busy ? 'Saving…' : 'Approve request'}</button>
-                <button className="btn btn--danger" disabled={busy} onClick={() => setDeclining(true)}>Decline</button>
-              </>
-            )}
-            {pending && declining && (
-              <>
-                <button className="btn btn--danger" disabled={busy || !reason.trim()} onClick={() => run('decline')}>{busy ? 'Saving…' : 'Confirm decline'}</button>
-                <button className="btn" disabled={busy} onClick={() => setDeclining(false)}>Cancel</button>
+                <button className="btn btn--primary" disabled={busy || total <= 0} onClick={() => { setActionError(null); setConfirming('approve'); }}>Approve request</button>
+                <button className="btn btn--danger" disabled={busy} onClick={() => { setActionError(null); setConfirming('decline'); }}>Decline</button>
               </>
             )}
             {approved && <button className="btn btn--primary" onClick={() => navigate(`/assignments?request=${r.id}`)}>Assign volunteer</button>}
@@ -181,6 +171,25 @@ export default function RequestReviewPage() {
           </div>
         </section>
       </div>
+      <AdminDialog
+        open={confirming !== null}
+        title={confirming === 'approve' ? `Approve request ${r.publicRef}?` : 'Decline this request?'}
+        description={confirming === 'approve'
+          ? `${r.requesterName} · ${r.items.map((item) => `${qtys[item.id] ?? 0} ${humanize(item.itemType)}`).join(' and ')}. Approval does not reserve or dispatch stock.`
+          : 'A clear reason is required and will be shared with the requester.'}
+        onClose={() => !busy && setConfirming(null)}
+        actions={confirming === 'approve' ? [
+          { label: busy ? 'Approving…' : 'Approve request', variant: 'primary', disabled: busy || total <= 0, onClick: () => void run('approve') },
+          { label: 'Cancel', onClick: () => setConfirming(null), disabled: busy },
+        ] : confirming === 'decline' ? [
+          { label: busy ? 'Declining…' : 'Decline request', variant: 'danger', disabled: busy || reason.trim().length < 2, onClick: () => void run('decline') },
+          { label: 'Cancel', onClick: () => setConfirming(null), disabled: busy },
+        ] : []}
+      >
+        {confirming === 'decline' && <label className="admin-dialog__field"><span>Decline reason</span><textarea rows={3} value={reason} onChange={(event) => setReason(event.target.value)} autoFocus/><small>Required · Keep the reason concise and respectful.</small></label>}
+        {actionError && <p className="admin-dialog__error" role="alert">{actionError}</p>}
+      </AdminDialog>
+      <FeedbackDialog feedback={feedback} onClose={() => setFeedback(null)} />
     </>
   );
 }

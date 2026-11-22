@@ -104,3 +104,31 @@ a.btn { display: inline-flex; align-items: center; justify-content: center; }
 
 @media (max-width: 1000px) { .filters { grid-template-columns: 1fr 1fr; } .review { grid-template-columns: 1fr; } }
 @media (max-width: 520px) { .filters { grid-template-columns: 1fr; } .drawer { padding: 24px 18px; } }
+
+/* Shared request, donation and volunteer patterns: donations */
+/* Donation detail extras. The rest comes from requests.css and admin.css. */
+.records { margin-top: 16px; display: flex; flex-direction: column; gap: 12px; font-size: 13px; line-height: 20px; }
+.records__item strong { color: var(--navy); }
+.records__item p { margin: 0; }
+.driver { font-size: 13px; line-height: 20px; margin: 0; }
+.donation-timeline { margin-top: 22px; }
+.saved { margin-top: 12px; font-size: 12px; color: var(--good); }
+
+/* Shared request, donation and volunteer patterns: volunteers */
+/* Volunteer pages. The rest comes from requests.css and admin.css. */
+.filters--three { grid-template-columns: 1.6fr 1fr 1fr; }
+@media (max-width: 1000px) { .filters--three { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 520px) { .filters--three { grid-template-columns: 1fr; } }
+
+.contact { font-size: 13px; line-height: 22px; margin: 16px 0 0; }
+.stats-lines p { margin: 0; font-size: 13px; line-height: 22px; }
+.note-readonly { display: block; margin-top: 6px; font-size: 13px; }
+
+.doc { background: #eaf1f7; border-radius: 10px; padding: 18px; margin-top: 14px; }
+.doc__title { font-size: 14px; font-weight: 600; color: var(--navy); margin: 0 0 8px; }
+.doc__text { font-size: 11px; color: var(--muted); margin: 0 0 12px; }
+.doc__demo { font-size: 15px; font-weight: 700; color: var(--muted); letter-spacing: .04em; padding: 60px 0; text-align: center; }
+.doc .btn:disabled { opacity: .5; }
+
+.doc-preview { overflow: auto; min-height: 200px; max-height: 62vh; display: grid; place-items: center; border-radius: 10px; background: #eef3f7; }
+.doc-preview img { display: block; max-width: 100%; max-height: 62vh; object-fit: contain; user-select: none; -webkit-user-drag: none; }

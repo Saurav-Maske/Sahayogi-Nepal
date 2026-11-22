@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import AdminDialog from '../overlay/AdminDialog';
 import { getDocumentUrl } from '../../services/volunteersService';
 
 interface Props { title: string; path: string | null }
@@ -21,36 +22,20 @@ export default function DocumentCard({ title, path }: Props) {
     return () => { off = true; };
   }, [open, path]);
 
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false);
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
-  }, [open]);
-
   return (
     <div className="doc">
       <h3 className="doc__title">{title}</h3>
       <p className="doc__text">{path ? 'Photo on file. Open secure preview to verify the original.' : 'Not uploaded.'}</p>
       <button className="btn" disabled={!path} onClick={() => setOpen(true)}>Open secure preview</button>
 
-      {open && (
-        <>
-          <div className="drawer__scrim" onClick={() => setOpen(false)} />
-          <div className="modal" role="dialog" aria-modal="true" aria-label={title}>
-            <div className="modal__head">
-              <strong>{title}</strong>
-              <button className="btn" onClick={() => setOpen(false)}>Close</button>
-            </div>
-            <div className="modal__body" onContextMenu={(e) => e.preventDefault()}>
-              {busy && <p className="empty">Requesting secure link…</p>}
-              {err && <p className="auth-error" role="alert">{err}</p>}
-              {url && <img src={url} alt={title} draggable={false} />}
-            </div>
-            <p className="modal__foot">The link expires after 60 seconds. Do not share or save this document.</p>
-          </div>
-        </>
-      )}
+      <AdminDialog open={open} title={title} description="Restricted access · A fresh, short-lived link is used for each preview." size="wide" onClose={() => setOpen(false)} actions={[{ label: 'Close preview', onClick: () => setOpen(false) }]}>
+        <div className="doc-preview" onContextMenu={(e) => e.preventDefault()}>
+          {busy && <p className="empty">Requesting secure link…</p>}
+          {err && <p className="auth-error" role="alert">{err}</p>}
+          {url && <img src={url} alt={title} draggable={false} />}
+        </div>
+        <p className="admin-dialog__note">The link expires after 60 seconds. Do not share or save this document.</p>
+      </AdminDialog>
     </div>
   );
 }

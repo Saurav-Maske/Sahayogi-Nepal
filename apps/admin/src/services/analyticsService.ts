@@ -82,9 +82,9 @@ export async function getAnalyticsData(): Promise<AnalyticsData> {
           districtsCovered: new Set(fulfilled.map((r) => r.district_id).filter((d) => d != null)).size,
           volunteerHours: null, // not tracked in the schema yet
           volunteerHoursChangePct: null,
-          deliverySuccessPct: delivered + failed ? Math.round((delivered / (delivered + failed)) * 1000) / 10 : 0,
+          deliverySuccessPct: delivered + failed ? Math.round((delivered / (delivered + failed)) * 1000) / 10 : null,
           completedJobs: delivered,
-          avgApprovalHours: hrs.length ? Math.round((hrs.reduce((a, b) => a + b, 0) / hrs.length) * 10) / 10 : 0,
+          avgApprovalHours: hrs.length ? Math.round((hrs.reduce((a, b) => a + b, 0) / hrs.length) * 10) / 10 : null,
           avgApprovalChangeMin: null,
         };
       })(),

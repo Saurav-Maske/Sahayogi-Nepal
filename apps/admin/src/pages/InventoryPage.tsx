@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import QuickAction from '../components/dashboard/QuickAction';
+import EmptyState from '../components/feedback/EmptyState';
+import FeedbackNotice from '../components/feedback/FeedbackNotice';
 import OperationsMapPreview from '../components/map/OperationsMapPreview';
+import AdminDialog from '../components/overlay/AdminDialog';
+import FeedbackDialog from '../components/overlay/FeedbackDialog';
 import { importStock, availableQty, listLots, prettyPhase, type Lot } from '../services/inventoryService';
 import '../styles/inventory.css';
 
@@ -18,11 +22,14 @@ export default function InventoryPage() {
   const [error, setError] = useState('');
   const [showAdd, setShowAdd] = useState(false);
   const [showMapPreview, setShowMapPreview] = useState(false);
-  const [addName, setAddName] = useState('');
-  const [addQty, setAddQty] = useState('');
-  const [addUnit, setAddUnit] = useState('');
+  const [savingAdd, setSavingAdd] = useState(false);
+  const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
+  const [quantities, setQuantities] = useState<Record<string, string>>({});
+  const [units, setUnits] = useState<Record<string, string>>({});
+  const [addProvider, setAddProvider] = useState('');
+  const [addContact, setAddContact] = useState('');
   const [addNote, setAddNote] = useState('');
-  const [toast, setToast] = useState('');
+  const [feedback, setFeedback] = useState<{ title: string; message: string } | null>(null);
 
   const refresh = useCallback(() => {
     setLoading(true);
@@ -36,19 +43,22 @@ export default function InventoryPage() {
     && (!query || `${itemName(lot.itemType)} ${lot.provider ?? ''} ${lot.sourceRequest ?? ''} ${inventoryId(lot.id)}`.toLowerCase().includes(query.toLowerCase()))), [lots, category, query]);
 
   async function addItem() {
-    const quantity = Number(addQty);
-    if (!addName || !Number.isFinite(quantity) || quantity <= 0) { setError('Choose an item type and enter a quantity greater than zero.'); return; }
+    const invalid = selectedTypes.length === 0 || selectedTypes.some((type) => !Number.isFinite(Number(quantities[type])) || Number(quantities[type]) <= 0 || !units[type]?.trim());
+    if (invalid) { setError('Choose at least one resource, then enter a valid quantity and unit for each.'); return; }
     setError('');
+    setSavingAdd(true);
     try {
-      await importStock([{ item_type: addName, qty: quantity, unit: addUnit, condition_note: addNote || null, phase: 'received' }]);
-      setShowAdd(false); setShowMapPreview(false); setAddName(''); setAddQty(''); setAddUnit(''); setAddNote(''); setToast('Inventory lot added.'); refresh();
+      await importStock(selectedTypes.map((type) => ({ item_type: type, qty: Number(quantities[type]), unit: units[type].trim(), provider_name: addProvider || null, provider_contact: addContact || null, condition_note: addNote || null, phase: 'received' })));
+      const summary = selectedTypes.map((type) => `${quantities[type]} ${units[type].trim()} of ${itemName(type)}`).join('; ');
+      setShowAdd(false); setShowMapPreview(false); setSelectedTypes([]); setQuantities({}); setUnits({}); setAddProvider(''); setAddContact(''); setAddNote(''); setFeedback({ title: 'Inventory receipt added', message: `${summary} recorded in received stock.` }); refresh();
     } catch (e) { setError(e instanceof Error ? e.message : 'Could not add inventory.'); }
+    finally { setSavingAdd(false); }
   }
 
   return <div className="inventory-page"><header className="page__head"><div><h1>Central inventory</h1><p className="crumbs">Sahayogi Nepal&nbsp; / &nbsp;Central Inventory&nbsp; / &nbsp;All districts</p></div><div className="page__actions"><QuickAction/></div></header>
     <div className="inventory-toolbar"><input placeholder="Search inventory" aria-label="Search inventory" value={query} onChange={(e) => setQuery(e.target.value)}/><select aria-label="Filter category" value={category} onChange={(e) => setCategory(e.target.value)}><option>All</option>{categories.map((value) => <option key={value} value={value}>{itemName(value)}</option>)}</select><button className="btn btn--primary" onClick={() => { setShowAdd(true); setError(''); }}>+ Add inventory</button><Link className="btn" to="/inventory/timeline">Activity timeline</Link></div>
-    <div className="inventory-workflow"><strong>Workflow stage ≠ stock movement</strong><p>Stage changes are audited. Reservations and dispatch quantities are managed by request approval and driver confirmation.</p></div>
-    {error && <p className="inventory-error" role="alert">{error} <button className="btn btn--ghost" onClick={refresh}>Retry</button></p>}{toast && <p className="inventory-toast" role="status">{toast}</p>}
+    <FeedbackNotice variant="info" title="Workflow stage and stock movement are separate" className="inventory-workflow">Stage changes are audited. Reservations and dispatch quantities are managed by request approval and driver confirmation.</FeedbackNotice>
+    {error && !showAdd && <p className="inventory-error" role="alert">{error} <button className="btn btn--ghost" onClick={refresh}>Retry</button></p>}
     {loading ? <p className="empty">Loading inventory…</p> : <div className="inventory-board">{PHASES.map((phase) => {
       const phaseLots = filtered.filter((lot) => lot.phase === phase);
       return <section className="inventory-column" key={phase}><h2>{prettyPhase(phase).toUpperCase()} <span>{phaseLots.length}</span></h2><div className="inventory-column-list">
@@ -61,15 +71,37 @@ export default function InventoryPage() {
         {phase === 'received' && <button className="btn inventory-add-item" onClick={() => { setShowAdd(true); setError(''); }}>+ Add item</button>}
       </div></section>;
     })}</div>}
-    {!loading && !filtered.length && !error && <p className="empty">No inventory matches this search.</p>}
+    {!loading && !filtered.length && !error && <EmptyState title="No inventory found" description="No stock matches these filters. Try another category or search term."/>}
     {!loading && <p className="inventory-live-note">Live inventory data · quantity changes require an audited backend action.</p>}
-    {showAdd && <div className="inventory-modal-backdrop" onMouseDown={(e) => { if (e.target === e.currentTarget) { setShowAdd(false); setShowMapPreview(false); } }}><section className={`inventory-modal${showMapPreview ? ' inventory-modal--map' : ''}`} role="dialog" aria-modal="true" aria-labelledby="add-inventory-title"><button className="inventory-modal-close" onClick={() => { setShowAdd(false); setShowMapPreview(false); }} aria-label="Close">×</button><h2 id="add-inventory-title">Add inventory item</h2>
-      <label>Item type<select value={addName} onChange={(e) => setAddName(e.target.value)}><option value="">Choose item type</option>{ITEM_TYPES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
-      <div className="inventory-modal-row"><label>Quantity<input type="number" min="0.01" step="0.01" value={addQty} onChange={(e) => setAddQty(e.target.value)}/></label><label>Unit<input value={addUnit} maxLength={20} onChange={(e) => setAddUnit(e.target.value)} placeholder="kg, bottles, units"/></label></div>
-      <label>Condition note<input value={addNote} maxLength={300} onChange={(e) => setAddNote(e.target.value)} placeholder="Optional"/></label>
+    <AdminDialog
+      open={showAdd}
+      size={showMapPreview ? 'wide' : 'regular'}
+      title="Add inventory receipt"
+      description="Record physical goods received. A receipt movement and audit entry are created together."
+      onClose={() => { if (!savingAdd) { setShowAdd(false); setShowMapPreview(false); } }}
+      actions={[
+        { label: savingAdd ? 'Saving…' : 'Save inventory item', variant: 'primary', disabled: savingAdd, onClick: () => void addItem() },
+        { label: 'Cancel', disabled: savingAdd, onClick: () => { setShowAdd(false); setShowMapPreview(false); } },
+      ]}
+    >
+      <div className="inventory-dialog-fields">
+        <fieldset className="inventory-category-picker"><legend>Select resources</legend>
+          <div className="inventory-category-picker__options">{ITEM_TYPES.map(([value, label]) => <label key={value} className={selectedTypes.includes(value) ? 'is-selected' : ''}><input type="checkbox" checked={selectedTypes.includes(value)} onChange={(event) => setSelectedTypes((current) => event.target.checked ? [...current, value] : current.filter((item) => item !== value))}/><span>{label}</span></label>)}</div>
+          <small>Select one or more categories. Each selected item has its own quantity and unit.</small>
+        </fieldset>
+        {selectedTypes.length > 0 && <div className="inventory-quantities-list" aria-label="Selected resource quantities">{selectedTypes.map((type) => <div className="inventory-quantity-row" key={type}>
+          <strong>{itemName(type)}</strong>
+          <label className="admin-dialog__field"><span>Quantity</span><input type="number" min="0.01" step="0.01" value={quantities[type] ?? ''} onChange={(e) => setQuantities((current) => ({ ...current, [type]: e.target.value }))} placeholder="Enter quantity"/></label>
+          <label className="admin-dialog__field"><span>Unit</span><input value={units[type] ?? ''} maxLength={20} onChange={(e) => setUnits((current) => ({ ...current, [type]: e.target.value }))} placeholder="kg, bottles, units"/></label>
+        </div>)}</div>}
+        <label className="admin-dialog__field"><span>Provider name</span><input value={addProvider} maxLength={120} onChange={(e) => setAddProvider(e.target.value)} placeholder="Supplier or donor"/><small>Optional source for this receipt.</small></label>
+        <label className="admin-dialog__field"><span>Provider contact</span><input value={addContact} maxLength={120} onChange={(e) => setAddContact(e.target.value)} placeholder="Phone or email"/><small>Restricted to authorised administrators.</small></label>
+        <label className="admin-dialog__field"><span>Condition note</span><input value={addNote} maxLength={300} onChange={(e) => setAddNote(e.target.value)} placeholder="Optional"/></label>
+      </div>
       <button className="btn inventory-map-toggle" type="button" aria-expanded={showMapPreview} onClick={() => setShowMapPreview((visible) => !visible)}>{showMapPreview ? 'Hide live map' : 'Check live map'}</button>
       {showMapPreview && <div className="inventory-map-panel"><p>Your live location and current operations are shown for reference. The stock record does not save a map location.</p><OperationsMapPreview followLiveLocation/></div>}
-      {error && <p className="inventory-error">{error}</p>}<button className="btn btn--primary" onClick={() => void addItem()}>Save inventory item</button>
-    </section></div>}
+      {error && <FeedbackNotice variant="validation" title="Check the inventory details">{error}</FeedbackNotice>}
+    </AdminDialog>
+    <FeedbackDialog feedback={feedback} onClose={() => setFeedback(null)} />
   </div>;
 }

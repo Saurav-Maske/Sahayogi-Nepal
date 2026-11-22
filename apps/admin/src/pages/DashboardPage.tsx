@@ -9,7 +9,7 @@ const time = (iso: string) =>
   new Date(iso).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
 
 export default function DashboardPage() {
-  const { data, loading, refreshing, error, reload } = useDashboard();
+  const { data, loading, error, reload } = useDashboard();
 
   if (error && !data) return <div className="table-msg"><p className="auth-error" role="alert">Couldn’t load the operations overview: {error}</p><button className="btn" onClick={reload}>Try again</button></div>;
 
@@ -35,9 +35,6 @@ export default function DashboardPage() {
           <p className="crumbs">Sahayogi Nepal / Overview / All districts</p>
         </div>
         <div className="page__actions">
-          <button className="btn btn--ghost" onClick={reload} disabled={refreshing}>
-            {refreshing ? 'Refreshing…' : 'Refresh'}
-          </button>
           <QuickAction />
         </div>
       </div>

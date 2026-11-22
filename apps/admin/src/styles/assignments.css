@@ -69,6 +69,7 @@
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 16px;
 }
+.assignment-grid > .admin-empty-state { grid-column: 1 / -1; }
 .assignment-card {
   min-height: 108px;
   padding: 18px 20px;

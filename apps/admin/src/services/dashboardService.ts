@@ -3,8 +3,6 @@ import type { ActivityItem, DashboardData } from '../types/dashboard';
 import { kindLabel, humanize } from '../utils/labels';
 import { hasSession } from '../services/session';
 
-/* ---- business rules: tune here ---- */
-const LOW_STOCK_THRESHOLD = 100; // no threshold column in the schema yet
 const IN_STOCK_PHASES = ['received', 'processing', 'ready_to_ship'];
 const APPROVED_STATUSES = ['approved', 'awaiting_assignment'];
 const ACTIVE_ASSIGNMENT_STATES = ['accepted', 'en_route_to_pickup', 'picked_up', 'en_route_to_destination'];
@@ -73,9 +71,6 @@ async function fetchLive(): Promise<DashboardData> {
     cur.available += (Number(l.quantity) || 0) - (Number(l.reserved_qty) || 0);
     stock.set(l.item_type, cur);
   });
-  const lowest = [...stock].filter(([, v]) => v.available < LOW_STOCK_THRESHOLD)
-    .sort((a, b) => a[1].available - b[1].available)[0];
-
   const byKind = new Map<string, number>();
   kinds.forEach((r) => byKind.set(r.kind, (byKind.get(r.kind) ?? 0) + 1));
 
@@ -117,9 +112,6 @@ async function fetchLive(): Promise<DashboardData> {
     activity: activity.slice(0, 6),
     attention: {
       quantityDiscrepancies: discrepancies,
-      lowStock: lowest
-        ? { item: humanize(lowest[0]), available: Math.round(lowest[1].available), threshold: LOW_STOCK_THRESHOLD, unit: lowest[1].unit }
-        : null,
     },
     updatedAt: new Date().toISOString(),
     source: 'live',

@@ -1,51 +1,83 @@
 import { useEffect, useState } from 'react';
 import QuickAction from '../components/dashboard/QuickAction';
-import { supabase } from '../supabase';
+import FeedbackNotice from '../components/feedback/FeedbackNotice';
+import { useAuth } from '../context/AuthContext';
 import { hasSession } from '../services/session';
+import { supabase } from '../supabase';
 import '../styles/settings.css';
 
-const PREFS_KEY = 'sahayogi-admin-notification-preferences';
-const DISTRICT_KEY = 'sahayogi-admin-default-district';
-const DEFAULT_PREFS = { shortage: true, requests: true, volunteers: true, inventory: true };
-type PrefKey = keyof typeof DEFAULT_PREFS;
+type DistrictConfig = {
+  name?: string;
+  center?: { lat?: number; lng?: number };
+  zoom?: number;
+};
 
 export default function SettingsPage() {
-  const [districts, setDistricts] = useState<string[]>([]);
-  const [district, setDistrict] = useState(() => localStorage.getItem(DISTRICT_KEY) ?? '');
-  const [prefs, setPrefs] = useState(DEFAULT_PREFS);
-  const [saved, setSaved] = useState(false);
-  const [permissionsOpen, setPermissionsOpen] = useState(false);
-  const [districtError, setDistrictError] = useState('');
+  const { profile, profileError, session } = useAuth();
+  const [district, setDistrict] = useState<DistrictConfig | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   useEffect(() => {
-    try { setPrefs({ ...DEFAULT_PREFS, ...JSON.parse(localStorage.getItem(PREFS_KEY) ?? '{}') }); } catch { /* defaults */ }
     let active = true;
     void (async () => {
-      if (!(await hasSession())) { if (active) setDistrictError('Sign in as an administrator to load district settings.'); return; }
-      const { data, error } = await supabase.from('districts').select('name').order('name');
+      if (!(await hasSession())) {
+        if (active) setError('Sign in as an administrator to load backend settings.');
+        if (active) setLoading(false);
+        return;
+      }
+      const { data, error: queryError } = await supabase
+        .from('app_settings')
+        .select('value')
+        .eq('key', 'district')
+        .maybeSingle();
       if (!active) return;
-      if (error) { setDistrictError(error.message); return; }
-      const names = (data ?? []).map((row) => row.name);
-      setDistricts(names);
-      setDistrict((current) => names.includes(current) ? current : (names[0] ?? ''));
+      if (queryError) setError(queryError.message);
+      else if (!data?.value) setError('The backend has no district configuration.');
+      else setDistrict(data.value as DistrictConfig);
+      setLoading(false);
     })();
     return () => { active = false; };
   }, []);
 
-  function save() {
-    localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
-    if (district) localStorage.setItem(DISTRICT_KEY, district);
-    window.dispatchEvent(new Event('sahayogi-notification-preferences'));
-    setSaved(true);
-    window.setTimeout(() => setSaved(false), 2600);
-  }
-  function toggle(key: PrefKey) { setPrefs((current) => ({ ...current, [key]: !current[key] })); setSaved(false); }
+  const center = district?.center;
 
-  return <div className="settings-page"><header className="page__head"><div><h1>Settings &amp; access</h1><p className="crumbs">Sahayogi Nepal&nbsp; / &nbsp;Settings&nbsp; / &nbsp;All districts</p></div><div className="page__actions"><QuickAction/></div></header>
-    <div className="settings-grid"><section className="card access-card"><h2 className="card__title">Access and privacy</h2><dl className="access-list"><div><dt>Admin role</dt><dd>Operations administrator</dd></div><div><dt>Identity documents</dt><dd>Restricted · access recorded</dd></div><div><dt>Exact addresses</dt><dd>Authorised staff only</dd></div><div><dt>Live location</dt><dd>Active assignments only</dd></div></dl><h3>Location retention</h3><p className="retention-copy">Volunteer locations older than 30 minutes are hidden.<br/>Fulfilled requests remain on the map for 12 hours.<br/>Location sharing stops when an assignment ends.</p><button className="btn permission-button" onClick={() => setPermissionsOpen(true)}>Manage permissions</button></section>
-      <section className="card preference-card"><h2 className="card__title">Notification preferences</h2><div className="preference-list">{([['shortage', 'Missing quantity alerts'], ['requests', 'New requests and donations'], ['volunteers', 'Volunteer applications'], ['inventory', 'Low inventory alerts']] as [PrefKey, string][]).map(([key, label]) => <label key={key} className="preference-option"><input type="checkbox" checked={prefs[key]} onChange={() => toggle(key)}/><span>{label}</span></label>)}</div>
-        {districtError && <p className="auth-error" role="alert">{districtError}</p>}<label className="district-setting"><span>Default district</span><select value={district} disabled={!districts.length} onChange={(e) => { setDistrict(e.target.value); setSaved(false); }}><option value="">{districts.length ? 'Choose a district' : 'No districts available'}</option>{districts.map((name) => <option key={name}>{name}</option>)}</select><small>Preferences are saved on this device; server sync is not available yet.</small></label><button className="btn btn--primary save-settings" disabled={!districts.length} onClick={save}>Save preferences</button>{saved && <p className="settings-saved" role="status">Preferences saved on this device.</p>}</section>
+  return <div className="settings-page">
+    <header className="page__head">
+      <div>
+        <h1>Settings &amp; access</h1>
+        <p className="crumbs">Sahayogi Nepal&nbsp; / &nbsp;Settings&nbsp; / &nbsp;Backend configuration</p>
+      </div>
+      <div className="page__actions"><QuickAction/></div>
+    </header>
+    <div className="settings-grid">
+      <section className="card access-card">
+        <h2 className="card__title">Signed-in account</h2>
+        <dl className="access-list">
+          <div><dt>Name</dt><dd>{profile?.full_name || 'Not set in backend profile'}</dd></div>
+          <div><dt>Email</dt><dd>{session?.user.email || 'Unavailable'}</dd></div>
+          <div><dt>Role</dt><dd>{profile?.role || (profileError ? 'Profile unavailable' : 'Loading…')}</dd></div>
+        </dl>
+        {profileError && <FeedbackNotice variant="validation" title="Could not load account profile">{profileError}</FeedbackNotice>}
+        <FeedbackNotice variant="info" title="Permission details are not available here">
+          Sign-in role comes from the backend profile. The backend does not expose a settings screen for changing access permissions or location-retention policy.
+        </FeedbackNotice>
+      </section>
+      <section className="card preference-card">
+        <h2 className="card__title">Backend configuration</h2>
+        {loading && <p className="empty">Loading settings…</p>}
+        {error && <FeedbackNotice variant="validation" title="Backend settings unavailable">{error}</FeedbackNotice>}
+        {district && <>
+          <dl className="access-list settings-config-list">
+            <div><dt>Configured district</dt><dd>{district.name || 'Unnamed district'}</dd></div>
+            {center && <div><dt>Map center</dt><dd>{typeof center.lat === 'number' && typeof center.lng === 'number' ? `${center.lat.toFixed(4)}, ${center.lng.toFixed(4)}` : 'Not configured'}</dd></div>}
+            <div><dt>Map zoom</dt><dd>{typeof district.zoom === 'number' ? district.zoom : 'Not configured'}</dd></div>
+          </dl>
+        </>}
+        <FeedbackNotice variant="info" title="Notification preferences are not backend-backed">
+          There is no backend setting or API for reading or saving notification preferences. The page does not save these choices locally.
+        </FeedbackNotice>
+      </section>
     </div>
-    {permissionsOpen && <div className="settings-modal-backdrop" role="presentation" onMouseDown={(e) => { if (e.target === e.currentTarget) setPermissionsOpen(false); }}><section className="settings-modal" role="dialog" aria-modal="true" aria-labelledby="permission-title"><button className="settings-modal-close" aria-label="Close" onClick={() => setPermissionsOpen(false)}>×</button><h2 id="permission-title">Access permissions</h2><p>Admin access is checked against your signed-in Supabase account. Sensitive volunteer identity documents are available only to authorised admins, and access is recorded.</p><ul><li>Review volunteer applications and documents</li><li>Manage requests, assignments, and incidents</li><li>View exact service addresses for operations</li><li>View live locations only during active assignments</li></ul><p className="settings-modal-note">Permission changes require an administrator account update.</p><button className="btn btn--primary" onClick={() => setPermissionsOpen(false)}>Done</button></section></div>}
   </div>;
 }

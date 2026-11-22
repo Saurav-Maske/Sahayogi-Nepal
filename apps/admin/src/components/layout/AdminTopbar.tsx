@@ -2,14 +2,13 @@ import { FormEvent, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 
 interface Props {
-  notificationCount: number;
   userName: string;
   userRole: string;
   onMenuClick: () => void;
   onSignOut: () => void;
 }
 
-export default function AdminTopbar({ notificationCount, userName, userRole, onMenuClick, onSignOut }: Props) {
+export default function AdminTopbar({ userName, userRole, onMenuClick, onSignOut }: Props) {
   const navigate = useNavigate();
   const [query, setQuery] = useState('');
 
@@ -42,10 +41,7 @@ export default function AdminTopbar({ notificationCount, userName, userRole, onM
 
       <div className="topbar__meta">
         <span className="topbar__date">{today}</span>
-        <Link to="/notifications" className="topbar__notif">
-          Notifications
-          {notificationCount > 0 && <span className="topbar__badge" aria-label={`${notificationCount} unread notifications`} title={`${notificationCount} unread notifications`}>{notificationCount > 99 ? '99+' : notificationCount}</span>}
-        </Link>
+        <Link to="/notifications" className="topbar__notif">Notifications</Link>
         <span className="topbar__user">
           <strong>{userName}</strong> / {userRole}
         </span>

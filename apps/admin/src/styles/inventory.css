@@ -76,59 +76,12 @@
 .inventory-error { margin: 8px 0; font-size: 12px; color: var(--bad); }
 .inventory-toast { margin: 8px 0; font-size: 12px; color: var(--good); }
 
-/* ---------- inventory: modal ---------- */
-.inventory-modal-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 100;
-  display: grid;
-  place-items: center;
-  padding: 20px;
-  background: rgba(23, 59, 87, .45); /* same as .shell__scrim */
-}
-.inventory-modal {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  width: 100%;
-  max-width: 440px;
-  padding: 24px;
-  background: var(--surface);
-  border-radius: var(--radius);
-  box-shadow: 0 8px 24px rgba(23, 59, 87, .12);
-}
-.inventory-modal--map { max-width: 760px; max-height: 90vh; overflow-y: auto; }
+/* ---------- inventory receipt dialog ---------- */
+.inventory-dialog-fields { display: grid; gap: 12px; }
+.inventory-dialog-fields__row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .inventory-map-toggle { align-self: flex-start; }
 .inventory-map-panel > p { margin: 0 0 8px; color: var(--muted); font-size: 11px; line-height: 16px; }
 .inventory-map-panel .operations-map-preview { height: 300px; }
-.inventory-modal h2 { font-size: 17px; line-height: 24px; color: var(--navy); }
-.inventory-modal > label,
-.inventory-modal-row label { flex: 1; display: flex; flex-direction: column; gap: 6px; font-size: 11px; color: var(--muted); }
-.inventory-modal input,
-.inventory-modal select {
-  height: 36px;
-  padding: 0 10px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  font: inherit;
-  font-size: 12px;
-  color: var(--text);
-}
-.inventory-modal-row { display: flex; gap: 12px; }
-.inventory-modal .btn { background: var(--navy); border-color: var(--navy); color: #fff; }
-.inventory-modal-close {
-  position: absolute;
-  top: 10px;
-  right: 12px;
-  border: 0;
-  background: transparent;
-  font-size: 24px;
-  line-height: 1;
-  color: var(--muted);
-  cursor: pointer;
-}
-.inventory-modal-close:hover { color: var(--navy); }
 
 /* ---------- inventory: detail ---------- */
 .inventory-detail-grid {
@@ -231,7 +184,7 @@
 }
 @media (max-width: 520px) {
   .inventory-board { grid-template-columns: 1fr; }
-  .inventory-modal-row { flex-direction: column; }
+  .inventory-dialog-fields__row { grid-template-columns: 1fr; }
   .inventory-toolbar input,
   .inventory-toolbar select,
   .inventory-modal input,
