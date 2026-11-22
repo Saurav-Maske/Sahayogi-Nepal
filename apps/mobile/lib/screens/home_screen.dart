@@ -140,23 +140,6 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            const Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.verified_user_outlined, color: appGold, size: 20),
-                SizedBox(width: 10),
-                Text(
-                  'HERE WHEN YOU NEED US',
-                  style: TextStyle(
-                    color: appGold,
-                    fontSize: 10,
-                    letterSpacing: 1.25,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
             const Text(
               'You’re not alone.\nLet’s find you support.',
               textAlign: TextAlign.center,
@@ -169,15 +152,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
             const SizedBox(height: 10),
-            const Text(
-              'Food, water, medicine and a safer place.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Color(0xFFD1DDE5),
-                fontSize: 13,
-              ),
-            ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 16),
             SizedBox(
               width: double.infinity,
               height: 52,
@@ -290,29 +265,24 @@ class _ActionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Material(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
+        color: Colors.transparent,
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(18),
-          child: Container(
-            height: 101,
-            decoration: BoxDecoration(
-              border: Border.all(color: const Color(0xFFE0E6EC)),
-              borderRadius: BorderRadius.circular(18),
-            ),
-            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 13),
+          borderRadius: BorderRadius.circular(12),
+          child: SizedBox(
+            height: 88,
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(icon, color: appTeal, size: 24),
+                Icon(icon, color: appTeal, size: 25),
+                const SizedBox(height: 9),
                 Text(
-                  label,
+                  label.replaceAll('\n', ' '),
                   textAlign: TextAlign.center,
                   style: const TextStyle(
                     color: appNavy,
                     fontSize: 11,
-                    height: 1.25,
+                    height: 1.2,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -355,7 +325,7 @@ class _NavigationItem extends StatelessWidget {
                 child: Icon(
                   icon,
                   size: 21,
-                  color: selected ? appNavy : appNavy,
+                  color: selected ? appNavy : appMuted,
                 ),
               ),
               const SizedBox(height: 3),

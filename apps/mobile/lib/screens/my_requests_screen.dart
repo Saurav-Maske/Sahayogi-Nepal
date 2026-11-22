@@ -167,16 +167,7 @@ class _MyRequestsScreenState extends State<MyRequestsScreen> {
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(24, 12, 24, 20),
                 children: [
-                  const Text(
-                    'Support, every step.',
-                    style: TextStyle(
-                      color: appNavy,
-                      fontSize: 24,
-                      height: 1.2,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 8),
                   SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
                     child: Row(

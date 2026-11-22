@@ -196,8 +196,7 @@ class _VolunteerRegistrationScreenState
           return;
         }
 
-        final verificationToken =
-            await VolunteerAuthService.verifySignupOtp(
+        final verificationToken = await VolunteerAuthService.verifySignupOtp(
           email: email,
           code: _signupOtpController.text,
         );
@@ -319,16 +318,8 @@ class _VolunteerRegistrationScreenState
                     children: [
                       IconButton(
                         onPressed: () => Navigator.of(context).pop(),
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints.tightFor(
-                          width: 32,
-                          height: 40,
-                        ),
-                        icon: const Icon(
-                          Icons.arrow_back_rounded,
-                          color: appNavy,
-                          size: 22,
-                        ),
+                        tooltip: 'Back',
+                        icon: const Icon(Icons.arrow_back_rounded),
                       ),
                       const SizedBox(width: 8),
                       const Text(
@@ -365,21 +356,7 @@ class _VolunteerRegistrationScreenState
                       ),
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Become a Volunteer and join Nepal’s community\nrelief network.',
-                    style: TextStyle(
-                      color: appMuted,
-                      fontSize: 14,
-                      height: 1.45,
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  const Text(
-                    'Applications are reviewed before volunteer accounts are activated.',
-                    style: TextStyle(color: appMuted, fontSize: 12),
-                  ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 24),
                   _formField(
                     label: 'Full name',
                     hint: 'John Dow',
@@ -470,10 +447,12 @@ class _VolunteerRegistrationScreenState
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(14),
                     child: InkWell(
-                      onTap: _signupOtpSent ? null : () => setState(() {
-                        _agreedToVolunteer = !_agreedToVolunteer;
-                        _agreementError = false;
-                      }),
+                      onTap: _signupOtpSent
+                          ? null
+                          : () => setState(() {
+                                _agreedToVolunteer = !_agreedToVolunteer;
+                                _agreementError = false;
+                              }),
                       borderRadius: BorderRadius.circular(14),
                       child: Container(
                         padding: const EdgeInsets.symmetric(
@@ -492,10 +471,12 @@ class _VolunteerRegistrationScreenState
                           children: [
                             Checkbox(
                               value: _agreedToVolunteer,
-                              onChanged: _signupOtpSent ? null : (value) => setState(() {
-                                _agreedToVolunteer = value ?? false;
-                                _agreementError = false;
-                              }),
+                              onChanged: _signupOtpSent
+                                  ? null
+                                  : (value) => setState(() {
+                                        _agreedToVolunteer = value ?? false;
+                                        _agreementError = false;
+                                      }),
                               activeColor: appNavy,
                             ),
                             const Expanded(
@@ -554,7 +535,9 @@ class _VolunteerRegistrationScreenState
                             width: optionWidth,
                             title: 'Transport Manpower',
                             selected: _transportManpowerSelected,
-                            onTap: _signupOtpSent ? null : _toggleTransportManpower,
+                            onTap: _signupOtpSent
+                                ? null
+                                : _toggleTransportManpower,
                           ),
                           _ContributionOption(
                             width: optionWidth,
