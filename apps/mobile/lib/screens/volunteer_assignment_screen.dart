@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_map_location_marker/flutter_map_location_marker.dart';
-import 'dart:convert';
 
 import 'package:geolocator/geolocator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -89,12 +88,29 @@ List<LatLng> _previewRoute = const [];
         destinationLongitude: destination.longitude,
       );
       if (!mounted || !result.ok || result.data == null) return;
+      final precision = (result.data!['shape_precision'] as num?)?.toInt() ?? 6;
+      final points = <LatLng>[];
       final legs = result.data!['legs'];
-      final shape = result.data!['shape']?.toString() ??
-          (legs is List && legs.isNotEmpty && legs.first is Map
-              ? (legs.first as Map)['shape']?.toString() ?? ''
-              : '');
-      final points = _decodePolyline(shape);
+      if (legs is List && legs.isNotEmpty) {
+        for (final leg in legs.whereType<Map>()) {
+          final shape = leg['shape']?.toString() ?? '';
+          final legPoints = _decodePolyline(shape, precision: precision);
+          if (points.isNotEmpty &&
+              legPoints.isNotEmpty &&
+              points.last.latitude == legPoints.first.latitude &&
+              points.last.longitude == legPoints.first.longitude) {
+            legPoints.removeAt(0);
+          }
+          points.addAll(legPoints);
+        }
+      } else {
+        points.addAll(
+          _decodePolyline(
+            result.data!['shape']?.toString() ?? '',
+            precision: precision,
+          ),
+        );
+      }
       if (points.isNotEmpty) {
         setState(() => _previewRoute = points);
         WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -114,8 +130,10 @@ List<LatLng> _previewRoute = const [];
     }
   }
 
-  List<LatLng> _decodePolyline(String encoded) {
+  List<LatLng> _decodePolyline(String encoded, {int precision = 6}) {
     final points = <LatLng>[];
+    if (precision != 5 && precision != 6) return points;
+    final scale = precision == 5 ? 100000.0 : 1000000.0;
     var index = 0;
     var latitude = 0;
     var longitude = 0;
@@ -140,7 +158,13 @@ List<LatLng> _previewRoute = const [];
         shift += 5;
       } while (value >= 0x20);
       longitude += (result & 1) != 0 ? ~(result >> 1) : (result >> 1);
-      points.add(LatLng(latitude / 1e5, longitude / 1e5));
+      final decodedLatitude = latitude / scale;
+      final decodedLongitude = longitude / scale;
+      if (decodedLatitude < -90 || decodedLatitude > 90 ||
+          decodedLongitude < -180 || decodedLongitude > 180) {
+        return const [];
+      }
+      points.add(LatLng(decodedLatitude, decodedLongitude));
     }
     return points;
   }
@@ -163,10 +187,6 @@ List<LatLng> _previewRoute = const [];
     await preferences.setString(
       'volunteer_active_assignment_id',
       widget.assignmentId,
-    );
-    await preferences.setString(
-      'volunteer_active_assignment',
-      jsonEncode(result.data!),
     );
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -348,10 +368,16 @@ List<LatLng> _previewRoute = const [];
   List<LatLng> get _route {
     final savedRoute = (_assignment['route'] as List? ?? const [])
         .whereType<Map>()
-        .map((point) => LatLng(
-              (point['lat'] as num).toDouble(),
-              (point['lng'] as num).toDouble(),
-            ))
+        .map((point) {
+          final latitude = point['lat'];
+          final longitude = point['lng'];
+          if (latitude is! num || longitude is! num) return null;
+          final lat = latitude.toDouble();
+          final lng = longitude.toDouble();
+          if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return null;
+          return LatLng(lat, lng);
+        })
+        .whereType<LatLng>()
         .toList();
     return savedRoute.isNotEmpty ? savedRoute : _previewRoute;
   }
@@ -360,7 +386,10 @@ List<LatLng> _previewRoute = const [];
     final latitude = _assignment['approx_lat'];
     final longitude = _assignment['approx_lng'];
     if (latitude is! num || longitude is! num) return null;
-    return LatLng(latitude.toDouble(), longitude.toDouble());
+    final lat = latitude.toDouble();
+    final lng = longitude.toDouble();
+    if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return null;
+    return LatLng(lat, lng);
   }
 
   bool get _isMine => _assignment['is_mine'] == true;
@@ -386,6 +415,18 @@ List<LatLng> _previewRoute = const [];
       return '$qty${unit.isEmpty ? '' : ' $unit'} ${_typeLabel('${item['item_type'] ?? ''}')}'
           .trim();
     }).where((value) => value.isNotEmpty).toList();
+    final requestKind = '${_assignment['kind'] ?? ''}'.trim();
+    final assignmentType = '${_assignment['assignment_type'] ?? ''}'.trim();
+    final urgency = '${_assignment['urgency'] ?? ''}'.replaceAll('_', ' ');
+    final requestDetails = <String>[
+      if (requestKind.isNotEmpty)
+        'Request type: ${requestKind.replaceAll('_', ' ')}',
+      if (assignmentType.isNotEmpty)
+        'Volunteer task: ${assignmentType.replaceAll('_', ' ')}',
+      if (urgency.isNotEmpty) 'Urgency: $urgency',
+      if (quantities.isNotEmpty)
+        'Approved items: ${quantities.join(' · ')}',
+    ].join('\n');
 
     return VolunteerSessionGuard(
       onUnauthorized: () => openVolunteerLogin(context),
@@ -430,19 +471,26 @@ List<LatLng> _previewRoute = const [];
                     ),
                   ),
                   const SizedBox(height: 18),
+                  const Text(
+                    'Request details',
+                    style: TextStyle(
+                      color: appNavy,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
                   _InfoBox(
-                    text: '$title · ${'${_assignment['public_ref'] ?? ''}'}',
+                    text: requestDetails,
                     color: Colors.white,
                     border: true,
                   ),
-                  if (quantities.isNotEmpty) ...[
-                    const SizedBox(height: 10),
-                    _InfoBox(
-                      text: quantities.join(' · '),
-                      color: Colors.white,
-                      border: true,
-                    ),
-                  ],
+                  const SizedBox(height: 10),
+                  _InfoBox(
+                    text: 'Reference: ${_assignment['public_ref'] ?? ''}',
+                    color: Colors.white,
+                    border: true,
+                  ),
                   if (_isMine && requester.isNotEmpty) ...[
                     const SizedBox(height: 14),
                     _InfoBox(
@@ -503,19 +551,16 @@ List<LatLng> _previewRoute = const [];
                             const CurrentLocationLayer(),
                             MarkerLayer(
                               markers: [
-                                for (var index = 0;
-                                    index < routePoints.length;
-                                    index++)
-                                  Marker(
-                                    point: routePoints[index],
-                                    width: 34,
-                                    height: 34,
-                                    child: const Icon(
-                                      Icons.location_on_rounded,
-                                      color: appNavy,
-                                      size: 30,
-                                    ),
+                                Marker(
+                                  point: routePoints.last,
+                                  width: 38,
+                                  height: 38,
+                                  child: const Icon(
+                                    Icons.location_on_rounded,
+                                    color: appNavy,
+                                    size: 34,
                                   ),
+                                ),
                               ],
                             ),
                           ],

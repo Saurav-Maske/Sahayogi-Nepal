@@ -39,17 +39,23 @@ class _AssignedTaskScreenState extends State<AssignedTaskScreen> {
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _error = 'No assigned task was found for this account.';
+        _error = 'You are not assigned to any task currently.';
       });
       return;
     }
 
     final result = await Api.getVolunteerAssignment(assignmentId);
     if (!mounted) return;
+    final assignment = result.data;
+    final isAssignedToVolunteer = assignment?['is_mine'] == true;
     setState(() {
       _loading = false;
-      if (result.ok && result.data != null) {
-        _assignment = result.data;
+      if (result.ok && assignment != null && isAssignedToVolunteer) {
+        _assignment = assignment;
+      } else if (result.errorCode == 'not_found' ||
+          (result.ok && assignment != null && !isAssignedToVolunteer)) {
+        _assignment = null;
+        _error = 'You are not assigned to any task currently.';
       } else {
         _error = result.errorMessage ?? 'Could not load your assigned task.';
       }

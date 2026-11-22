@@ -43,23 +43,25 @@ class _ExploreScreenState extends State<ExploreScreen>
   Position? _currentPosition;
   List<_ReliefRequest> _mapRequests = const [];
   StreamSubscription<Position>? _positionSubscription;
+  Timer? _offerRefreshTimer;
 
   List<_ReliefRequest> get _nearbyRequests {
-    if (!_canViewNearbyRequests) return const [];
     final position = _currentPosition;
-    if (position == null) return const [];
+    if (position == null) return _mapRequests;
 
     final nearby = _mapRequests
         .map((request) {
-          final distanceInMeters = Geolocator.distanceBetween(
-            position.latitude,
-            position.longitude,
-            request.position.latitude,
-            request.position.longitude,
-          );
+          final distanceKm = request.distanceKm ??
+              Geolocator.distanceBetween(
+                    position.latitude,
+                    position.longitude,
+                    request.position.latitude,
+                    request.position.longitude,
+                  ) /
+                  1000;
           return request.copyWith(
-            distanceKm: distanceInMeters / 1000,
-            quantity: '${(distanceInMeters / 1000).toStringAsFixed(1)} km away',
+            distanceKm: distanceKm,
+            quantity: '${distanceKm.toStringAsFixed(1)} km away',
           );
         })
         .where((request) => request.distanceKm! <= 100)
@@ -76,12 +78,20 @@ class _ExploreScreenState extends State<ExploreScreen>
     WidgetsBinding.instance.addObserver(this);
     _loadMapRequests();
     _requestLocationAccess();
+    if (_canViewNearbyRequests) {
+      _offerRefreshTimer = Timer.periodic(const Duration(seconds: 60), (_) {
+        if (mounted && !_loadingRequests && _currentPosition != null) {
+          unawaited(_loadMapRequests());
+        }
+      });
+    }
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _positionSubscription?.cancel();
+    _offerRefreshTimer?.cancel();
     super.dispose();
   }
 
@@ -159,6 +169,7 @@ class _ExploreScreenState extends State<ExploreScreen>
         locationSettings: settings,
       );
       _updateCurrentPosition(position);
+      unawaited(_loadMapRequests());
     } catch (_) {
       // The location marker layer continues requesting fixes from its own stream.
     }
@@ -172,25 +183,27 @@ class _ExploreScreenState extends State<ExploreScreen>
   }
 
   Future<void> _loadMapRequests() async {
-    if (!_canViewNearbyRequests) {
-      if (mounted) {
-        setState(() {
-          _mapRequests = const [];
-          _loadingRequests = false;
-          _requestLoadError = null;
-        });
-      }
-      return;
-    }
     if (mounted) {
       setState(() {
         _loadingRequests = true;
         _requestLoadError = null;
       });
     }
+    final position = _currentPosition;
+    final nearbyOffersFuture = !_canViewNearbyRequests || position == null
+        ? Future.value(
+            const ApiResult<List<Map<String, dynamic>>>(
+              data: <Map<String, dynamic>>[],
+            ),
+          )
+        : Api.getNearbyVolunteerOffers(
+            latitude: position.latitude,
+            longitude: position.longitude,
+            radiusKm: 100,
+          );
     final results = await Future.wait([
       Api.getMapMarkers(),
-      Api.getVolunteerOffers(),
+      nearbyOffersFuture,
     ]);
     final result = results[0] as ApiResult<List<Map<String, dynamic>>>;
     final offersResult = results[1] as ApiResult<List<Map<String, dynamic>>>;
@@ -222,6 +235,29 @@ class _ExploreScreenState extends State<ExploreScreen>
             ))
         .whereType<_ReliefRequest>()
         .toList();
+    if (_canViewNearbyRequests && offersResult.ok) {
+      for (final offer in offersResult.data ?? const []) {
+        final items = (offer['items'] as List? ?? const [])
+            .whereType<Map>()
+            .map((item) => item['item_type'])
+            .whereType<String>()
+            .toList();
+        final request = _requestFromMarker(
+          {
+            'layer': 'need',
+            'kind': offer['kind'],
+            'lat': offer['approx_lat'],
+            'lng': offer['approx_lng'],
+            'item_types': items,
+            'urgency': offer['urgency'],
+            'at': offer['offered_at'],
+            'distance_km': offer['distance_km'],
+          },
+          joinOffers: [offer],
+        );
+        if (request != null) parsed.add(request);
+      }
+    }
     final groups = <String, _ReliefRequest>{};
     for (final request in parsed) {
       final key =
@@ -305,6 +341,7 @@ class _ExploreScreenState extends State<ExploreScreen>
       icon: _markerIcon(kindCode, itemTypes),
       isMultiple: itemTypes.length > 1,
       key: '${marker['key'] ?? ''}',
+      distanceKm: (marker['distance_km'] as num?)?.toDouble(),
       joinOffers: joinOffers,
     );
   }
@@ -408,29 +445,7 @@ class _ExploreScreenState extends State<ExploreScreen>
             style: TextStyle(color: appNavy, fontSize: 14, height: 1.4),
           ),
           const SizedBox(height: 18),
-          if (request.joinOffers.isEmpty)
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: () {
-                  Navigator.of(context).pop();
-                  ScaffoldMessenger.of(this.context).showSnackBar(
-                    const SnackBar(
-                      content: Text(
-                        'No claimable task is available for this request right now.',
-                      ),
-                    ),
-                  );
-                },
-                icon: const Icon(Icons.volunteer_activism_outlined),
-                label: const Text('Join now'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: appGold,
-                  foregroundColor: appNavy,
-                ),
-              ),
-            )
-          else ...[
+          if (request.joinOffers.isNotEmpty) ...[
             ...request.joinOffers.map(
               (offer) => Padding(
                 padding: const EdgeInsets.only(bottom: 8),
@@ -964,6 +979,24 @@ class _ExploreScreenState extends State<ExploreScreen>
                                   userAgentPackageName:
                                       'np.sahayogi.sahayogi_mobile',
                                   maxZoom: 19,
+                                ),
+                                MarkerLayer(
+                                  markers: _nearbyRequests
+                                      .map(
+                                        (request) => Marker(
+                                          point: request.position,
+                                          width: 46,
+                                          height: 46,
+                                          child: GestureDetector(
+                                            onTap: () =>
+                                                _showRequestDetails(request),
+                                            child: _RequestMapMarker(
+                                              request: request,
+                                            ),
+                                          ),
+                                        ),
+                                      )
+                                      .toList(),
                                 ),
                                 if (_locationAllowed)
                                   const CurrentLocationLayer(

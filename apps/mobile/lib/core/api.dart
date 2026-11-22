@@ -82,6 +82,62 @@ class Api {
     );
   }
 
+  static Future<ApiResult<List<Map<String, dynamic>>>> getNearbyVolunteerOffers({
+    required double latitude,
+    required double longitude,
+    double radiusKm = 100,
+  }) async {
+    final result = await volunteerAction(
+      'offers/nearby',
+      body: {
+        'lat': latitude,
+        'lng': longitude,
+        'radius_km': radiusKm,
+      },
+    );
+    dynamic responseData = result.data;
+    if (!result.ok && result.errorCode == 'unknown_action') {
+      // Older deployed Edge Function versions may not have the nested route yet.
+      // The authenticated RPC applies the same volunteer, tier, and distance rules.
+      try {
+        responseData = await _sb.rpc(
+          'nearby_offers',
+          params: {
+            'p_lat': latitude,
+            'p_lng': longitude,
+            'p_radius_km': radiusKm,
+          },
+        );
+      } catch (error) {
+        return ApiResult(
+          errorCode: 'nearby_offers_failed',
+          errorMessage: error.toString(),
+        );
+      }
+    } else if (!result.ok) {
+      return ApiResult(
+        errorCode: result.errorCode,
+        errorMessage: result.errorMessage,
+      );
+    }
+    if (responseData is! List) {
+      return const ApiResult(
+        errorCode: 'invalid_response',
+        errorMessage: 'The server returned an unexpected nearby offers response.',
+      );
+    }
+    return ApiResult(
+      data: responseData
+          .whereType<Map>()
+          .map((offer) {
+            final normalized = Map<String, dynamic>.from(offer);
+            normalized['id'] ??= normalized['assignment_id'];
+            return normalized;
+          })
+          .toList(),
+    );
+  }
+
   static Future<ApiResult<Map<String, dynamic>>> getVolunteerStats() async {
     final result = await volunteerAction('stats');
     return _mapResult(result, 'stats');
