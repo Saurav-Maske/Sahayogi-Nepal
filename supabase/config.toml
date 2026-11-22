@@ -32,11 +32,11 @@ enable_confirmations = true
 
 [auth.email.smtp]
 enabled = true
-host = "smtp.gmail.com"
+host = "smtp.resend.com"
 port = 465
-user = "env(GMAIL_ADDRESS)"
-pass = "env(GMAIL_APP_PASSWORD)"
-admin_email = "env(GMAIL_ADDRESS)"
+user = "resend"
+pass = "env(RESEND_API_KEY)"
+admin_email = "env(MAIL_FROM_ADDRESS)"
 sender_name = "Sahayogi Nepal"
 
 [auth.email.template.invite]

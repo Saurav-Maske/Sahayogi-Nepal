@@ -231,3 +231,12 @@ Everything below is still to build; the UI should mock it.
 | Who sees a general request in the first 60 s                                 | Built in `my_offers()`: exactly category A first, then everyone with A.                           |
 | Public map                                                                   | RPC `map_markers()`, not a view.                                                                |
 | Who reads the OTP                                                            | Donor for pickup, requester for delivery, both through `requester_get_otp`.                     |
+### Inventory repositories (migration `20261122120000_inventory_repository_sync.sql`)
+
+- Every lot, reservation and movement carries `inventory_repository_id`; it is NOT NULL. A reservation always has its lot's repository (trigger plus composite foreign key).
+- `admin_import_stock`: each row accepts optional `repository_id` (uuid, default FWU-SOE). Unknown id raises `invalid_repository`. Each returned lot includes `repository_id`.
+- `admin_move_lot`: a split keeps the source lot's repository. The audit detail includes `repository_id`.
+- `admin_approve_request`: reserves from repositories in the request's district first, then others, FIFO inside each group.
+- Donation pickups create lots in the repository nearest to the donation request (fallback FWU-SOE).
+- `admin_inventory_reconcile()` (admin, edge route `stock/reconcile`): `{ ok, issues[] }`. Issue types: `reserved_mismatch`, `stale_reservation`, `reservation_not_ready`.
+- View `inventory_available_by_repository` (service role / admin JWT through RLS): availability per repository and item type. `inventory_available` is unchanged.
