@@ -51,7 +51,7 @@ const STATUS: Record<string, number> = {
   unauthorized: 401, forbidden: 403, not_found: 404,
   already_claimed: 409, already_on_request: 409, already_assigned: 409, already_reported: 409, not_available: 409,
   invalid_state: 409, invalid_transition: 409, otp_required: 409, otp_not_available: 409,
-  lot_reserved: 409, insufficient_stock: 409,
+  lot_reserved: 409, insufficient_stock: 409, already_received: 409, not_received: 409,
   too_many_requests: 429, hub_not_configured: 500,
 };
 
@@ -66,9 +66,15 @@ const MESSAGES: Record<string, string> = {
   invalid_state: "This cannot be done in the current state.",
   invalid_transition: "That move is not allowed from the current state.",
   otp_required: "This step needs the OTP.",
+  already_received: "This donation has already been counted at the hub.",
+  not_received: "Count the donation at the hub before issuing the code.",
+  invalid_items: "The items are not valid. List each item with a whole-number quantity.",
   otp_not_available: "No code can be issued right now.",
   too_many_requests: "Too many tries. Please wait and retry.",
   insufficient_stock: "Not enough stock to reserve.",
+  invalid_quantity: "Quantity must be a whole number of kits.",
+  invalid_type: "type must be pickup_refused or items_mismatch.",
+  invalid_note: "Write a short note (2 to 500 characters).",
   hub_not_configured: "The central hub is not configured.",
 };
 

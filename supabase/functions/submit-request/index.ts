@@ -26,7 +26,8 @@ const RPC_CLIENT_ERRORS: Record<string, string> = {
   outside_service_area: "This location is outside the area we currently serve.",
   invalid_urgency: "urgency must be low, normal, high or critical.",
   invalid_volunteers_needed: "volunteers_needed must be a whole number from 1 to 100.",
-  invalid_items: `1-20 items, each with item_type (${ITEM_TYPES.join(", ")}), qty > 0 and unit.`,
+  invalid_quantity: "Quantity must be a whole number of kits.",
+  invalid_items: `1-20 items, each with item_type (${ITEM_TYPES.join(", ")}), a whole number qty from 1 (every unit is a kit).`,
   too_many_requests: "Too many requests from this phone number. Please try again in an hour.",
 };
 
@@ -74,8 +75,8 @@ Deno.serve(async (req) => {
   } else {
     items = Array.isArray(b.items) ? b.items : [];
     const bad = items.length < 1 || items.length > 20 || items.some((i: any) =>
-      !ITEM_TYPES.includes(String(i?.item_type)) || !(Number(i?.qty) > 0) || Number(i.qty) > 1_000_000 ||
-      !i?.unit || String(i.unit).length > 20);
+      !ITEM_TYPES.includes(String(i?.item_type)) || !Number.isInteger(Number(i?.qty)) || Number(i.qty) < 1 ||
+      Number(i.qty) > 1_000_000);
     if (bad) return fail("invalid_items", RPC_CLIENT_ERRORS.invalid_items);
   }
 
@@ -86,7 +87,7 @@ Deno.serve(async (req) => {
       kind, requester_name, requester_phone, lat: b.lat, lng: b.lng, urgency, volunteers_needed,
       address_note: b.address_note ? String(b.address_note).slice(0, 300) : null,
       notes: b.notes ? String(b.notes).slice(0, 1000) : null,
-      items: items.length ? items.map((i) => ({ item_type: i.item_type, qty: Number(i.qty), unit: String(i.unit) })) : null,
+      items: items.length ? items.map((i) => ({ item_type: i.item_type, qty: Number(i.qty), unit: "kit" })) : null,
       tracking_token_hash: await sha256(token),
     },
     p_profile: profile?.id ?? null,

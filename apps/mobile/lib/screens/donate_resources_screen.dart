@@ -3,6 +3,9 @@ import 'package:latlong2/latlong.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../core/app_colors.dart';
+import '../core/api.dart';
+import '../core/request_submission.dart';
+import '../core/volunteer_auth_service.dart';
 import 'explore_screen.dart';
 import 'location_picker_screen.dart';
 import 'my_requests_screen.dart';
@@ -17,16 +20,11 @@ class DonateResourcesScreen extends StatefulWidget {
 
 class _DonateResourcesScreenState extends State<DonateResourcesScreen> {
   final _formKey = GlobalKey<FormState>();
-  final List<TextEditingController> _nameControllers = [
-    TextEditingController(),
-  ];
-  final List<TextEditingController> _descriptionControllers = [
-    TextEditingController(),
-  ];
   final List<TextEditingController> _quantityControllers = [
     TextEditingController(),
   ];
   final _contactController = TextEditingController();
+  final _donorNameController = TextEditingController();
 
   final List<String?> _categories = [null];
   final List<bool> _categoryErrors = [false];
@@ -35,6 +33,7 @@ class _DonateResourcesScreenState extends State<DonateResourcesScreen> {
   bool _locationAllowed = false;
   bool _locationServiceEnabled = true;
   bool _locationError = false;
+  bool _isSubmitting = false;
 
   static const _categoryOptions = [
     'Food supplies',
@@ -47,7 +46,25 @@ class _DonateResourcesScreenState extends State<DonateResourcesScreen> {
   @override
   void initState() {
     super.initState();
+    _prefillVolunteer();
     _requestLiveLocation();
+  }
+
+  Future<void> _prefillVolunteer() async {
+    if (!VolunteerAuthService.hasSession) return;
+    try {
+      final account = await VolunteerAuthService.currentVolunteer();
+      if (!mounted) return;
+      setState(() {
+        _donorNameController.text = account.name;
+        _contactController.text = account.phone;
+      });
+    } catch (_) {
+      // Donation intake is public and can continue without a valid session.
+      await VolunteerAuthService.signOut();
+      await clearSavedRequests();
+      if (mounted) setState(() {});
+    }
   }
 
   Future<void> _requestLiveLocation() async {
@@ -106,24 +123,17 @@ class _DonateResourcesScreenState extends State<DonateResourcesScreen> {
 
   @override
   void dispose() {
-    for (final controller in _nameControllers) {
-      controller.dispose();
-    }
-    for (final controller in _descriptionControllers) {
-      controller.dispose();
-    }
     for (final controller in _quantityControllers) {
       controller.dispose();
     }
     _contactController.dispose();
+    _donorNameController.dispose();
     super.dispose();
   }
 
   void _addDonationItem() => setState(() {
         _categories.add(null);
         _categoryErrors.add(false);
-        _nameControllers.add(TextEditingController());
-        _descriptionControllers.add(TextEditingController());
         _quantityControllers.add(TextEditingController());
       });
 
@@ -132,8 +142,6 @@ class _DonateResourcesScreenState extends State<DonateResourcesScreen> {
     setState(() {
       _categories.removeAt(index);
       _categoryErrors.removeAt(index);
-      _nameControllers.removeAt(index).dispose();
-      _descriptionControllers.removeAt(index).dispose();
       _quantityControllers.removeAt(index).dispose();
     });
   }
@@ -181,7 +189,7 @@ class _DonateResourcesScreenState extends State<DonateResourcesScreen> {
     if (selected != null && mounted) onSelected(selected);
   }
 
-  void _submitDonation() {
+  Future<void> _submitDonation() async {
     final fieldsValid = _formKey.currentState!.validate();
     final categoriesValid = _categories.every((category) => category != null);
     final locationValid = _location != null;
@@ -192,10 +200,34 @@ class _DonateResourcesScreenState extends State<DonateResourcesScreen> {
       _locationError = !locationValid;
     });
     if (!fieldsValid || !categoriesValid || !locationValid) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-          content: Text('Donation submission is not connected yet.')),
-    );
+    setState(() => _isSubmitting = true);
+    final items = List.generate(_categories.length, (index) {
+      return {
+        'item_type': resourceItemType(_categories[index]!)!,
+        'qty': int.parse(_quantityControllers[index].text.trim()),
+        'unit': 'kit',
+      };
+    });
+    final payload = <String, dynamic>{
+      'kind': 'donation_offer',
+      'requester_name': _donorNameController.text.trim(),
+      'requester_phone': normalizeNepalPhone(_contactController.text)!,
+      'lat': _location!.latitude,
+      'lng': _location!.longitude,
+      'urgency': 'normal',
+      'items': items,
+    };
+    final result = await Api.submitRequest(payload);
+    if (!mounted) return;
+    setState(() => _isSubmitting = false);
+    if (!result.ok || result.data == null) {
+      showSubmissionError(context, result);
+      return;
+    }
+    await saveSubmittedRequest(response: result.data!, payload: payload);
+    if (!mounted) return;
+    await showSubmissionSuccessDialog(context, result.data!);
+    if (mounted) Navigator.of(context).pop();
   }
 
   @override
@@ -309,34 +341,20 @@ class _DonateResourcesScreenState extends State<DonateResourcesScreen> {
                             ),
                           ],
                           const SizedBox(height: 18),
-                          _fieldLabel('Resource name'),
-                          const SizedBox(height: 8),
-                          _textField(
-                            controller: _nameControllers[index],
-                            hint: 'Family food kits',
-                            validator: (value) =>
-                                value == null || value.trim().isEmpty
-                                    ? 'Enter a resource name'
-                                    : null,
-                          ),
-                          const SizedBox(height: 18),
-                          _fieldLabel('Description'),
-                          const SizedBox(height: 8),
-                          _textField(
-                            controller: _descriptionControllers[index],
-                            hint: 'Rice, lentils, cooking oil and salt.',
-                            validator: null,
-                          ),
-                          const SizedBox(height: 18),
                           _fieldLabel('Available quantity'),
                           const SizedBox(height: 8),
                           _textField(
                             controller: _quantityControllers[index],
-                            hint: '40 family kits',
-                            validator: (value) =>
-                                value == null || value.trim().isEmpty
-                                    ? 'Enter the available quantity'
-                                    : null,
+                            hint: 'Enter a number',
+                            keyboardType: TextInputType.number,
+                            suffixText: 'kit',
+                            validator: (value) {
+                              final quantity =
+                                  int.tryParse(value?.trim() ?? '');
+                              return quantity == null || quantity < 1
+                                  ? 'Enter a valid quantity'
+                                  : null;
+                            },
                           ),
                         ],
                       ),
@@ -430,24 +448,24 @@ class _DonateResourcesScreenState extends State<DonateResourcesScreen> {
                     controller: _contactController,
                     hint: '+977 9841 234 567',
                     keyboardType: TextInputType.phone,
-                    validator: (value) {
-                      final contact = value?.trim() ?? '';
-                      if (contact.isEmpty) return 'Enter a contact number';
-                      if (contact.replaceAll(RegExp(r'\D'), '').length < 7) {
-                        return 'Enter a valid contact number';
-                      }
-                      return null;
-                    },
+                    validator: validateNepalPhone,
+                  ),
+                  const SizedBox(height: 16),
+                  _fieldLabel('Donor name'),
+                  const SizedBox(height: 8),
+                  _textField(
+                    controller: _donorNameController,
+                    hint: 'Your full name',
+                    validator: validateRequesterName,
                   ),
                   const SizedBox(height: 24),
                   SizedBox(
                     width: double.infinity,
                     height: 52,
-                    child: FilledButton.icon(
-                      onPressed: _submitDonation,
-                      iconAlignment: IconAlignment.end,
-                      icon: const Icon(Icons.arrow_forward_rounded, size: 20),
-                      label: const Text('Share resources'),
+                    child: FilledButton(
+                      onPressed: _isSubmitting ? null : _submitDonation,
+                      child: Text(
+                          _isSubmitting ? 'Submitting…' : 'Share resources'),
                       style: FilledButton.styleFrom(
                         backgroundColor: appNavy,
                         foregroundColor: Colors.white,
@@ -507,11 +525,6 @@ class _DonateResourcesScreenState extends State<DonateResourcesScreen> {
                     style: const TextStyle(color: appMuted, fontSize: 14),
                   ),
                 ),
-                const Icon(
-                  Icons.chevron_right_rounded,
-                  color: appMuted,
-                  size: 22,
-                ),
               ],
             ),
           ),
@@ -523,6 +536,7 @@ class _DonateResourcesScreenState extends State<DonateResourcesScreen> {
     required String hint,
     required String? Function(String?)? validator,
     TextInputType keyboardType = TextInputType.text,
+    String? suffixText,
   }) =>
       TextFormField(
         controller: controller,
@@ -537,11 +551,7 @@ class _DonateResourcesScreenState extends State<DonateResourcesScreen> {
           isDense: true,
           contentPadding:
               const EdgeInsets.symmetric(horizontal: 14, vertical: 15),
-          suffixIcon: const Icon(
-            Icons.chevron_right_rounded,
-            color: appMuted,
-            size: 22,
-          ),
+          suffixText: suffixText,
           errorStyle: const TextStyle(fontSize: 11),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(14),
@@ -592,7 +602,7 @@ Widget _donationNavigationBar(BuildContext context) => Container(
                 selected: false,
                 onTap: () => Navigator.of(context).push(
                   MaterialPageRoute<void>(
-                    builder: (_) => const ExploreScreen(),
+                    builder: (_) => ExploreScreen(),
                   ),
                 ),
               ),
@@ -602,13 +612,13 @@ Widget _donationNavigationBar(BuildContext context) => Container(
                 selected: false,
                 onTap: () => Navigator.of(context).push(
                   MaterialPageRoute<void>(
-                    builder: (_) => const MyRequestsScreen(),
+                    builder: (_) => MyRequestsScreen(),
                   ),
                 ),
               ),
               _DonationNavigationItem(
                 icon: Icons.person_outline_rounded,
-                label: 'Profile',
+                label: VolunteerAuthService.hasSession ? 'Profile' : 'Join',
                 selected: false,
                 onTap: () => openVolunteerLogin(context),
               ),

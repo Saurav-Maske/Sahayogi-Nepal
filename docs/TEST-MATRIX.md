@@ -10,13 +10,21 @@ Run against the demo project after `seed_demo.mjs` and `seed_extra.mjs`. Reset w
 | Volunteer eligibility | A: general; B: +transport; C: +healthcare                                              | `my_offers`                  |     |     |     |     |
 | 60 s escalation       | A-only offer opens to B and C after `escalate_at`                                    | `my_offers`                  |     |     |     |     |
 | Double accept         | Only one claim succeeds                                                                | `claim_assignment`           |     |     |     |     |
-| Donation pickup       | Donor can lower qty before OTP; confirmed qty lands in inventory as `received`       | `driver_verify_otp`          |     |     |     |     |
+| Donation pickup       | Donor can lower, raise, remove and add items before the OTP; driver confirms changes (`quantity_changed`); the pickup OTP records `confirmed_qty` and puts the job in transit, no stock yet | `driver_verify_otp`, `requester_update_pickup_qty` |     |     |     |     |
+| Hub count             | Admin counts whole kits per item; `received` lots plus movements; a differing count opens a `hub_shortfall` incident with the driver; second count `already_received` | `admin_receive_donation` |     |     |     |     |
+| Hub drop-off code     | Code only after the count (`not_received` before); 6 digits, 15 min, 5 attempts, 10 per hour; right code makes the job `delivered` and the request `fulfilled`; the driver cannot mark `delivered` himself (`otp_required`) | `admin_issue_otp`, `driver_verify_otp` |     |     |     |     |
+| Hub pickup code       | Delivery job gets a `hub_pickup` code; only then `picked_up`; stock stays reserved until the requester code | `admin_issue_otp`, `driver_verify_otp` |     |     |     |     |
+| Driver issue report   | Refusal on a pickup (before donor code) or delivery (before hub code) opens an incident with the driver, releases the job with that driver excluded, request back to `awaiting_assignment`; reserved stock kept | `driver_report_issue` |     |     |     |     |
+| Reserve alert         | Below the reserve (ready_to_ship minus reserved) queues one `low_stock` push; recovering re-arms; changing the level re-alerts once; level 0 is off | `admin_set_reserve_level`, `send-push` |     |     |     |     |
+| Kits only             | Unit stored as `kit`; fraction refused (`invalid_quantity` / `invalid_items`) | `submit-request`, `inventory_lots` |     |     |     |     |
 | Delivery OTP          | Single-use, expires in 15 min, locks after 5 attempts, bound to assignment and purpose | `driver_verify_otp`          |     |     |     |     |
 | Short delivery        | Incident in admin queue; request not marked fully fulfilled                            | `requester_confirm_delivery` |     |     |     |     |
 | Map windows           | Pickup older than 6 h and fulfilled older than 12 h disappear                          | `map_markers`                |     |     |     |     |
+| Public map content    | Only donations picked up in the last 6 h (blue) and resource requests delivered in the last 12 h (green); pending, approved, in-progress and other kinds never appear; a donation dropped at the hub stays blue | `map_markers`                |     |     |     |     |
+| Offer route preview   | Open eligible offer and own unfinished job return legs (donor then hub, or hub then requester); wrong tier, declined, someone else's job, finished job, suspended account and admin are refused; the answer holds no coordinates of the donor, requester or hub; a normal volunteer cannot call `offer_route_points` directly | `get-offer-route`, `offer_route_points` |     |     |     |     |
 | Document privacy      | Anon and non-admin cannot read `volunteer-docs` objects                              | live                           |     |     |     |     |
 | Stock concurrency     | Available never below 0 under parallel approvals                                       | `admin_approve_request`      |     |     |     |     |
-| Function privileges   | Only `get_tracking`, the 3 `requester_*` functions and `map_markers` are anon-callable (plus `is_admin`, which RLS policies need and which returns false for anon). Every function outside the 25 client RPCs is `service_role` only. Query 1 of `scripts/check_function_privileges.sql` returns zero rows | migration `20261122000011`, `scripts/check_function_privileges.sql` |     |     |     |     |
+| Function privileges   | Only `get_tracking`, the 3 `requester_*` functions, `map_markers`, `register_public_device_token` and `get_district_config` are anon-callable (plus `is_admin`, which RLS policies need and which returns false for anon). Every function outside the client RPCs listed in `scripts/check_function_privileges.sql` is `service_role` only. Query 1 of `scripts/check_function_privileges.sql` returns zero rows | migration `20261122000011`, `scripts/check_function_privileges.sql` |     |     |     |     |
 | Audit chain           | `select * from verify_audit_chain()` returns no broken row                           | live                           |     |     |     |     |
 | Short-delivery dispute | Report opens one incident, assignment `disputed`, request `partially_fulfilled`; a second report returns `already_reported` | `requester_confirm_delivery` |     |     |     |     |
 | Incident resolution   | Dismiss puts request back to `fulfilled`; resolve keeps `partially_fulfilled`; closed incident cannot change | `admin_resolve_incident`   |     |     |     |     |
@@ -37,7 +45,7 @@ Run against the demo project after `seed_demo.mjs` and `seed_extra.mjs`. Reset w
 | RLS: volunteer        | Volunteer reads only own profile, own assignments, own device tokens; zero rows from admin tables; cannot raise own role or categories; cannot insert into `requests` | runner: `RLS: volunteer ...` |     |     |     |     |
 | Settings exposure     | Anon and volunteer read only the `district` setting, never `central_inventory`; admin reads both | runner: `Settings exposure` |     |     |     |     |
 | Edge API roles        | No token 401; volunteer on admin-api 403; admin on volunteer-api 401/403; malformed uuid `invalid_input` 400; wrong tracking token 404; A-only helper claiming a tier B offer 400 `not_eligible`; public map works without a token | runner: `Edge API roles` |     |     |     |     |
-| Submit rate limit     | 6th submission from one phone 429 `too_many_requests`, also for the `+977` form; another phone works; outside Kathmandu bounds 400 `outside_service_area`; bad phone 400 `invalid_phone` | runner: `Submit rate limit` |     |     |     |     |
+| Submit rate limit     | 6th submission from one phone 429 `too_many_requests`, also for the `+977` form; another phone works; outside the pilot district bounds 400 `outside_service_area`; bad phone 400 `invalid_phone` | runner: `Submit rate limit` |     |     |     |     |
 
 ## Automated runner (concurrency, RLS, roles)
 
@@ -71,7 +79,7 @@ Needs `.env` with `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KE
 | `Document privacy` | Document privacy |
 | `Submit rate limit` | Submit rate limit |
 
-Not automated, still by hand: Short delivery and Short-delivery dispute, Incident resolution, Lot moves, Audit timeline, Map windows, Stock after delivery, Donation pickup, Push: new offer / privileges / dead token (need a device or FCM), the sign-up and reset OTP rows, the 11th OTP request in an hour, and the `anon` / `authenticated` catalog check.
+Not automated, still by hand: Short delivery and Short-delivery dispute, Incident resolution, Lot moves, Audit timeline, Map windows, Stock after delivery, Donation pickup, Hub count, Hub drop-off code, Hub pickup code, Driver issue report, Reserve alert, Kits only, Push: new offer / privileges / dead token (need a device or FCM), the sign-up and reset OTP rows, the 11th OTP request in an hour, and the `anon` / `authenticated` catalog check.
 
 ## Seed smoke checks (live now)
 

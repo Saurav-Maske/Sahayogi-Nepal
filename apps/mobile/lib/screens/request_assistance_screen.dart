@@ -3,6 +3,9 @@ import 'package:latlong2/latlong.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../core/app_colors.dart';
+import '../core/api.dart';
+import '../core/request_submission.dart';
+import '../core/volunteer_auth_service.dart';
 import 'explore_screen.dart';
 import 'location_picker_screen.dart';
 import 'my_requests_screen.dart';
@@ -19,6 +22,7 @@ class RequestAssistanceScreen extends StatefulWidget {
 class _RequestAssistanceScreenState extends State<RequestAssistanceScreen> {
   final _formKey = GlobalKey<FormState>();
   final _contactController = TextEditingController();
+  final _requesterNameController = TextEditingController();
   final _affectedPeopleController = TextEditingController();
   final List<TextEditingController> _numberControllers = [
     TextEditingController(),
@@ -30,6 +34,7 @@ class _RequestAssistanceScreenState extends State<RequestAssistanceScreen> {
   bool _locationAllowed = false;
   bool _locationServiceEnabled = true;
   bool _locationError = false;
+  bool _isSubmitting = false;
 
   static const _assistanceOptions = [
     'Health Worker',
@@ -40,7 +45,25 @@ class _RequestAssistanceScreenState extends State<RequestAssistanceScreen> {
   @override
   void initState() {
     super.initState();
+    _prefillVolunteer();
     _requestLiveLocation();
+  }
+
+  Future<void> _prefillVolunteer() async {
+    if (!VolunteerAuthService.hasSession) return;
+    try {
+      final account = await VolunteerAuthService.currentVolunteer();
+      if (!mounted) return;
+      setState(() {
+        _requesterNameController.text = account.name;
+        _contactController.text = account.phone;
+      });
+    } catch (_) {
+      // Public request forms remain available if a saved session has expired.
+      await VolunteerAuthService.signOut();
+      await clearSavedRequests();
+      if (mounted) setState(() {});
+    }
   }
 
   Future<void> _requestLiveLocation() async {
@@ -100,6 +123,7 @@ class _RequestAssistanceScreenState extends State<RequestAssistanceScreen> {
   @override
   void dispose() {
     _contactController.dispose();
+    _requesterNameController.dispose();
     _affectedPeopleController.dispose();
     for (final controller in _numberControllers) {
       controller.dispose();
@@ -171,7 +195,7 @@ class _RequestAssistanceScreenState extends State<RequestAssistanceScreen> {
     return null;
   }
 
-  void _submitRequest() {
+  Future<void> _submitRequest() async {
     final fieldsValid = _formKey.currentState!.validate();
     final typesValid = _assistanceTypes.every((type) => type != null);
     final locationValid = _location != null;
@@ -182,11 +206,40 @@ class _RequestAssistanceScreenState extends State<RequestAssistanceScreen> {
       _locationError = !locationValid;
     });
     if (!fieldsValid || !typesValid || !locationValid) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Assistance request submission is not connected yet.'),
-      ),
-    );
+    if (_assistanceTypes.length != 1) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'The current API supports one assistance type per request. Select one type to continue.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isSubmitting = true);
+    final payload = <String, dynamic>{
+      'kind': assistanceRequestKind(_assistanceTypes.single!)!,
+      'requester_name': _requesterNameController.text.trim(),
+      'requester_phone': normalizeNepalPhone(_contactController.text)!,
+      'lat': _location!.latitude,
+      'lng': _location!.longitude,
+      'urgency': 'normal',
+      'volunteers_needed': int.parse(_numberControllers.single.text.trim()),
+      'notes':
+          'Estimated affected people: ${_affectedPeopleController.text.trim()}',
+    };
+    final result = await Api.submitRequest(payload);
+    if (!mounted) return;
+    setState(() => _isSubmitting = false);
+    if (!result.ok || result.data == null) {
+      showSubmissionError(context, result);
+      return;
+    }
+    await saveSubmittedRequest(response: result.data!, payload: payload);
+    if (!mounted) return;
+    await showSubmissionSuccessDialog(context, result.data!);
+    if (mounted) Navigator.of(context).pop();
   }
 
   @override
@@ -275,14 +328,15 @@ class _RequestAssistanceScreenState extends State<RequestAssistanceScreen> {
                     controller: _contactController,
                     hint: '+977 9841 234 567',
                     keyboardType: TextInputType.phone,
-                    validator: (value) {
-                      final contact = value?.trim() ?? '';
-                      if (contact.isEmpty) return 'Enter a contact number';
-                      if (contact.replaceAll(RegExp(r'\D'), '').length < 7) {
-                        return 'Enter a valid contact number';
-                      }
-                      return null;
-                    },
+                    validator: validateNepalPhone,
+                  ),
+                  const SizedBox(height: 16),
+                  _fieldLabel('Requester name'),
+                  const SizedBox(height: 8),
+                  _textField(
+                    controller: _requesterNameController,
+                    hint: 'Your full name',
+                    validator: validateRequesterName,
                   ),
                   const SizedBox(height: 26),
                   ...List.generate(
@@ -431,11 +485,10 @@ class _RequestAssistanceScreenState extends State<RequestAssistanceScreen> {
                   SizedBox(
                     width: double.infinity,
                     height: 52,
-                    child: FilledButton.icon(
-                      onPressed: _submitRequest,
-                      iconAlignment: IconAlignment.end,
-                      icon: const Icon(Icons.arrow_forward_rounded, size: 20),
-                      label: const Text('Submit request'),
+                    child: FilledButton(
+                      onPressed: _isSubmitting ? null : _submitRequest,
+                      child: Text(
+                          _isSubmitting ? 'Submitting…' : 'Submit request'),
                       style: FilledButton.styleFrom(
                         backgroundColor: appNavy,
                         foregroundColor: Colors.white,
@@ -500,11 +553,6 @@ class _RequestAssistanceScreenState extends State<RequestAssistanceScreen> {
                     style: const TextStyle(color: appMuted, fontSize: 14),
                   ),
                 ),
-                const Icon(
-                  Icons.chevron_right_rounded,
-                  color: appMuted,
-                  size: 22,
-                ),
               ],
             ),
           ),
@@ -530,11 +578,6 @@ class _RequestAssistanceScreenState extends State<RequestAssistanceScreen> {
           isDense: true,
           contentPadding:
               const EdgeInsets.symmetric(horizontal: 14, vertical: 15),
-          suffixIcon: const Icon(
-            Icons.chevron_right_rounded,
-            color: appMuted,
-            size: 22,
-          ),
           errorStyle: const TextStyle(fontSize: 11),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(14),
@@ -585,7 +628,7 @@ Widget _assistanceNavigationBar(BuildContext context) => Container(
                 selected: false,
                 onTap: () => Navigator.of(context).push(
                   MaterialPageRoute<void>(
-                    builder: (_) => const ExploreScreen(),
+                    builder: (_) => ExploreScreen(),
                   ),
                 ),
               ),
@@ -595,13 +638,13 @@ Widget _assistanceNavigationBar(BuildContext context) => Container(
                 selected: true,
                 onTap: () => Navigator.of(context).push(
                   MaterialPageRoute<void>(
-                    builder: (_) => const MyRequestsScreen(),
+                    builder: (_) => MyRequestsScreen(),
                   ),
                 ),
               ),
               _AssistanceNavigationItem(
                 icon: Icons.person_outline_rounded,
-                label: 'Profile',
+                label: VolunteerAuthService.hasSession ? 'Profile' : 'Join',
                 selected: false,
                 onTap: () => openVolunteerLogin(context),
               ),

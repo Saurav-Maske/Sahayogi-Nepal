@@ -1,6 +1,83 @@
+
 # Contract and backend changelog
 
 Newest first. Anything that changes a payload, table, function or seed behaviour gets a line here.
+
+## 2026-11-23 (mobile auth, request history and transfer handoffs, contract v1.7)
+- Mobile auth-aware navigation, profile prefill and volunteer stats; saved request history clears between anonymous and volunteer sessions.
+- Added owner-scoped volunteer request history and requester/driver OTP, quantity and issue-report flows; admin assignment details can count donations and issue hub OTPs.
+
+## 2026-11-23 (hub pickup code and refusal for resource requests, contract v1.6)
+
+- **Migration `20261123000300_hub_pickup_otp.sql`:** `admin_issue_otp` now picks the purpose from the job: a `delivery` job that is `accepted` or `en_route_to_pickup` gets a `hub_pickup` code (6 digits, hashed, 15 minutes, 5 attempts, 10 per hour). The driver enters it in `driver_verify_otp` (purpose `hub_pickup`) and only then is the job `picked_up`. `update_assignment_state` no longer allows `delivery` -> `picked_up` (`otp_required`). Stock stays reserved until the requester's delivery code.
+- **`driver_report_issue`** also works for a `delivery` job before `hub_pickup` (incident types `hub_pickup_refused`, `hub_items_mismatch`). The job is released with that driver excluded and the request goes back to `awaiting_assignment`. **Decision (c):** the reserved stock is kept, because another driver still has to deliver it; the admin can decline the request from the incident to release it.
+- **Tested** on a scratch PostgreSQL with a reduced schema (no PostGIS); not on the Supabase project.
+- **Deploy:** `supabase db push`, then `supabase functions deploy admin-api volunteer-api`. **Apps:** driver app needs a `hub_pickup` code entry step and the report-issue screen for delivery jobs; admin app shows the code once.
+
+## 2026-11-23 (hub drop-off code)
+
+- **Migration `20261123000200_hub_dropoff_otp.sql`:** `otp_challenges.purpose` allows `hub_dropoff`. New RPC `admin_issue_otp(p_id)` (edge route `admin-api/assignments/issue-otp`): after the hub count the admin gets a 6-digit code (hashed, 15 minutes, 5 attempts, 10 per hour, shown once) and reads it to the driver. `driver_verify_otp` (purpose `hub_dropoff`) then sets the job `delivered` and the donation request `fulfilled`. The driver can no longer mark a pickup job delivered (`update_assignment_state` answers `otp_required`). Before the count the admin gets `not_received`. Donations picked up before the hub count existed keep their lots and count as counted.
+
+## 2026-11-23 (hub count, stock from the count)
+
+- **Migration `20261123000100_hub_receive_count.sql`:** **behaviour change.** The pickup OTP no longer creates inventory lots; it records `confirmed_qty` and the job is `picked_up` (in transit). New RPC `admin_receive_donation(p_id, p_items)` (edge route `admin-api/assignments/receive`) takes the counted whole kits per item, creates the `received` lots plus movements (reason `hub receipt`), runs the reserve check and opens a `hub_shortfall` incident when a count differs from what the driver confirmed. Once per job; old-flow donations with lots are refused with `already_received`. **Decision (b):** donated stock counts from the hub count.
+- **`get_tracking`** returns `hub_received_at` so the donor sees "delivered to hub".
+- **Audit:** new actions `hub_received`, `hub_pickup_confirmed`, `hub_dropoff_completed`.
+- **Tested** on a scratch PostgreSQL with a reduced schema; not on the Supabase project.
+- **Apps:** admin count screen; donor screen shows the new step.
+
+## 2026-11-22 (driver issue reporting)
+
+- **Migration `20261122191000_driver_report_issue.sql`:** new `driver_report_issue(p_id, p_type, p_note)` (edge route `volunteer-api/assignments/report-issue`). `p_type` is `pickup_refused` or `items_mismatch`, note 2-500 characters. It opens an incident that keeps the reporting driver, releases the job back to offers with that driver excluded and sets the request back to `awaiting_assignment`. `admin_list_incidents` shows the driver. Donation pickups only (resource requests were added by `20261123000300`). **Not tested against real data.**
+
+## 2026-11-22 (donor can raise and add items)
+
+- **Migration `20261122190000_donor_edit_items.sql`:** `requester_update_pickup_qty` now lets the donor lower, raise, remove (qty 0) and add items (`{ item_type, qty >= 1 }`) until the driver enters the pickup OTP. A raised or added item differs from the approved quantity, so the driver must confirm it (`quantity_changed`). New error `invalid_quantity`. **Decision (d).** Not tested against real data.
+
+## 2026-11-22 (kits only)
+
+- **Migration `20261122181000_kit_units_whole_numbers.sql`:** every unit is `kit` and every quantity a whole number, on `request_items` and `inventory_lots` (check constraints plus trigger `fn_enforce_whole_kits`). Other units sent become `kit`; fractions are refused with `invalid_quantity`. Existing fractional rows are **rounded by the migration**: check hosted data first, because rounding changes stock numbers. `submit-request` now requires a whole-number `qty` and no longer needs `unit`.
+
+## 2026-11-22 (reserve counts approvable stock, district config, reserve re-alert)
+
+- **Migration `20261122183000_reserve_counts_ready_to_ship.sql` (E6):** the low-stock check counts only `ready_to_ship` stock minus reserved (same rule as approval and `inventory_available`). This **replaces** the rule in the 2026-11-22 reserve alerts entry below (received, processing and ready_to_ship). Flags are reset without sending an alert. Counted hub stock joins the reserve once the admin moves it to `ready_to_ship`.
+- **Migration `20261122182000_district_public_and_reserve_realert.sql`:** E4: `get_district_config()` (anon-callable) and route `public-api/district` replace direct reads of `app_settings`, which stopped being public with `settings_public_read` dropped in `20261122113715`. E7: `admin_set_reserve_level` resets the alert flag when the level changes, so a category already below its new level alerts once straight away.
+- **New `scripts/check_push_setup.sql`** (E5): read-only check of the one-time push setup (vault entries, `pg_net`, `pg_cron`, cron jobs, device and outbox counts).
+
+## 2026-11-22 (one driver-location system)
+
+- **Migration `20261122180000_cleanup_driver_location_and_nearby.sql` (E2, E3):** `update_my_location` (`volunteer_locations`) is the only driver-location system; `driver_latest_location`, its view and trigger are dropped. **Delete** the Edge Functions `update-driver-location`, `get-driver-location` and `get_nearby_requests` (folders and deployed copies). `nearby_offers` (`volunteer-api/offers/nearby`) replaces the last one.
+
+## 2026-11-22 (approval creates driver offers)
+
+- **Migration `20261122150000_approval_assignments_nearby_offers.sql`:** `admin_approve_request` calls `create_assignments` in the same transaction, so drivers see an approved request (and get a push) without a separate Assign step. `requests/assign` stays for re-creating offers. Adds `nearby_offers(p_lat, p_lng, p_radius_km)` (edge route `volunteer-api/offers/nearby`). **Decision (a).** Not tested against real data.
+
+## 2026-11-22 (server-side route preview for offers)
+
+- **Why:** before a driver accepts, `my_offers` and `assignments/detail` show only an approximate position and never the hub, so the app could not preview the full route. The preview is now built on the server from exact points.
+- **Migration `20261122170000_offer_route_points.sql`:** new `offer_route_points(p_user, p_id)`, **service role only** (revoked from anon and authenticated, because it returns exact coordinates). Same visibility rule as `my_assignment_detail`: an open eligible offer, or your own unfinished assignment; anything else is `not_found`. Returns `{ kind, assignment_type, points[] }` in driving order after the driver: donation donor then hub, resource request hub then requester, other kinds the requester. The hub is read live from `app_settings` `central_inventory`, not from `route_snapshot`, so it is correct even for offers created before the hub moved. Errors `unauthorized | forbidden | not_found | hub_not_configured`. Tested on a scratch PostgreSQL with 14 access cases. That test found and fixed a NULL bug: on an open offer `volunteer_id` is null, and an unguarded check let wrong-tier and declined volunteers through; the whole check is now wrapped in `coalesce(..., false)`.
+- **New Edge Function `get-offer-route`** (`POST`, volunteer JWT): body `{ id, lat, lng, costing? }`. Calls `offer_route_points`, sends driver + points to Valhalla, and returns only `{ kind, assignment_type, costing, shape_precision, summary, legs: [{ to, shape, length, time }] }`. No coordinates of the donor, requester or hub, no street names, no steps; nothing is saved; Valhalla's error text is never returned. Shape encoding is polyline precision 5, the same as `get-route`. Type-checked with Deno and run against a mocked database and routing service (11 cases).
+- **Unchanged:** `get-route`, `my_offers`, `my_assignment_detail`, `route_snapshot`, `scripts/check_function_privileges.sql` (a service-role-only function needs no allow-list entry).
+- **Deploy:** `supabase db push`, then `supabase functions deploy get-offer-route`. Uses the same `VALHALLA_URL`, `VALHALLA_CLIENT_ID` and `VALHALLA_PROXY_SECRET` as `get-route`. Run `scripts/check_function_privileges.sql` afterwards.
+- **App:** call it when the volunteer opens an offer, with the phone's GPS position, and draw every leg. Not rate limited beyond the Valhalla timeout.
+
+## 2026-11-22 (public map shows completed work only)
+
+- **Migration `20261122160000_public_map_completed_only.sql`** replaces `map_markers()`. Layers are now only `pickup` (blue: donation received from a user, `picked_up_at` within 6 h) and `fulfilled` (green: resource request delivered, `fulfilled_at` within 12 h, `kind = resource_request` only). A donation dropped at the hub stays in `pickup` until 6 h after pickup (before, it jumped into `fulfilled`). The `donation` and `need` layers are removed, so nothing waiting for approval or still in progress is public. Output shape, rounding and privacy are unchanged. A delivery reported short (`partially_fulfilled`) still counts as delivered. Tested on a scratch PostgreSQL + PostGIS with 12 cases (not on the Supabase project).
+- **`send-push`:** the `low_stock` broadcast now reads `push_recipients_all()` page by page. PostgREST returns at most 1000 rows per call, so with more than 1000 devices the rest would never have been told.
+- **App:** the Explore screen must stop expecting `donation` and `need` markers and draw `pickup` as blue and `fulfilled` as green.
+- **Deploy:** `supabase db push`, then `supabase functions deploy send-push`. `public-api` needs no redeploy.
+
+## 2026-11-22 (hub moved to Kanchanpur, reserve alerts)
+
+- **Hub:** migration `20261122140000_hub_to_fwu_soe.sql` upserts `app_settings` key `central_inventory` to FWU-SOE, Kanchanpur (28.954657907336678, 80.17888176615499), and rewrites the hub point inside `route_snapshot` of every unfinished assignment. The seed scripts, `docs/DEMO-SETUP.md` and `docs/REMOTE_SEED.md` no longer mention the Kathmandu placeholder. **Not yet run against a database.**
+- **Reserve alerts, migration `20261122141000_reserve_alerts.sql`:** new table `inventory_reserve_levels` (one row per `item_type`, whole kits, `min_qty` 0 = off; starts at 10 as a placeholder). Stock for a category = `sum(quantity - reserved_qty)` over lots in phase received, processing or ready_to_ship, so donated stock counts from pickup. A statement-level trigger on `inventory_lots` runs `_reserve_check()`: the first time a category falls below its reserve it queues one `low_stock` row in `push_outbox`; when stock is back at or above the reserve the flag resets. Nothing is sent for the starting state.
+- **Push outbox:** `kind` also allows `low_stock`; `assignment_id`, `request_id` and `assignment_type` are now nullable; new column `item_type`. `push_claim_batch` returns `item_type` as well. `send-push` broadcasts `low_stock` to `push_recipients_all()` (every device seen in the last 90 days, volunteers and normal users). Payload: `{ type: "low_stock", item_type }`, no personal data.
+- **Devices:** `device_tokens.profile_id` is nullable. New anon RPC `register_public_device_token(p_token, p_platform)`, exposed as `POST /functions/v1/public-api/device-token` with `{ token, platform }` (token 20-4096 characters, platform android, ios or web). It never changes the owner of a token that already belongs to a volunteer.
+- **Admin:** `POST /functions/v1/admin-api/stock/reserve-levels` returns `[{ item_type, min_qty, stock, below_reserve, last_alert_at }]`. `POST /functions/v1/admin-api/stock/reserve-levels/set` with `{ item_type, min_qty }` sets a level (whole number, 0 to 1000000) and runs the check at once. Errors: `forbidden`, `invalid_items` (unknown category), `invalid_qty`.
+- **Scripts:** `scripts/check_function_privileges.sql` allow-lists the three new RPCs.
+- **Deploy:** `supabase db push`, then `supabase functions deploy send-push public-api admin-api` straight away (an old `send-push` would mark `low_stock` rows as done without sending). Run `scripts/check_function_privileges.sql` afterwards.
+- **Not done here:** the mobile app does not register a device token for normal users yet, and the admin app has no screen for reserve levels.
 
 ## 2026-11-22 (volunteers with more than one type)
 

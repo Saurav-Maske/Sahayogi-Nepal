@@ -1,4 +1,3 @@
-
 # Seeding the hosted Supabase project
 
 Owner: Person 4 (Rujan Dhamala, Aakash Thakur), who are also Person 2. Run on the **demo** project first. For production, apply only step 1.
@@ -69,4 +68,4 @@ Rows counts in Studio's table list are estimates and often show 0 right after in
 | Unique `name` conflict on `districts` | The hosted project already has districts under different ids. Clear that table once in Studio, then re-push with `--include-seed`. |
 | `FAILED: ...` from a script             | The message is the database error. Send the full output to Person 2.                                                                 |
 
-Replace the placeholder `central_inventory` coordinates once the hub is confirmed, via a new migration.
+The `central_inventory` hub is FWU-SOE, Kanchanpur, set by migration `20261122140000_hub_to_fwu_soe.sql`. To move it, add a new migration.

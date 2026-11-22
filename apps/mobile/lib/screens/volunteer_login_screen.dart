@@ -1,30 +1,51 @@
+import 'dart:async';
+
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../core/app_colors.dart';
+import '../core/saved_volunteer_application.dart';
+import '../core/request_submission.dart';
 import '../core/volunteer_auth_service.dart';
 import 'volunteer_dashboard_screen.dart';
+import 'volunteer_application_status_screen.dart';
 import 'volunteer_registration_screen.dart';
 
 Future<void> openVolunteerLogin(BuildContext context) async {
   if (VolunteerAuthService.hasSession) {
     try {
       final account = await VolunteerAuthService.currentVolunteer();
+      await SavedVolunteerApplication.clearForEmail(account.email);
       if (!context.mounted) return;
-      Navigator.of(context).push(
+      Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute<void>(
-          builder: (_) => VolunteerDashboardScreen(
-            volunteerName: account.name,
-            roles: account.roles,
-          ),
+          builder: (_) => VolunteerDashboardScreen(account: account),
         ),
+        (_) => false,
       );
       return;
     } catch (_) {
       await VolunteerAuthService.signOut();
+      await clearSavedRequests();
     }
   }
+  final application = await SavedVolunteerApplication.load();
   if (!context.mounted) return;
+  if (application != null) {
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute<void>(
+        builder: (_) => VolunteerApplicationStatusScreen(
+          application: application.submission,
+          name: application.name,
+          email: application.email,
+          phone: application.phone,
+          roles: application.roles,
+        ),
+      ),
+      (_) => false,
+    );
+    return;
+  }
   Navigator.of(context).push(
     MaterialPageRoute<void>(
       builder: (_) => const VolunteerLoginScreen(),
@@ -66,15 +87,14 @@ class _VolunteerLoginScreenState extends State<VolunteerLoginScreen> {
         email: _emailController.text,
         password: _passwordController.text,
       );
+      await SavedVolunteerApplication.clearForEmail(account.email);
+      await clearSavedRequests();
       if (!mounted) return;
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute<void>(
-          builder: (_) => VolunteerDashboardScreen(
-            volunteerName: account.name,
-            roles: account.roles,
-          ),
+          builder: (_) => VolunteerDashboardScreen(account: account),
         ),
-        (route) => route.isFirst,
+        (_) => false,
       );
     } on VolunteerAuthException catch (error) {
       if (mounted) setState(() => _signInError = error.message);
@@ -109,6 +129,7 @@ class _VolunteerLoginScreenState extends State<VolunteerLoginScreen> {
         newPassword: newPassword,
       );
       if (mounted) {
+        _passwordController.clear();
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Password updated. You can now log in.'),
@@ -135,79 +156,152 @@ class _VolunteerLoginScreenState extends State<VolunteerLoginScreen> {
   Future<String?> _requestResetCode(String email) async {
     final controller = TextEditingController();
     var verifying = false;
+    var resendSeconds = 60;
+    var resending = false;
     String? errorMessage;
+    Timer? resendTimer;
     try {
       return await showDialog<String>(
         context: context,
         barrierDismissible: false,
         builder: (dialogContext) => StatefulBuilder(
-          builder: (dialogContext, setDialogState) => AlertDialog(
-            title: const Text('Verify your email'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Enter the 6-digit code sent to $email.'),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: controller,
-                  keyboardType: TextInputType.number,
-                  maxLength: 6,
-                  decoration: InputDecoration(
-                    labelText: 'Verification code',
-                    errorText: errorMessage,
+          builder: (dialogContext, setDialogState) {
+            resendTimer ??= Timer.periodic(const Duration(seconds: 1), (_) {
+              if (resendSeconds == 0) {
+                resendTimer?.cancel();
+                resendTimer = null;
+                return;
+              }
+              setDialogState(() => resendSeconds--);
+            });
+            return AlertDialog(
+              title: const Text('Verify your email'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Enter the 6-digit code sent to $email.'),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: controller,
+                    keyboardType: TextInputType.number,
+                    maxLength: 6,
+                    onChanged: (_) {
+                      if (errorMessage != null) {
+                        setDialogState(() => errorMessage = null);
+                      }
+                    },
+                    decoration: InputDecoration(
+                      labelText: 'Verification code',
+                      errorText: errorMessage,
+                    ),
                   ),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton(
+                      onPressed: resendSeconds > 0 || resending
+                          ? null
+                          : () async {
+                              setDialogState(() {
+                                resending = true;
+                                errorMessage = null;
+                              });
+                              try {
+                                await VolunteerAuthService.requestPasswordReset(
+                                    email);
+                                setDialogState(() {
+                                  resending = false;
+                                  resendSeconds = 60;
+                                  resendTimer = Timer.periodic(
+                                      const Duration(seconds: 1), (_) {
+                                    if (resendSeconds == 0) {
+                                      resendTimer?.cancel();
+                                      resendTimer = null;
+                                      return;
+                                    }
+                                    setDialogState(() => resendSeconds--);
+                                  });
+                                });
+                              } on VolunteerAuthException catch (error) {
+                                setDialogState(() {
+                                  resending = false;
+                                  errorMessage = error.message;
+                                });
+                              } catch (_) {
+                                setDialogState(() {
+                                  resending = false;
+                                  errorMessage = 'Could not resend the code.';
+                                });
+                              }
+                            },
+                      child: Text(
+                        resending
+                            ? 'Sending...'
+                            : resendSeconds > 0
+                                ? 'Resend code in ${resendSeconds}s'
+                                : 'Resend code',
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: verifying
+                      ? null
+                      : () => Navigator.of(dialogContext).pop(),
+                  child: const Text('Cancel'),
+                ),
+                FilledButton(
+                  onPressed: verifying
+                      ? null
+                      : () async {
+                          if (controller.text.trim().length != 6) {
+                            setDialogState(
+                              () => errorMessage = 'Enter the 6-digit code.',
+                            );
+                            return;
+                          }
+                          setDialogState(() {
+                            verifying = true;
+                            errorMessage = null;
+                          });
+                          try {
+                            final token = await VolunteerAuthService
+                                .verifyPasswordResetOtp(
+                              email: email,
+                              code: controller.text,
+                            );
+                            if (dialogContext.mounted) {
+                              Navigator.of(dialogContext).pop(token);
+                            }
+                          } on VolunteerAuthException catch (error) {
+                            setDialogState(() {
+                              verifying = false;
+                              errorMessage = error.message;
+                            });
+                          } catch (_) {
+                            setDialogState(() {
+                              verifying = false;
+                              errorMessage = 'Could not verify the code.';
+                            });
+                          }
+                        },
+                  child: verifying
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text('Verify code'),
                 ),
               ],
-            ),
-            actions: [
-              TextButton(
-                onPressed:
-                    verifying ? null : () => Navigator.of(dialogContext).pop(),
-                child: const Text('Cancel'),
-              ),
-              FilledButton(
-                onPressed: verifying
-                    ? null
-                    : () async {
-                        setDialogState(() {
-                          verifying = true;
-                          errorMessage = null;
-                        });
-                        try {
-                          final token =
-                              await VolunteerAuthService.verifyPasswordResetOtp(
-                            email: email,
-                            code: controller.text,
-                          );
-                          if (dialogContext.mounted) {
-                            Navigator.of(dialogContext).pop(token);
-                          }
-                        } on VolunteerAuthException catch (error) {
-                          setDialogState(() {
-                            verifying = false;
-                            errorMessage = error.message;
-                          });
-                        } catch (_) {
-                          setDialogState(() {
-                            verifying = false;
-                            errorMessage = 'Could not verify the code.';
-                          });
-                        }
-                      },
-                child: verifying
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Text('Verify code'),
-              ),
-            ],
-          ),
+            );
+          },
         ),
       );
     } finally {
+      resendTimer?.cancel();
       controller.dispose();
     }
   }
@@ -396,10 +490,16 @@ class _VolunteerLoginScreenState extends State<VolunteerLoginScreen> {
                         foregroundColor: appTeal,
                         padding: const EdgeInsets.symmetric(vertical: 8),
                       ),
-                      child: const Text(
-                        'Forgot password?',
-                        style: TextStyle(fontSize: 12),
-                      ),
+                      child: _isResettingPassword
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Text(
+                              'Forgot password?',
+                              style: TextStyle(fontSize: 12),
+                            ),
                     ),
                   ),
                   const SizedBox(height: 12),
