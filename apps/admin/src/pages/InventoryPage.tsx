@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import QuickAction from '../components/dashboard/QuickAction';
+import OperationsMapPreview from '../components/map/OperationsMapPreview';
 import { importStock, availableQty, listLots, prettyPhase, type Lot } from '../services/inventoryService';
 import '../styles/inventory.css';
 
@@ -16,6 +17,7 @@ export default function InventoryPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showAdd, setShowAdd] = useState(false);
+  const [showMapPreview, setShowMapPreview] = useState(false);
   const [addName, setAddName] = useState('');
   const [addQty, setAddQty] = useState('');
   const [addUnit, setAddUnit] = useState('');
@@ -39,7 +41,7 @@ export default function InventoryPage() {
     setError('');
     try {
       await importStock([{ item_type: addName, qty: quantity, unit: addUnit, condition_note: addNote || null, phase: 'received' }]);
-      setShowAdd(false); setAddName(''); setAddQty(''); setAddUnit(''); setAddNote(''); setToast('Inventory lot added.'); refresh();
+      setShowAdd(false); setShowMapPreview(false); setAddName(''); setAddQty(''); setAddUnit(''); setAddNote(''); setToast('Inventory lot added.'); refresh();
     } catch (e) { setError(e instanceof Error ? e.message : 'Could not add inventory.'); }
   }
 
@@ -61,10 +63,13 @@ export default function InventoryPage() {
     })}</div>}
     {!loading && !filtered.length && !error && <p className="empty">No inventory matches this search.</p>}
     {!loading && <p className="inventory-live-note">Live inventory data · quantity changes require an audited backend action.</p>}
-    {showAdd && <div className="inventory-modal-backdrop" onMouseDown={(e) => { if (e.target === e.currentTarget) setShowAdd(false); }}><section className="inventory-modal" role="dialog" aria-modal="true" aria-labelledby="add-inventory-title"><button className="inventory-modal-close" onClick={() => setShowAdd(false)} aria-label="Close">×</button><h2 id="add-inventory-title">Add inventory item</h2>
+    {showAdd && <div className="inventory-modal-backdrop" onMouseDown={(e) => { if (e.target === e.currentTarget) { setShowAdd(false); setShowMapPreview(false); } }}><section className={`inventory-modal${showMapPreview ? ' inventory-modal--map' : ''}`} role="dialog" aria-modal="true" aria-labelledby="add-inventory-title"><button className="inventory-modal-close" onClick={() => { setShowAdd(false); setShowMapPreview(false); }} aria-label="Close">×</button><h2 id="add-inventory-title">Add inventory item</h2>
       <label>Item type<select value={addName} onChange={(e) => setAddName(e.target.value)}><option value="">Choose item type</option>{ITEM_TYPES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
       <div className="inventory-modal-row"><label>Quantity<input type="number" min="0.01" step="0.01" value={addQty} onChange={(e) => setAddQty(e.target.value)}/></label><label>Unit<input value={addUnit} maxLength={20} onChange={(e) => setAddUnit(e.target.value)} placeholder="kg, bottles, units"/></label></div>
-      <label>Condition note<input value={addNote} maxLength={300} onChange={(e) => setAddNote(e.target.value)} placeholder="Optional"/></label>{error && <p className="inventory-error">{error}</p>}<button className="btn btn--primary" onClick={() => void addItem()}>Save inventory item</button>
+      <label>Condition note<input value={addNote} maxLength={300} onChange={(e) => setAddNote(e.target.value)} placeholder="Optional"/></label>
+      <button className="btn inventory-map-toggle" type="button" aria-expanded={showMapPreview} onClick={() => setShowMapPreview((visible) => !visible)}>{showMapPreview ? 'Hide live map' : 'Check live map'}</button>
+      {showMapPreview && <div className="inventory-map-panel"><p>Your live location and current operations are shown for reference. The stock record does not save a map location.</p><OperationsMapPreview followLiveLocation/></div>}
+      {error && <p className="inventory-error">{error}</p>}<button className="btn btn--primary" onClick={() => void addItem()}>Save inventory item</button>
     </section></div>}
   </div>;
 }
