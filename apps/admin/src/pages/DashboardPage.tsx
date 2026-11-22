@@ -9,7 +9,9 @@ const time = (iso: string) =>
   new Date(iso).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
 
 export default function DashboardPage() {
-  const { data, loading, refreshing, reload } = useDashboard();
+  const { data, loading, refreshing, error, reload } = useDashboard();
+
+  if (error && !data) return <div className="table-msg"><p className="auth-error" role="alert">Couldn’t load the operations overview: {error}</p><button className="btn" onClick={reload}>Try again</button></div>;
 
   if (loading || !data) {
     return (
@@ -30,10 +32,9 @@ export default function DashboardPage() {
       <div className="page__head">
         <div>
           <h1>Operations overview</h1>
-          <p className="crumbs">Sahayogi Nepal / Overview / Kathmandu district</p>
+          <p className="crumbs">Sahayogi Nepal / Overview / All districts</p>
         </div>
         <div className="page__actions">
-          {data.source === 'demo' && <span className="pill" title="Supabase tables not reachable">Demo data</span>}
           <button className="btn btn--ghost" onClick={reload} disabled={refreshing}>
             {refreshing ? 'Refreshing…' : 'Refresh'}
           </button>

@@ -100,7 +100,7 @@ export default function RequestReviewPage() {
           <h1>{title} · {r.publicRef}</h1>
           <p className="crumbs"><Link to="/requests">Requests</Link> / {r.publicRef} / {r.district} district</p>
         </div>
-        <div className="page__actions">{data?.demo && <span className="pill">Demo data</span>}<QuickAction /></div>
+        <div className="page__actions"><QuickAction /></div>
       </div>
 
       <div className="review">

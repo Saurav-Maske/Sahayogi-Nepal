@@ -36,46 +36,9 @@ async function countApps(status: string) {
   return count ?? 0;
 }
 
-/* ------------------------------ demo data (no session) ------------------------------ */
-const mk = (n: number, name: string, email: string, phone: string, type: string, date: string, status: string, extra: Partial<Volunteer> = {}): Volunteer => ({
-  id: `demo-vol-${n}`, profileId: `demo-prof-${n}`, fullName: name, email, phone, volunteerType: type,
-  citizenshipNo: '42-01-12345-21', citizenshipPath: 'demo/citizenship.jpg',
-  licenseNo: type === 'driver' ? '01-02-345678-19' : null, licensePath: type === 'driver' ? 'demo/licence.jpg' : null,
-  serviceCardNo: type === 'doctor' ? 'NMC-20931' : null, serviceCardPath: type === 'doctor' ? 'demo/service-card.jpg' : null,
-  reviewStatus: status, reviewNote: null, reviewedAt: null, createdAt: date, accountStatus: null, ...extra,
-});
-
-let demo: Volunteer[] = [
-  mk(1, 'Ramesh Gurung', 'ramesh.gurung@gmail.com', '9841 662 583', 'driver', '2026-06-18T08:00:00Z', 'pending'),
-  mk(2, 'Nisha Rai', 'nisha.r@gmail.com', '9841 555 042', 'doctor', '2026-06-18T07:30:00Z', 'pending'),
-  mk(3, 'Suman Thapa', 'suman.t@gmail.com', '9841 555 043', 'general', '2026-06-17T12:00:00Z', 'pending', { citizenshipPath: null }),
-  mk(4, 'Rita Lama', 'rita.l@gmail.com', '9841 555 044', 'general', '2026-06-17T09:00:00Z', 'pending'),
-  mk(5, 'Gita Sharma', 'gita.s@gmail.com', '9841 555 045', 'general', '2026-06-10T09:00:00Z', 'approved', { reviewNote: 'Identity reviewed.', accountStatus: 'active' }),
-  mk(6, 'Dev Karki', 'dev.k@gmail.com', '9841 555 046', 'driver', '2026-06-09T09:00:00Z', 'rejected', { reviewNote: 'Licence photo unreadable.' }),
-  mk(7, 'Anil Magar', 'anil.m@gmail.com', '9841 555 047', 'driver', '2026-06-01T09:00:00Z', 'approved', { reviewNote: 'Suspended after repeated no-shows.', accountStatus: 'suspended' }),
-];
-const DEMO_STATS: VolunteerStats = { completedJobs: 24, hours: 86, kgDelivered: 420, donationsCollected: 12, successPct: 96 };
-
-function listDemo(f: VolunteerFilters): VolunteerList {
-  const q = f.q.trim().toLowerCase();
-  const filtered = [...demo].sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt)).filter((v) =>
-    (f.tab === 'pending' ? v.reviewStatus === REVIEW.pending
-      : f.tab === 'approved' ? v.reviewStatus === REVIEW.approved && v.accountStatus !== SUSPENDED
-      : f.tab === 'declined' ? v.reviewStatus === REVIEW.rejected
-      : v.accountStatus === SUSPENDED) &&
-    (!q || [v.fullName, v.email, v.phone].some((s) => s.toLowerCase().includes(q))) &&
-    (!f.category || v.volunteerType === f.category));
-  const start = (f.page - 1) * PAGE_SIZE;
-  return {
-    rows: filtered.slice(start, start + PAGE_SIZE), total: filtered.length, demo: true,
-    pendingTotal: demo.filter((v) => v.reviewStatus === REVIEW.pending).length,
-    approvedTotal: demo.filter((v) => v.reviewStatus === REVIEW.approved && v.accountStatus !== SUSPENDED).length,
-  };
-}
-
 /* ------------------------------------- public API ------------------------------------ */
 export async function listVolunteers(f: VolunteerFilters): Promise<VolunteerList> {
-  if (!(await hasSession())) return listDemo(f);
+  if (!(await hasSession())) throw new Error('Sign in as an administrator to view volunteers.');
 
   const select = f.tab === 'suspended' ? SELECT.replace('profiles!profile_id(', 'profiles!profile_id!inner(') : SELECT;
   let q: any = supabase.from('volunteer_applications').select(select, { count: 'exact' });
@@ -93,7 +56,7 @@ export async function listVolunteers(f: VolunteerFilters): Promise<VolunteerList
 
   const [{ data, count, error }, pendingTotal, approvedTotal] = await Promise.all([q, countApps(REVIEW.pending), countApps(REVIEW.approved)]);
   if (error) throw error;
-  return { rows: (data ?? []).map(mapRow), total: count ?? 0, pendingTotal, approvedTotal, demo: false };
+  return { rows: (data ?? []).map(mapRow), total: count ?? 0, pendingTotal, approvedTotal };
 }
 
 async function loadStats(profileId: string): Promise<VolunteerStats | null> {
@@ -122,28 +85,15 @@ async function loadStats(profileId: string): Promise<VolunteerStats | null> {
 }
 
 export async function getVolunteer(id: string): Promise<VolunteerDetail> {
-  if (!(await hasSession())) {
-    const v = demo.find((x) => x.id === id);
-    if (!v) throw new Error('Volunteer not found');
-    return { volunteer: structuredClone(v), stats: v.fullName === 'Ramesh Gurung' ? DEMO_STATS : { completedJobs: 0, hours: null, kgDelivered: 0, donationsCollected: 0, successPct: null }, demo: true };
-  }
+  if (!(await hasSession())) throw new Error('Sign in as an administrator to view this volunteer.');
   const { data, error } = await supabase.from('volunteer_applications').select(SELECT).eq('id', id).single();
   if (error) throw error;
   const volunteer = mapRow(data);
-  return { volunteer, stats: volunteer.profileId ? await loadStats(volunteer.profileId) : null, demo: false };
+  return { volunteer, stats: volunteer.profileId ? await loadStats(volunteer.profileId) : null };
 }
 
 export async function reviewVolunteer(id: string, decision: VolunteerDecision, note: string) {
-  if (!(await hasSession())) {
-    const v = demo.find((x) => x.id === id);
-    if (!v) throw new Error('Volunteer not found');
-    v.reviewNote = note || v.reviewNote; v.reviewedAt = new Date().toISOString();
-    if (decision === 'approve') { v.reviewStatus = REVIEW.approved; v.accountStatus = 'active'; }
-    else if (decision === 'reject') v.reviewStatus = REVIEW.rejected;
-    else if (decision === 'suspend') v.accountStatus = SUSPENDED;
-    else v.accountStatus = 'active';
-    return;
-  }
+  if (!(await hasSession())) throw new Error('Sign in as an administrator to review volunteers.');
   if (decision === 'approve' || decision === 'reject') {
     // approve-volunteer (admin only): creates the account, sets categories, sends the invite email.
     await callFunction('approve-volunteer', { application_id: id, decision: decision === 'approve' ? 'approve' : 'decline', note });
@@ -167,9 +117,9 @@ async function callFunction(name: string, body: Record<string, unknown>) {
   throw new Error(msg);
 }
 
-/** Short-lived signed link to a private identity document. Returns null in demo mode. */
+/** Short-lived signed link to a private identity document. */
 export async function getDocumentUrl(path: string): Promise<string | null> {
-  if (!(await hasSession())) return null;
+  if (!(await hasSession())) throw new Error('Sign in as an administrator to view identity documents.');
   const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(path, 60);
   if (error) throw error;
   return data.signedUrl;

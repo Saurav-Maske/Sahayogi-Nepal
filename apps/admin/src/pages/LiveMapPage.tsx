@@ -1,10 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import {
   Circle,
   MapContainer,
   Marker,
-  Polyline,
   Popup,
   TileLayer,
   useMap,
@@ -28,75 +27,15 @@ type Marker = {
 };
 
 type Me = { lat: number; lng: number; accuracy: number; at: number };
-
-const SAMPLE: Marker[] = [
-  {
-    id: "req1042",
-    kind: "request",
-    title: "REQ-1042",
-    detail: "Open food assistance · Kirtipur",
-    lat: 27.675,
-    lng: 85.29,
-    updated: "2 min ago",
-    to: "/requests",
-  },
-  {
-    id: "driver0302",
-    kind: "driver",
-    title: "Ramesh Gurung",
-    detail: "ASG-0302 · Active driver · En route to requester",
-    lat: 27.697,
-    lng: 85.318,
-    updated: "Updated 2 min ago",
-    to: "/assignments/demo-asg-0302",
-  },
-  {
-    id: "hub",
-    kind: "hub",
-    title: "Central inventory",
-    detail: "Teku · Main supply hub",
-    lat: 27.701,
-    lng: 85.33,
-    updated: "Current location",
-  },
-  {
-    id: "pickup0284",
-    kind: "pickup",
-    title: "Pickup completed",
-    detail: "DON-0284 · 45 kg rice collected",
-    lat: 27.72,
-    lng: 85.31,
-    updated: "18 Jun · 09:35",
-    to: "/donations/demo-don-284",
-  },
-  {
-    id: "done1038",
-    kind: "fulfilled",
-    title: "Request fulfilled",
-    detail: "REQ-1038 · Delivered in Kirtipur",
-    lat: 27.665,
-    lng: 85.337,
-    updated: "18 Jun · 08:40",
-    to: "/requests",
-  },
-  {
-    id: "volunteer",
-    kind: "volunteer",
-    title: "Active volunteer",
-    detail: "Volunteer location rounded for privacy",
-    lat: 27.705,
-    lng: 85.285,
-    updated: "Updated 4 min ago",
-    to: "/volunteers",
-  },
-];
+const isDemoSeed = (value?: string | null) =>
+  /^demo(?:\s|$)/i.test(value?.trim() ?? "");
 
 const tabs = [
   ["all", "All activities"],
   ["requests", "Open requests"],
   ["volunteers", "Active volunteers"],
   ["drivers", "Active drivers"],
-  ["pickups", "Pickups · 6h"],
+  ["pickups", "Donation pickup requests"],
   ["fulfilled", "Fulfilled · 12h"],
 ];
 
@@ -112,7 +51,7 @@ const labels: Record<string, string> = {
   request: "Open request",
   driver: "Active driver",
   hub: "Central inventory",
-  pickup: "Recent pickup",
+  pickup: "Donation pickup",
   fulfilled: "Fulfilled request",
   volunteer: "Active volunteer",
   me: "Your location",
@@ -137,7 +76,7 @@ function MapFocus({ marker }: { marker: Marker | null }) {
   const map = useMap();
   useEffect(() => {
     if (marker) map.flyTo([marker.lat, marker.lng], 14, { duration: 0.6 });
-  }, [map, marker]);
+  }, [map, marker?.id]);
   return null;
 }
 
@@ -151,12 +90,23 @@ function FlyToMe({ me, nonce }: { me: Me | null; nonce: number }) {
   return null;
 }
 
+function FitActivities({ markers, enabled }: { markers: Marker[]; enabled: boolean }) {
+  const map = useMap();
+  const fitted = useRef(false);
+  useEffect(() => {
+    if (!enabled || fitted.current || !markers.length) return;
+    const bounds = L.latLngBounds(markers.map((marker) => [marker.lat, marker.lng]));
+    map.fitBounds(bounds, { padding: [28, 28], maxZoom: 12 });
+    fitted.current = true;
+  }, [enabled, map, markers]);
+  return null;
+}
+
 export default function LiveMapPage() {
   const [params, setParams] = useSearchParams();
   const tab = params.get("layer") ?? "all";
-  const mode = params.get("view") ?? "";
   const [selected, setSelected] = useState<Marker | null>(null);
-  const [markers, setMarkers] = useState(SAMPLE),
+  const [markers, setMarkers] = useState<Marker[]>([]),
     [live, setLive] = useState(false),
     [error, setError] = useState("");
 
@@ -215,11 +165,10 @@ export default function LiveMapPage() {
   };
 
   useEffect(() => {
-    startTracking(); // asks for permission on load
     return () => {
       if (watchId.current !== null)
         navigator.geolocation.clearWatch(watchId.current);
-      watchId.current = null; // keeps React StrictMode's double-run working
+      watchId.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -229,33 +178,28 @@ export default function LiveMapPage() {
     let active = true;
     let channel: any;
     const load = async () => {
-      if (!(await hasSession())) return;
+      if (!(await hasSession())) { setError('Sign in with an administrator account to load live operations.'); return; }
       const { data, error: e } = await supabase.rpc("admin_map_markers");
       if (!active) return;
       if (e) {
-        setError(
-          "Live map data is unavailable. Apply the admin_map_markers migration.",
-        );
+        setLive(false);
+        setError(e.message || 'Live map data is unavailable.');
         return;
       }
-      const rows = Array.isArray(data) ? data : [];
-      const parsed: Marker[] = rows
-        .map((x: any, i: number) => ({
-          id: String(x.id ?? i),
-          kind: (x.kind ?? x.type ?? "request") as Marker["kind"],
-          title: x.title ?? x.public_ref ?? x.name ?? "Map activity",
-          detail: x.detail ?? x.status ?? "",
-          lat: Number(x.lat ?? x.latitude),
-          lng: Number(x.lng ?? x.longitude),
-          updated: x.updated_at ?? "Recently",
-          to:
-            x.kind === "driver"
-              ? "/assignments"
-              : x.kind === "request"
-                ? "/requests"
-                : undefined,
-        }))
-        .filter((m) => Number.isFinite(m.lat) && Number.isFinite(m.lng));
+      const hub = data?.hub;
+      const requests = Array.isArray(data?.requests) ? data.requests : [];
+      const volunteers = Array.isArray(data?.volunteers) ? data.volunteers : [];
+      const parsed: Marker[] = [
+        ...(hub && !/placeholder/i.test(`${hub.name ?? ''} ${hub.address_note ?? ''}`)
+          ? [{ id: 'hub', kind: 'hub' as const, title: hub.name ?? 'Central inventory', detail: hub.address_note ?? 'Supply hub', lat: Number(hub.lat), lng: Number(hub.lng), updated: 'Configured hub' }]
+          : []),
+        ...requests
+          .filter((x: any) => !isDemoSeed(x.requester_name))
+          .map((x: any) => ({ id: x.id, kind: (x.status === 'fulfilled' ? 'fulfilled' : x.kind === 'donation_offer' ? 'pickup' : 'request') as Marker['kind'], title: x.public_ref, detail: `${x.requester_name} · ${x.district} · ${x.status}`, lat: Number(x.lat), lng: Number(x.lng), updated: x.updated_at ?? x.created_at, to: x.kind === 'donation_offer' ? `/donations/${x.id}` : `/requests/${x.id}` })),
+        ...volunteers
+          .filter((x: any) => !isDemoSeed(x.volunteer_name))
+          .map((x: any) => ({ id: x.assignment_id, kind: (x.assignment_type === 'delivery' || x.assignment_type === 'pickup' ? 'driver' : 'volunteer') as Marker['kind'], title: x.volunteer_name ?? 'Active volunteer', detail: `${x.public_ref} · ${x.state}`, lat: Number(x.lat), lng: Number(x.lng), updated: x.updated_at, to: `/assignments/${x.assignment_id}` })),
+      ].filter((m) => Number.isFinite(m.lat) && Number.isFinite(m.lng));
       setMarkers(parsed);
       setLive(true);
       setError("");
@@ -290,39 +234,23 @@ export default function LiveMapPage() {
     };
   }, []);
 
-  const layerMarkers = useMemo(
-    () => markers.filter((m) => inTab(m, tab)),
-    [markers, tab],
-  );
-  const displayMarkers =
-    mode === "pickup-expired" || mode === "fulfilled-expired"
-      ? []
-      : layerMarkers;
-  const heading =
-    mode === "driver"
-      ? "Driver route · Ramesh Gurung"
-      : mode === "pickup"
-        ? "Recent pickups · Last 6 hours"
-        : mode === "fulfilled"
-          ? "Fulfilled requests · Last 12 hours"
-          : mode === "pickup-expired"
-            ? "Pickup layer · Expired at 15:36"
-            : mode === "fulfilled-expired"
-              ? "Fulfillment layer · Expired at 20:41"
-              : "Live operations map";
+  const displayMarkers = markers.filter((marker) => inTab(marker, tab));
+  const activeTab = tabs.find(([key]) => key === tab);
+  const heading = tab === "all" ? "Live operations map" : activeTab?.[1] ?? "Live operations map";
   const liveSelected = selected
     ? (markers.find((m) => m.id === selected.id) ?? selected)
     : null;
-  const side =
-    liveSelected ??
-    (mode === "driver"
-      ? (markers.find((m) => m.kind === "driver") ?? null)
-      : mode === "pickup"
-        ? SAMPLE[3]
-        : mode === "fulfilled"
-          ? SAMPLE[4]
-          : null);
+  const side = liveSelected;
+  const mapCenter: [number, number] | null = me
+    ? [me.lat, me.lng]
+    : markers.length
+      ? [
+          markers.reduce((sum, marker) => sum + marker.lat, 0) / markers.length,
+          markers.reduce((sum, marker) => sum + marker.lng, 0) / markers.length,
+        ]
+      : null;
   const setLayer = (v: string) => {
+    setSelected(null);
     setParams((p) => {
       if (v === "all") p.delete("layer");
       else p.set("layer", v);
@@ -337,8 +265,7 @@ export default function LiveMapPage() {
         <div>
           <h1>{heading}</h1>
           <p className="crumbs">
-            Sahayogi Nepal&nbsp; / &nbsp;Live Map&nbsp; / &nbsp;Kathmandu
-            district
+            Sahayogi Nepal&nbsp; / &nbsp;Live Map&nbsp; / &nbsp;Live operations
           </p>
         </div>
         <div className="page__actions">
@@ -361,15 +288,24 @@ export default function LiveMapPage() {
           className="map-canvas"
           aria-label="OpenStreetMap operations map"
         >
-          <MapContainer center={[27.7172, 85.324]} zoom={12} scrollWheelZoom>
-            <TileLayer
-              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-            />
-            <MapFocus marker={liveSelected} />
-            <FlyToMe me={me} nonce={meNonce} />
-            {me && (
-              <>
+          {mapCenter ? (
+            <MapContainer
+              key={me ? "live-location-map" : "operations-activity-map"}
+              center={mapCenter}
+              zoom={13}
+              minZoom={8}
+              maxZoom={19}
+              worldCopyJump
+              scrollWheelZoom
+            >
+              <TileLayer
+                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              />
+              <FitActivities markers={displayMarkers} enabled={!me} />
+              <MapFocus marker={liveSelected} />
+              <FlyToMe me={me} nonce={meNonce} />
+              {me && <>
                 <Circle
                   center={[me.lat, me.lng]}
                   radius={me.accuracy}
@@ -390,38 +326,32 @@ export default function LiveMapPage() {
                     Accuracy ±{Math.round(me.accuracy)} m
                   </Popup>
                 </Marker>
-              </>
-            )}
-            {displayMarkers.map((m) => (
-              <Marker
-                key={m.id}
-                position={[m.lat, m.lng]}
-                icon={pinIcon(m.kind)}
-                eventHandlers={{ click: () => setSelected(m) }}
-              >
-                <Popup>
-                  <strong>{m.title}</strong>
-                  <br />
-                  {m.detail}
-                  <br />
-                  {m.updated}
-                </Popup>
-              </Marker>
-            ))}
-            {mode === "driver" && (
-              <Polyline
-                positions={displayMarkers
-                  .filter(
-                    (m) =>
-                      m.kind === "hub" ||
-                      m.kind === "driver" ||
-                      m.kind === "request",
-                  )
-                  .map((m) => [m.lat, m.lng] as [number, number])}
-                pathOptions={{ color: "#24728a", weight: 4 }}
-              />
-            )}
-          </MapContainer>
+              </>}
+              {displayMarkers.map((m) => (
+                <Marker
+                  key={m.id}
+                  position={[m.lat, m.lng]}
+                  icon={pinIcon(m.kind)}
+                  eventHandlers={{ click: () => setSelected(m) }}
+                >
+                  <Popup>
+                    <strong>{m.title}</strong>
+                    <br />
+                    {m.detail}
+                    <br />
+                    {m.updated}
+                    {m.to && <><br /><Link to={m.to}>Open record</Link></>}
+                  </Popup>
+                </Marker>
+              ))}
+            </MapContainer>
+          ) : (
+            <div className="map-location-prompt" role="status">
+              {geoError || (tracking
+                ? "Waiting for your live GPS location…"
+                : "No live activity locations are available yet. Enable location to view your position on the map.")}
+            </div>
+          )}
         </section>
         <aside className="map-side card">
           <h2 className="card__title">{side?.title ?? "Live activity"}</h2>
@@ -432,48 +362,20 @@ export default function LiveMapPage() {
                 <br />
                 {side.updated}
               </p>
-              {mode === "driver" && (
-                <p className="driver-meta">
-                  ASG-0302 · Active driver
-                  <br />
-                  Current: Teku, Kathmandu
-                  <br />
-                  Destination: Kirtipur
-                  <br />
-                  Route: Inventory → Request
-                  <br />
-                  4.8 km · ETA 18 min
-                  <br />
-                  Progress: Delivery in progress
-                </p>
-              )}
-              {mode === "pickup" && (
-                <p className="driver-meta">
-                  DON-0284 · 18 Jun, 09:35
-                  <br />
-                  45 kg rice collected
-                  <br />
-                  Expires from layer at 15:35
-                </p>
-              )}
-              {mode === "fulfilled" && (
-                <p className="driver-meta">
-                  REQ-1038 · 18 Jun, 08:40
-                  <br />
-                  Delivery and quantity confirmed
-                  <br />
-                  Expires from layer at 20:40
-                </p>
-              )}
+              {side.to && <Link to={side.to}>Open record</Link>}
             </>
           ) : (
             <div className="map-stats">
-              <p>48 open requests</p>
-              <p>124 active volunteers</p>
-              <p>8 drivers en route</p>
-              <p>1 central inventory location</p>
+              <p>{markers.filter((m) => m.kind === "request").length} open requests</p>
+              <p>{markers.filter((m) => m.kind === "volunteer").length} active volunteers</p>
+              <p>{markers.filter((m) => m.kind === "driver").length} active drivers</p>
+              <p>{markers.filter((m) => m.kind === "hub").length} central inventory locations</p>
+              {!markers.length && <p>No live operations are currently available.</p>}
             </div>
           )}
+
+          {!side && error && <p className="map-source-note" role="alert">{error}</p>}
+          {!side && !error && <p className="map-source-note">{live ? "Live map data · refreshes every 15 seconds" : "Connecting to live map data…"}</p>}
 
           <h3>My location</h3>
           <p className="map-side-detail">
@@ -486,7 +388,7 @@ export default function LiveMapPage() {
             ) : tracking ? (
               "Waiting for GPS…"
             ) : (
-              "Live location is off"
+              "Not enabled · live activities remain visible"
             )}
           </p>
           {geoError && (
@@ -510,7 +412,7 @@ export default function LiveMapPage() {
 
           <h3>Map legend</h3>
           <ul className="map-legend">
-            {Object.entries(labels).map(([k, v]) => (
+            {Object.entries(labels).filter(([key]) => key === 'me' ? !!me : displayMarkers.some((marker) => marker.kind === key)).map(([k, v]) => (
               <li key={k} className={`legend-${k}`}>
                 <span />
                 {v}
@@ -526,33 +428,6 @@ export default function LiveMapPage() {
           </div>
         </aside>
       </div>
-      {mode.endsWith("expired") && (
-        <button
-          className="btn map-expired-action"
-          onClick={() => {
-            setSelected(null);
-            setParams({});
-          }}
-        >
-          Back to current time
-        </button>
-      )}
-      {mode === "pickup" && (
-        <button
-          className="btn map-expired-action"
-          onClick={() => setParams({ view: "pickup-expired" })}
-        >
-          Preview 15:36 · marker expired
-        </button>
-      )}
-      {mode === "fulfilled" && (
-        <button
-          className="btn map-exyypired-action"
-          onClick={() => setParams({ view: "fulfilled-expired" })}
-        >
-          Preview 20:41 · marker expired
-        </button>
-      )}
       {error && <p className="map-source-note">{error}</p>}
       {live && (
         <p className="map-source-note">Live, privacy-rounded activity.</p>

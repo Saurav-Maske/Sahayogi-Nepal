@@ -1,7 +1,7 @@
 import type { ChartPoint } from './dashboard';
 
 export interface AnalyticsKpis {
-  peopleSupported: number;
+  fulfilledRequests: number;
   districtsCovered: number;
   volunteerHours: number | null; // null = not tracked yet
   volunteerHoursChangePct: number | null;
@@ -18,5 +18,4 @@ export interface AnalyticsData {
   inventoryStock: ChartPoint[];
   requestsByDistrict: ChartPoint[];
   updatedAt: string;
-  demoSections: string[]; // sections currently showing demo data
 }

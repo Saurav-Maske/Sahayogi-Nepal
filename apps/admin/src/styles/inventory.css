@@ -98,6 +98,10 @@
   border-radius: var(--radius);
   box-shadow: 0 8px 24px rgba(23, 59, 87, .12);
 }
+.inventory-modal--map { max-width: 760px; max-height: 90vh; overflow-y: auto; }
+.inventory-map-toggle { align-self: flex-start; }
+.inventory-map-panel > p { margin: 0 0 8px; color: var(--muted); font-size: 11px; line-height: 16px; }
+.inventory-map-panel .operations-map-preview { height: 300px; }
 .inventory-modal h2 { font-size: 17px; line-height: 24px; color: var(--navy); }
 .inventory-modal > label,
 .inventory-modal-row label { flex: 1; display: flex; flex-direction: column; gap: 6px; font-size: 11px; color: var(--muted); }
