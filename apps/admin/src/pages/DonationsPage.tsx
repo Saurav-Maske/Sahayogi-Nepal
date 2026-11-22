@@ -53,7 +53,11 @@ export default function DonationsPage() {
   }, [search]);
 
   const hasFilters = !!(filters.q || filters.districtId || filters.itemType || filters.from || filters.to);
-  const count = (key: DonationTab) => (key === 'all' ? data?.allTotal : key === 'pending' ? data?.pendingTotal : undefined);
+  const count = (key: DonationTab) =>
+    key === 'all' ? data?.allTotal
+      : key === 'pending' ? data?.pendingTotal
+        : key === 'in_progress' ? data?.inProgressTotal
+          : undefined;
 
   return (
     <>

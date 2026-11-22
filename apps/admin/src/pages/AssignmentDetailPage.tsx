@@ -12,7 +12,33 @@ import "../styles/assignments.css";
 type Detail = Awaited<ReturnType<typeof getAssignment>>;
 const label = (s: string) =>
   s.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase());
-const eventText = (e: AssignmentEvent) => label(e.type);
+const eventText = (e: AssignmentEvent) => {
+  if (e.type === "otp_verified") {
+    return e.payload?.purpose === "pickup"
+      ? "Inventory pickup verified"
+      : "Delivery OTP verified";
+  }
+  const names: Record<string, string> = {
+    accepted: "Assignment accepted",
+    en_route_to_pickup: "Heading to pickup",
+    picked_up: "Pickup completed",
+    en_route_to_destination: "Delivery in progress",
+    delivered: "Delivery completed",
+    incident_opened: "Delivery discrepancy reported",
+    declined: "Assignment declined",
+    expired: "Assignment expired",
+    cancelled: "Assignment cancelled",
+  };
+  return names[e.type] ?? label(e.type);
+};
+const dateTime = (value: string) =>
+  new Date(value).toLocaleString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 export default function AssignmentDetailPage() {
   const { id = "" } = useParams();
   const [data, setData] = useState<Detail | null>(null),
@@ -70,7 +96,7 @@ export default function AssignmentDetailPage() {
     "picked_up",
     "en_route_to_destination",
   ].includes(data.state);
-  const pickup = data.route[0]?.label ?? "—",
+  const pickup = data.route[0]?.label ?? "Pickup location not recorded",
     destination = data.route[data.route.length - 1]?.label ?? data.district;
   const hubReceived = data.events.some((event) => event.type === "hub_received");
   const canCountDonation = data.assignmentType === "pickup" &&
@@ -125,6 +151,9 @@ export default function AssignmentDetailPage() {
       setActionError("Clipboard access is unavailable. Copy the displayed code manually.");
     }
   };
+  const items = data.items
+    .map((i) => `${label(i.item_type)} ${i.qty} ${i.unit}`)
+    .join(" · ");
   return (
     <div className="assignment-detail-page">
       <header className="page__head">
@@ -142,9 +171,7 @@ export default function AssignmentDetailPage() {
       </header>
       <div className="assignment-detail-grid">
         <section className="card assignment-resource">
-          <h2 className="card__title">
-            {label(data.assignmentType)} assignment
-          </h2>
+          <h2 className="card__title">Resource delivery</h2>
           <p className="card__sub">
             <Link to={`/requests/${data.requestId}`}>{data.requestRef}</Link> ·{" "}
             {data.volunteer ?? "Unclaimed"} · {label(data.state)}
@@ -160,30 +187,19 @@ export default function AssignmentDetailPage() {
             </div>
             <div>
               <dt>Items</dt>
-              <dd>
-                {data.items
-                  .map(
-                    (i) =>
-                      `${i.item_type.replace(/_/g, " ")} ${i.qty} ${i.unit}`,
-                  )
-                  .join(" · ") || "No item quantities"}
-              </dd>
+              <dd>{items || "Item quantities not recorded"}</dd>
             </div>
             <div>
-              <dt>Offered</dt>
-              <dd>{new Date(data.offeredAt).toLocaleString()}</dd>
+              <dt>Assigned</dt>
+              <dd>{dateTime(data.offeredAt)}</dd>
             </div>
             <div>
               <dt>Accepted</dt>
               <dd>
                 {data.acceptedAt
-                  ? new Date(data.acceptedAt).toLocaleString()
+                  ? dateTime(data.acceptedAt)
                   : "Awaiting acceptance"}
               </dd>
-            </div>
-            <div>
-              <dt>Tier</dt>
-              <dd>{data.requiredTier}</dd>
             </div>
           </dl>
           {active && (
@@ -250,18 +266,15 @@ export default function AssignmentDetailPage() {
               {data.events.map((e, i) => (
                 <li
                   className={
-                    i === data.events.length - 1
+                    i === data.events.length - 1 && !data.completedAt
                       ? "event-current"
                       : "event-done"
                   }
                   key={e.id}
                 >
                   <span>{eventText(e)}</span>
-                  <p>
-                    {e.actor ? `Actor ${e.actor}` : ""}
-                    {e.payload ? ` · ${JSON.stringify(e.payload)}` : ""}
-                  </p>
-                  <time>{new Date(e.createdAt).toLocaleString()}</time>
+                  <p>{data.volunteer ?? "Assignment activity recorded"}</p>
+                  <time>{dateTime(e.createdAt)}</time>
                 </li>
               ))}
             </ol>
@@ -269,9 +282,7 @@ export default function AssignmentDetailPage() {
             <p className="empty">No assignment events recorded yet.</p>
           )}
           {data.completedAt && (
-            <p className="discrepancy">
-              Completed {new Date(data.completedAt).toLocaleString()}
-            </p>
+            <p className="discrepancy">Completed {dateTime(data.completedAt)}</p>
           )}
         </section>
       </div>

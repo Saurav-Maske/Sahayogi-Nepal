@@ -19,12 +19,13 @@ const when = (iso: string) => {
 
 export default function NotificationsPage() {
   const [tab, setTab] = useState<string>('All notifications');
-  const { items, loading, error, reload } = useNotifications();
+  const { items, loading, error, reload, markRead } = useNotifications();
   const navigate = useNavigate();
   const filtered = useMemo(() => items.filter((item) =>
     tab === 'All notifications' || item.category === tab), [items, tab]);
 
   function openNotice(item: Notice) {
+    markRead(item.id);
     navigate(item.to);
   }
 

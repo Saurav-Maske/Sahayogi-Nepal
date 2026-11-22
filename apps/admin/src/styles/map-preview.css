@@ -3,7 +3,7 @@
   height: 260px;
   overflow: hidden;
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius-sm);
   background: #e9f0eb;
 }
 .operations-map-preview .leaflet-container { width: 100%; height: 100%; font: inherit; }
@@ -13,7 +13,7 @@
   place-items: center;
   padding: 18px;
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius-sm);
   color: var(--muted);
   font-size: 12px;
   text-align: center;
@@ -29,3 +29,7 @@
   color: var(--muted);
   font-size: 10px;
 }
+
+.operations-map-preview,
+.operations-map-preview__message { border-color: rgba(191, 208, 218, .72); }
+.operations-map-preview__note { background: rgba(248, 251, 252, .88); }

@@ -2,15 +2,10 @@
 .incidents-page,
 .incident-detail-page { width: 100%; max-width: none; margin: 0; }
 
-/* .btn--primary is defined in the inventory CSS; if that file isn't loaded here, uncomment:
-.btn--primary { background: var(--navy); border-color: var(--navy); color: #fff; }
-.btn--primary:hover:not(:disabled) { background: var(--teal); border-color: var(--teal); }
-*/
-
 .incident-alert {
   min-height: 62px;
   padding: 14px 16px;
-  background: #eaf1f7;
+  background: var(--info-bg);
   border-radius: 8px;
   font-size: 12px;
   color: var(--navy);
@@ -20,7 +15,7 @@
 
 .incident-filters {
   display: grid;
-  grid-template-columns: 1.15fr .9fr .9fr .9fr;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, .9fr) minmax(0, .9fr) minmax(0, .9fr);
   gap: 12px;
   margin: 16px 0;
 }
@@ -51,7 +46,7 @@
 }
 .incident-table th {
   padding: 12px;
-  background: #edf2f7;
+  background: var(--surface-2);
   color: var(--muted);
   font-size: 11px;
   font-weight: 500;
@@ -73,7 +68,7 @@
 .incident-table td a:hover { text-decoration: underline; }
 
 .incident-status { font-weight: 500; color: var(--muted); }
-.incident-status--open         { color: #b7740b; } /* darker than --warn so text stays readable on white */
+.incident-status--open         { color: var(--warn-text); }
 .incident-status--under_review { color: var(--blue); }
 .incident-status--resolved     { color: var(--good); }
 .incident-status--dismissed    { color: var(--muted); }
@@ -91,12 +86,12 @@
 
 .incident-report .card__sub { margin-top: 6px; }
 .reporter-details { margin-top: 16px; font-size: 12px; line-height: 18px; }
-.reporter-details p { display: grid; grid-template-columns: 72px 1fr; gap: 8px; padding: 2px 0; }
+.reporter-details p { display: grid; grid-template-columns: minmax(0, 72px) minmax(0, 1fr); gap: 8px; padding: 2px 0; }
 .reporter-details strong { font-weight: 500; color: var(--navy); }
 .reporter-details blockquote { margin: 2px 0 0; font-size: 12px; color: var(--text); }
 
 .quantity-review { margin: 16px 0 0; font-size: 12px; line-height: 18px; }
-.quantity-review div { display: grid; grid-template-columns: 145px 1fr; gap: 8px; padding: 3px 0; }
+.quantity-review div { display: grid; grid-template-columns: minmax(0, 145px) minmax(0, 1fr); gap: 8px; padding: 3px 0; }
 .quantity-review dt,
 .quantity-review dd { margin: 0; min-width: 0; font-weight: 500; color: var(--navy); overflow-wrap: anywhere; }
 
@@ -114,29 +109,32 @@
 
 .incident-input-card {
   display: block;
-  margin: 12px 0;
-  padding: 10px 12px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  transition: border-color .15s;
+  margin: 16px 0;
+  padding: 0;
+  border: 0;
 }
-.incident-input-card:focus-within { border-color: var(--blue); box-shadow: 0 0 0 1px var(--blue); }
-.incident-input-card > span { display: block; font-size: 11px; color: var(--muted); }
+.incident-input-card > span { display: block; margin-bottom: 7px; font-size: 13px; font-weight: 600; color: var(--navy); }
 .incident-input-card textarea,
+.incident-input-card input,
 .incident-input-card select {
   display: block;
   width: 100%;
   max-width: 100%;
-  padding: 6px 0;
-  border: 0;
-  outline: 0; /* the wrapper shows focus instead */
-  background: transparent;
+  min-height: 46px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  outline: none;
+  background: var(--surface);
   color: var(--text);
   font: inherit;
-  font-size: 12px;
+  font-size: 14px;
+  line-height: 1.5;
 }
-.incident-input-card textarea { min-height: 40px; resize: vertical; }
-.incident-input-card small { display: block; font-size: 10px; line-height: 14px; color: var(--muted); }
+.incident-input-card textarea { min-height: 118px; resize: vertical; }
+.incident-input-card :is(input, textarea, select):focus { border-color: var(--blue); box-shadow: none; }
+.incident-input-card :is(input, textarea, select):disabled { background: var(--bg); color: var(--muted); cursor: not-allowed; }
+.incident-input-card small { display: block; margin-top: 6px; font-size: 12px; line-height: 1.45; color: var(--muted); }
 
 .incident-resolution .btn--primary {
   display: flex;
@@ -149,14 +147,32 @@
 
 /* ---------- responsive (same breakpoints as admin) ---------- */
 @media (max-width: 900px) {
-  .incident-detail-grid { grid-template-columns: 1fr; }
+  .incident-detail-grid { grid-template-columns: minmax(0, 1fr); }
   .incident-detail-grid > .card { min-height: 0; }
-  .incident-filters { grid-template-columns: 1fr 1fr; }
+  .incident-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 520px) {
-  .incident-filters { grid-template-columns: 1fr; }
+  .incident-filters { grid-template-columns: minmax(0, 1fr); }
   .incident-filters input,
   .incident-filters select,
-  .incident-input-card textarea,
-  .incident-input-card select { font-size: 16px; } /* stops iOS zoom on focus */
+  .incident-input-card :is(input, textarea, select) { font-size: 16px; } /* stops iOS zoom on focus */
 }
+
+/* Navy and teal fade treatment */
+.page .incident-alert,
+.page .incident-guidance { background: rgba(228, 239, 245, .78); }
+.page .incident-table-wrap {
+  border: 1px solid rgba(191, 211, 222, .45);
+  background: rgba(211, 228, 237, .32);
+}
+.page .incident-table th { background: rgba(220, 233, 240, .72); color: #536e80; }
+.page .incident-table td { border-bottom-color: rgba(205, 220, 229, .58); }
+.page .incident-table tbody tr { background: transparent; }
+.page .incident-table tbody tr:nth-child(even) { background: rgba(211, 228, 237, .16); }
+.page .incident-table tbody tr:hover { background: rgba(204, 224, 234, .42); }
+.page .incident-filters :is(input, select),
+.page .incident-input-card :is(input, textarea, select) {
+  border-color: rgba(191, 208, 218, .78);
+  background: rgba(229, 239, 245, .72);
+}
+.page .incident-input-card :is(input, textarea, select):focus { box-shadow: 0 0 0 1px var(--blue); }

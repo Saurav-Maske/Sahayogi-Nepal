@@ -88,7 +88,7 @@ export default function VolunteerProfilePage() {
           <label className="qty">
             <span className="qty__title">Internal admin note</span>
             {rejected ? <span className="note-readonly">{v.reviewNote ?? '—'}</span> : (
-              <textarea rows={2} value={note} onChange={(e) => setNote(e.target.value)} placeholder="e.g. Identity and driving licence reviewed." />
+              <textarea className="qty__textarea" rows={2} value={note} onChange={(e) => setNote(e.target.value)} placeholder="e.g. Identity and driving licence reviewed." />
             )}
             <span className="qty__hint">Restricted to volunteer administrators{!rejected && ' · A note is required to reject or suspend'}</span>
           </label>

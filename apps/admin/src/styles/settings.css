@@ -1,11 +1,6 @@
 /* ---------- settings ---------- */
 .settings-page { width: 100%; max-width: none; margin: 0; }
 
-/* .btn--primary is defined in the inventory CSS; if that file isn't loaded here, uncomment:
-.btn--primary { background: var(--navy); border-color: var(--navy); color: #fff; }
-.btn--primary:hover:not(:disabled) { background: var(--teal); border-color: var(--teal); }
-*/
-
 .settings-grid {
   display: grid;
   grid-template-columns: minmax(0, .9fr) minmax(0, 1fr);
@@ -15,7 +10,7 @@
 
 /* access card */
 .access-list { margin: 16px 0 0; font-size: 12px; line-height: 18px; }
-.access-list div { display: grid; grid-template-columns: 100px 1fr; gap: 8px; padding: 3px 0; }
+.access-list div { display: grid; grid-template-columns: minmax(0, 100px) minmax(0, 1fr); gap: 8px; padding: 3px 0; }
 .access-list dt { font-weight: 500; color: var(--navy); }
 .access-list dd { margin: 0; min-width: 0; color: var(--text); overflow-wrap: anywhere; }
 .access-card h3 { margin: 16px 0 8px; font-size: 14px; line-height: 20px; color: var(--navy); }
@@ -41,7 +36,7 @@
   width: 16px;
   height: 16px;
   margin: 0;
-  border: 1px solid #a0aec0;
+  border: 1px solid var(--border-strong);
   border-radius: 4px;
   background: var(--surface);
   cursor: pointer;
@@ -80,12 +75,19 @@
 }
 .district-setting small { display: block; font-size: 10px; line-height: 14px; color: var(--muted); }
 
-.save-settings { margin-top: 16px; background: var(--navy); border-color: var(--navy); color: #fff; }
-.save-settings:hover:not(:disabled) { background: var(--teal); border-color: var(--teal); color: #fff; }
+.save-settings { margin-top: 16px; }
 .settings-saved { display: inline-block; margin-left: 12px; font-size: 12px; color: var(--good); }
 
 /* ---------- responsive (same breakpoints as admin) ---------- */
 @media (max-width: 900px) {
-  .settings-grid { grid-template-columns: 1fr; }
+  .settings-grid { grid-template-columns: minmax(0, 1fr); }
   .settings-grid > .card { min-height: 0; }
 }
+
+/* Navy and teal fade treatment */
+.page .settings-grid > .card {
+  border-color: rgba(191, 211, 222, .48);
+  background: rgba(211, 228, 237, .42);
+}
+.page .district-setting { background: rgba(229, 239, 245, .62); }
+.page .preference-option input { background: rgba(229, 239, 245, .72); }

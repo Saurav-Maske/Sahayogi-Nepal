@@ -11,6 +11,7 @@ import '../styles/inventory.css';
 
 const PHASES = ['received', 'processing', 'ready_to_ship', 'reserved', 'dispatched', 'adjusted'];
 const ITEM_TYPES = [['food', 'Food'], ['cloth', 'Clothing'], ['temp_shelter', 'Temporary shelter'], ['medical_supplies', 'Medical supplies'], ['drinking_water', 'Drinking water']];
+const STOCK_UNIT = 'kits';
 const itemName = (item: string) => ITEM_TYPES.find(([value]) => value === item)?.[1] ?? item.replace(/_/g, ' ');
 const inventoryId = (id: string) => `INV-${id.slice(0, 8).toUpperCase()}`;
 
@@ -25,7 +26,6 @@ export default function InventoryPage() {
   const [savingAdd, setSavingAdd] = useState(false);
   const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
   const [quantities, setQuantities] = useState<Record<string, string>>({});
-  const [units, setUnits] = useState<Record<string, string>>({});
   const [addProvider, setAddProvider] = useState('');
   const [addContact, setAddContact] = useState('');
   const [addNote, setAddNote] = useState('');
@@ -43,14 +43,14 @@ export default function InventoryPage() {
     && (!query || `${itemName(lot.itemType)} ${lot.provider ?? ''} ${lot.sourceRequest ?? ''} ${inventoryId(lot.id)}`.toLowerCase().includes(query.toLowerCase()))), [lots, category, query]);
 
   async function addItem() {
-    const invalid = selectedTypes.length === 0 || selectedTypes.some((type) => !Number.isFinite(Number(quantities[type])) || Number(quantities[type]) <= 0 || !units[type]?.trim());
-    if (invalid) { setError('Choose at least one resource, then enter a valid quantity and unit for each.'); return; }
+    const invalid = selectedTypes.length === 0 || selectedTypes.some((type) => !Number.isFinite(Number(quantities[type])) || Number(quantities[type]) <= 0);
+    if (invalid) { setError('Choose at least one resource, then enter a valid quantity for each.'); return; }
     setError('');
     setSavingAdd(true);
     try {
-      await importStock(selectedTypes.map((type) => ({ item_type: type, qty: Number(quantities[type]), unit: units[type].trim(), provider_name: addProvider || null, provider_contact: addContact || null, condition_note: addNote || null, phase: 'received' })));
-      const summary = selectedTypes.map((type) => `${quantities[type]} ${units[type].trim()} of ${itemName(type)}`).join('; ');
-      setShowAdd(false); setShowMapPreview(false); setSelectedTypes([]); setQuantities({}); setUnits({}); setAddProvider(''); setAddContact(''); setAddNote(''); setFeedback({ title: 'Inventory receipt added', message: `${summary} recorded in received stock.` }); refresh();
+      await importStock(selectedTypes.map((type) => ({ item_type: type, qty: Number(quantities[type]), unit: STOCK_UNIT, provider_name: addProvider || null, provider_contact: addContact || null, condition_note: addNote || null, phase: 'received' })));
+      const summary = selectedTypes.map((type) => `${quantities[type]} ${STOCK_UNIT} of ${itemName(type)}`).join('; ');
+      setShowAdd(false); setShowMapPreview(false); setSelectedTypes([]); setQuantities({}); setAddProvider(''); setAddContact(''); setAddNote(''); setFeedback({ title: 'Inventory receipt added', message: `${summary} recorded in received stock.` }); refresh();
     } catch (e) { setError(e instanceof Error ? e.message : 'Could not add inventory.'); }
     finally { setSavingAdd(false); }
   }
@@ -87,12 +87,12 @@ export default function InventoryPage() {
       <div className="inventory-dialog-fields">
         <fieldset className="inventory-category-picker"><legend>Select resources</legend>
           <div className="inventory-category-picker__options">{ITEM_TYPES.map(([value, label]) => <label key={value} className={selectedTypes.includes(value) ? 'is-selected' : ''}><input type="checkbox" checked={selectedTypes.includes(value)} onChange={(event) => setSelectedTypes((current) => event.target.checked ? [...current, value] : current.filter((item) => item !== value))}/><span>{label}</span></label>)}</div>
-          <small>Select one or more categories. Each selected item has its own quantity and unit.</small>
+          <small>Select one or more categories. Enter each quantity in kits.</small>
         </fieldset>
         {selectedTypes.length > 0 && <div className="inventory-quantities-list" aria-label="Selected resource quantities">{selectedTypes.map((type) => <div className="inventory-quantity-row" key={type}>
           <strong>{itemName(type)}</strong>
           <label className="admin-dialog__field"><span>Quantity</span><input type="number" min="0.01" step="0.01" value={quantities[type] ?? ''} onChange={(e) => setQuantities((current) => ({ ...current, [type]: e.target.value }))} placeholder="Enter quantity"/></label>
-          <label className="admin-dialog__field"><span>Unit</span><input value={units[type] ?? ''} maxLength={20} onChange={(e) => setUnits((current) => ({ ...current, [type]: e.target.value }))} placeholder="kg, bottles, units"/></label>
+          <div className="admin-dialog__field"><span>Unit</span><strong>{STOCK_UNIT}</strong></div>
         </div>)}</div>}
         <label className="admin-dialog__field"><span>Provider name</span><input value={addProvider} maxLength={120} onChange={(e) => setAddProvider(e.target.value)} placeholder="Supplier or donor"/><small>Optional source for this receipt.</small></label>
         <label className="admin-dialog__field"><span>Provider contact</span><input value={addContact} maxLength={120} onChange={(e) => setAddContact(e.target.value)} placeholder="Phone or email"/><small>Restricted to authorised administrators.</small></label>

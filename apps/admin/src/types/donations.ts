@@ -1,4 +1,4 @@
-export type DonationTab = 'all' | 'pending' | 'accepted' | 'pickup' | 'collected' | 'declined';
+export type DonationTab = 'all' | 'pending' | 'accepted' | 'pickup' | 'in_progress' | 'collected' | 'declined';
 
 /** Four separate records per item (request_items): offered, accepted, donor-updated, verified collected. */
 export interface DonationItem {
@@ -35,5 +35,5 @@ export interface Donation {
 export interface DonationFilters {
   tab: DonationTab; q: string; districtId: number | null; itemType: string; from: string; to: string; page: number;
 }
-export interface DonationList { rows: Donation[]; total: number; allTotal: number; pendingTotal: number }
+export interface DonationList { rows: Donation[]; total: number; allTotal: number; pendingTotal: number; inProgressTotal: number }
 export interface DonationDetail { donation: Donation }

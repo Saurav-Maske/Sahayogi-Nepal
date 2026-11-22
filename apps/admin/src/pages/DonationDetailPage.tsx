@@ -6,9 +6,10 @@ import FeedbackDialog from '../components/overlay/FeedbackDialog';
 import StatusBadge from '../components/requests/StatusBadge';
 import { useDonation } from '../hooks/useDonations';
 import { reviewDonation, saveAcceptedQuantities } from '../services/donationsService';
+import { offerRequestToVolunteers } from '../services/requestsService';
 import type { Donation, DonationItem } from '../types/donations';
 import { humanize } from '../utils/labels';
-import { DONATION_STATUS_LABEL, buildDonationHistory, canAdjustDonation, isPendingDonation } from '../utils/donations';
+import { DONATION_STATUS_LABEL, buildDonationHistory, canAdjustDonation, isFinalDonation, isPendingDonation } from '../utils/donations';
 import { fmtDate, fmtTime } from '../utils/requests';
 import '../styles/requests.css';
 
@@ -23,8 +24,6 @@ function QtyCard({ item, value, editable, onChange }: { item: DonationItem; valu
             <input type="number" min={0} value={value} aria-label={`Accepted ${item.itemType} quantity`} onChange={(e) => set(Number(e.target.value))} />
             <span>{item.unit} accepted</span>
             <span className="qty__btns">
-              <button type="button" aria-label="Decrease" onClick={() => set(value - 1)} disabled={value <= 0}>−</button>
-              <button type="button" aria-label="Increase" onClick={() => set(value + 1)}>+</button>
             </span>
           </>
         ) : (
@@ -63,11 +62,26 @@ export default function DonationDetailPage() {
   const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [distributionError, setDistributionError] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{ title: string; message: string } | null>(null);
 
   useEffect(() => {
     if (d) setQtys(Object.fromEntries(d.items.map((i) => [i.id, i.acceptedQty ?? i.offeredQty])));
   }, [d?.id, d?.status]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!d || !canAdjustDonation(d.status)) return;
+    let active = true;
+    void offerRequestToVolunteers(d.id)
+      .then(() => {
+        if (active) setDistributionError(null);
+        if (active && d.status === 'approved') reload();
+      })
+      .catch((e) => {
+        if (active) setDistributionError(e instanceof Error ? e.message : 'Could not share this donation with volunteers.');
+      });
+    return () => { active = false; };
+  }, [d?.id, d?.status]);
 
   if (loading && !d) return <div className="skeleton-wrap" aria-busy="true"><div className="skeleton skeleton--title" /><div className="skeleton" style={{ height: 320 }} /></div>;
   if (error || !d) {
@@ -83,6 +97,13 @@ export default function DonationDetailPage() {
   const adjustable = canAdjustDonation(d.status);
   const items = d.items.map((i) => ({ item_id: i.id, qty: qtys[i.id] ?? 0 }));
   const total = items.reduce((s, i) => s + i.qty, 0);
+
+  const acceptDonation = async () => {
+    await reviewDonation(d.id, 'approve', items, note.trim());
+    setDistributionError(null);
+    try { await offerRequestToVolunteers(d.id); }
+    catch (e) { setDistributionError(e instanceof Error ? e.message : 'Could not share this donation with volunteers.'); }
+  };
 
   const run = async (fn: () => Promise<void>, done: string) => {
     setBusy(true); setActionError(null); setFeedback(null);
@@ -147,11 +168,22 @@ export default function DonationDetailPage() {
 
           <Records d={d} />
 
+          {!pending && !isFinalDonation(d.status) && (
+            <div className={distributionError ? 'callout callout--bad' : 'callout'} role={distributionError ? 'alert' : undefined}>
+              <strong>{distributionError ? 'Could not share with volunteers' : 'Volunteer distribution'}</strong>
+              <p>{distributionError ?? 'Eligible volunteers can claim this pickup offer in the mobile app. Administrators do not choose an individual driver.'}</p>
+              {distributionError && <button className="btn" disabled={busy} onClick={() => {
+                setBusy(true);
+                void offerRequestToVolunteers(d.id).then(() => { setDistributionError(null); reload(); })
+                  .catch((e) => setDistributionError(e instanceof Error ? e.message : 'Could not share this donation with volunteers.'))
+                  .finally(() => setBusy(false));
+              }}>Retry sharing</button>}
+            </div>
+          )}
+
           {(pending || adjustable) && (
             <label className="qty">
-              <span className="qty__title">Admin note</span>
-              <textarea rows={2} value={note} onChange={(e) => setNote(e.target.value)} placeholder="e.g. Confirm the actual pickup quantity with donor." />
-              <span className="qty__hint">All quantity changes are recorded</span>
+              <textarea className="qty__textarea" rows={2} value={note} onChange={(e) => setNote(e.target.value)} placeholder="e.g. Confirm the actual pickup quantity with donor." />
             </label>
           )}
 
@@ -186,7 +218,7 @@ export default function DonationDetailPage() {
           : 'A clear reason is required and will be shared with the donor.'}
         onClose={() => !busy && setConfirming(null)}
         actions={confirming === 'accept' ? [
-          { label: busy ? 'Accepting…' : 'Accept donation', variant: 'primary', disabled: busy || total <= 0, onClick: () => void run(() => reviewDonation(d.id, 'approve', items, note.trim()), 'Donation accepted.') },
+          { label: busy ? 'Accepting…' : 'Accept donation', variant: 'primary', disabled: busy || total <= 0, onClick: () => void run(acceptDonation, 'Donation accepted.') },
           { label: 'Cancel', disabled: busy, onClick: () => setConfirming(null) },
         ] : confirming === 'decline' ? [
           { label: busy ? 'Declining…' : 'Decline donation', variant: 'danger', disabled: busy || reason.trim().length < 2, onClick: () => void run(() => reviewDonation(d.id, 'decline', [], reason.trim()), 'Donation declined.') },
