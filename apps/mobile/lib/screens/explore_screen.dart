@@ -38,45 +38,45 @@ class _ExploreScreenState extends State<ExploreScreen>
         title: 'Food and clean water needed',
         location: 'Nearby area',
         quantity: '8 households',
-        kind: 'Help request',
-        color: const Color(0xFFE53935),
-        icon: Icons.priority_high_rounded,
+        kind: 'Multiple help requests',
+        status: _RequestStatus.needed,
+        isMultiple: true,
       ),
       _ReliefRequest(
         position: LatLng(anchor.latitude + 0.015, anchor.longitude - 0.006),
         title: 'Temporary shelter support',
         location: 'Nearby area',
         quantity: '4 families',
-        kind: 'Help request',
-        color: const Color(0xFFF4BD32),
-        icon: Icons.priority_high_rounded,
+        kind: 'Temporary shelter',
+        status: _RequestStatus.onTheWay,
+        icon: Icons.home_rounded,
       ),
       _ReliefRequest(
         position: LatLng(anchor.latitude - 0.012, anchor.longitude + 0.004),
-        title: 'Medical supplies delivered',
+        title: 'Food kits delivered',
         location: 'Nearby area',
         quantity: '12 kits',
-        kind: 'Resource request',
-        color: const Color(0xFF159B68),
-        icon: Icons.check_rounded,
+        kind: 'Food only',
+        status: _RequestStatus.closed,
+        icon: Icons.restaurant_rounded,
       ),
       _ReliefRequest(
         position: LatLng(anchor.latitude - 0.018, anchor.longitude - 0.010),
         title: 'Transport volunteers needed',
         location: 'Nearby area',
         quantity: '3 volunteers',
-        kind: 'Assistance request',
-        color: const Color(0xFF247A91),
-        icon: Icons.add_rounded,
+        kind: 'Manpower only',
+        status: _RequestStatus.needed,
+        icon: Icons.person_rounded,
       ),
       _ReliefRequest(
         position: LatLng(anchor.latitude + 0.004, anchor.longitude - 0.018),
-        title: 'Medicine request',
+        title: 'Multiple community requests',
         location: 'Nearby area',
-        quantity: '8 kits',
-        kind: 'Help request',
-        color: const Color(0xFF247A91),
-        count: '8',
+        quantity: '3 requests',
+        kind: 'Multiple help requests',
+        status: _RequestStatus.onTheWay,
+        isMultiple: true,
       ),
     ];
   }
@@ -219,79 +219,21 @@ class _ExploreScreenState extends State<ExploreScreen>
     );
   }
 
-  void _showNearbyRequests() {
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: appPaper,
-      showDragHandle: true,
-      builder: (context) => SafeArea(
-        child: DraggableScrollableSheet(
-          expand: false,
-          initialChildSize: 0.62,
-          minChildSize: 0.35,
-          maxChildSize: 0.9,
-          builder: (context, scrollController) => ListView(
-            controller: scrollController,
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
-            children: [
-              const Text(
-                'Nearby requests',
-                style: TextStyle(
-                  color: appNavy,
-                  fontSize: 20,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 6),
-              const Text(
-                'Sample requests shown until live request data is connected.',
-                style: TextStyle(color: appMuted, fontSize: 13),
-              ),
-              const SizedBox(height: 14),
-              ..._nearbyRequests.map(
-                (request) => Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: Material(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(14),
-                    child: InkWell(
-                      onTap: () {
-                        Navigator.of(context).pop();
-                        _showRequestDetails(request);
-                      },
-                      borderRadius: BorderRadius.circular(14),
-                      child: Padding(
-                        padding: const EdgeInsets.all(14),
-                        child: _requestSummary(request),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              if (_nearbyRequests.isEmpty)
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 20),
-                  child: Text(
-                    _currentPosition == null
-                        ? 'Allow location access to find sample requests within 100 km.'
-                        : 'There are no sample requests within 100 km of your location.',
-                    style: const TextStyle(color: appMuted, fontSize: 13),
-                  ),
-                ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
   Widget _requestDetails(_ReliefRequest request) => Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _requestSummary(request),
           const SizedBox(height: 14),
+          Text(
+            'Status: ${request.statusLabel}',
+            style: TextStyle(
+              color: request.status.color,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 10),
           const Text(
             'Sample map request',
             style: TextStyle(color: appMuted, fontSize: 12),
@@ -323,7 +265,9 @@ class _ExploreScreenState extends State<ExploreScreen>
                 const SizedBox(height: 3),
                 Text(
                   '${request.kind} · ${request.location} · ${request.quantity}',
-                  style: const TextStyle(color: appMuted, fontSize: 12),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: appMuted, fontSize: 11),
                 ),
               ],
             ),
@@ -583,7 +527,26 @@ class _ExploreScreenState extends State<ExploreScreen>
                           ),
                         ),
                       ),
-                      const SizedBox(height: 14),
+                      const SizedBox(height: 12),
+                      const Wrap(
+                        spacing: 12,
+                        runSpacing: 6,
+                        children: [
+                          _MapLegendItem(
+                            color: Color(0xFFE53935),
+                            label: 'Currently needed',
+                          ),
+                          _MapLegendItem(
+                            color: Color(0xFFF4BD32),
+                            label: 'Help on the way',
+                          ),
+                          _MapLegendItem(
+                            color: Color(0xFF159B68),
+                            label: 'Request closed',
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
                       Container(
                         padding: const EdgeInsets.all(14),
                         decoration: BoxDecoration(
@@ -591,58 +554,80 @@ class _ExploreScreenState extends State<ExploreScreen>
                           border: Border.all(color: const Color(0xFFE0E6EC)),
                           borderRadius: BorderRadius.circular(18),
                         ),
-                        child: SizedBox(
-                          child: Column(
-                            children: [
-                              Padding(
-                                padding: const EdgeInsets.only(bottom: 10),
-                                child: Row(
-                                  children: [
-                                    const Icon(
-                                      Icons.radar_rounded,
-                                      size: 16,
-                                      color: appTeal,
-                                    ),
-                                    const SizedBox(width: 6),
-                                    Expanded(
-                                      child: Text(
-                                        _currentPosition == null
-                                            ? 'Requests within 100 km'
-                                            : '${_nearbyRequests.length} sample requests within 100 km',
-                                        style: const TextStyle(
-                                          color: appMuted,
-                                          fontSize: 12,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Row(
+                              children: [
+                                const Icon(
+                                  Icons.radar_rounded,
+                                  size: 17,
+                                  color: appTeal,
                                 ),
-                              ),
-                              SizedBox(
-                                height: 52,
-                                width: double.infinity,
-                                child: FilledButton.icon(
-                                  onPressed: _showNearbyRequests,
-                                  iconAlignment: IconAlignment.end,
-                                  icon: const Icon(
-                                    Icons.arrow_forward_rounded,
-                                  ),
-                                  label: const Text('View nearby requests'),
-                                  style: FilledButton.styleFrom(
-                                    backgroundColor: appNavy,
-                                    foregroundColor: Colors.white,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(15),
-                                    ),
-                                    textStyle: const TextStyle(
-                                      fontSize: 14,
+                                const SizedBox(width: 7),
+                                const Expanded(
+                                  child: Text(
+                                    'Nearby requests',
+                                    style: TextStyle(
+                                      color: appNavy,
+                                      fontSize: 15,
                                       fontWeight: FontWeight.w700,
                                     ),
                                   ),
                                 ),
-                              ),
-                            ],
-                          ),
+                                Text(
+                                  '${_nearbyRequests.length} within 100 km',
+                                  style: const TextStyle(
+                                    color: appMuted,
+                                    fontSize: 10,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 5),
+                            const Text(
+                              'Sample requests until live request data is connected.',
+                              style: TextStyle(color: appMuted, fontSize: 11),
+                            ),
+                            const SizedBox(height: 10),
+                            SizedBox(
+                              height: 236,
+                              child: _nearbyRequests.isEmpty
+                                  ? Center(
+                                      child: Padding(
+                                        padding: const EdgeInsets.all(16),
+                                        child: Text(
+                                          _currentPosition == null
+                                              ? 'Allow location access to find sample requests within 100 km.'
+                                              : 'There are no sample requests within 100 km of your location.',
+                                          textAlign: TextAlign.center,
+                                          style: const TextStyle(
+                                            color: appMuted,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                      ),
+                                    )
+                                  : ListView.separated(
+                                      itemCount: _nearbyRequests.length,
+                                      separatorBuilder: (_, __) =>
+                                          const Divider(height: 1),
+                                      itemBuilder: (context, index) {
+                                        final request = _nearbyRequests[index];
+                                        return InkWell(
+                                          onTap: () =>
+                                              _showRequestDetails(request),
+                                          child: Padding(
+                                            padding: const EdgeInsets.symmetric(
+                                              vertical: 9,
+                                            ),
+                                            child: _requestSummary(request),
+                                          ),
+                                        );
+                                      },
+                                    ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
@@ -670,9 +655,9 @@ class _ReliefRequest {
     required this.location,
     required this.quantity,
     required this.kind,
-    required this.color,
     this.icon,
-    this.count,
+    required this.status,
+    this.isMultiple = false,
   });
 
   final LatLng position;
@@ -680,9 +665,25 @@ class _ReliefRequest {
   final String location;
   final String quantity;
   final String kind;
-  final Color color;
   final IconData? icon;
-  final String? count;
+  final _RequestStatus status;
+  final bool isMultiple;
+
+  String get statusLabel => switch (status) {
+        _RequestStatus.needed => 'Currently needed',
+        _RequestStatus.onTheWay => 'Help on the way',
+        _RequestStatus.closed => 'Request closed',
+      };
+}
+
+enum _RequestStatus { needed, onTheWay, closed }
+
+extension on _RequestStatus {
+  Color get color => switch (this) {
+        _RequestStatus.needed => const Color(0xFFE53935),
+        _RequestStatus.onTheWay => const Color(0xFFF4BD32),
+        _RequestStatus.closed => const Color(0xFF159B68),
+      };
 }
 
 class _RequestMapMarker extends StatelessWidget {
@@ -696,7 +697,7 @@ class _RequestMapMarker extends StatelessWidget {
         width: size,
         height: size,
         decoration: BoxDecoration(
-          color: request.color,
+          color: request.status.color,
           shape: BoxShape.circle,
           border: Border.all(color: Colors.white, width: 3),
           boxShadow: const [
@@ -708,20 +709,35 @@ class _RequestMapMarker extends StatelessWidget {
           ],
         ),
         alignment: Alignment.center,
-        child: request.count != null
-            ? Text(
-                request.count!,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w800,
-                ),
-              )
-            : Icon(
-                request.icon,
-                color: Colors.white,
-                size: size * 0.53,
-              ),
+        child: Icon(
+          request.isMultiple ? Icons.priority_high_rounded : request.icon,
+          color: Colors.white,
+          size: size * 0.53,
+        ),
+      );
+}
+
+class _MapLegendItem extends StatelessWidget {
+  const _MapLegendItem({required this.color, required this.label});
+
+  final Color color;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) => Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+          ),
+          const SizedBox(width: 5),
+          Text(
+            label,
+            style: const TextStyle(color: appMuted, fontSize: 9),
+          ),
+        ],
       );
 }
 

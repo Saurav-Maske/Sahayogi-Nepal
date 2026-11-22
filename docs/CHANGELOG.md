@@ -2,6 +2,50 @@
 
 Newest first. Anything that changes a payload, table, function or seed behaviour gets a line here.
 
+## 2026-11-22 (first full run on the hosted demo project)
+
+- **Result:** `npm run test:api` against the hosted demo project passed: `sahayogi-edge-api` 37 requests / 0 failed, `sahayogi-flows` 86 requests / 0 failed. 28 of 43 Edge endpoints have a Postman request; the sign-up, password-reset, upload, route, driver-location, volunteer-approval and `send-push` functions are not covered yet.
+- **Behaviour:** `admin-api` now answers a missing, invalid or expired token with `401 unauthenticated` (it was `403 forbidden`). `403 forbidden` is only for a signed-in user who is not an admin. Same as `volunteer-api`. Clients should treat 401 as "refresh or sign in again". Change is in `supabase/functions/_shared/rpc.ts`.
+- **Tests:** device-token test now sends a token of at least 20 characters (the RPC requires 20-4096). Removed a contradictory `no error` assertion from the `skip OTP early` flow step (the expected result is a 409 `otp_required` error).
+- **Deploy note:** `submit-request` must be redeployed with the rest (`supabase functions deploy`, no names). A stale copy did not return `request_id`, which broke every flow step that uses it.
+
+## 2026-11-22 (test runner and demo deploy)
+
+- **Tests:** `scripts/tests/matrix.mjs` (+ `lib.mjs`) runs the concurrency, RLS and role rows of `TEST-MATRIX.md` as real roles over HTTP. `npm run test:matrix` and `test:matrix:fast` in `scripts/`. Not yet run against a project.
+- **Demo project:** `scripts/demo_deploy.sh` and `scripts/demo_deploy.ps1` (link, `db push --include-seed`, secrets, deploy all functions), `scripts/demo_vault_secrets.sql` (vault entries for send-push), `supabase/functions/.env.demo.example`, `docs/DEMO-SETUP.md`.
+- **Postman:** `postman/sahayogi-edge-api.postman_collection.json` and `postman/demo.postman_environment.json` cover admin-api, volunteer-api and public-api, including the 401/403/404 cases. Edge API endpoints are documented in `docs/API-EDGE.md`.
+
+## 2026-11-22 (migrations 000008 and 000009 rebuilt)
+
+- **Why:** `20261122000008_email_otp.sql` and `20261122000009_push_outbox.sql` were 0 bytes in `Sahayogi-Nepal-test.zip` (issue 13). Both were rebuilt from the code that depends on them (`_shared/otp.ts`, the auth functions, `send-push`) and from the entries below. **Not yet run against a database.** If the originals exist in Git or on a project that already applied them, keep the originals and discard these.
+- **000008:** `email_otps` (unique per email + purpose), `auth_attempts.kind` widened with `otp_send | otp_verify`, `volunteer_applications.email_verified_at`, `purge_email_otps()`, `revoke_user_sessions(uuid)`. Service role only.
+- **000008 (addition):** pg_cron jobs `purge-email-otps` (daily 03:23 UTC, calls `purge_email_otps()`) and `purge-auth-attempts` (daily 03:29 UTC, calls `purge_auth_attempts()`). Both functions existed but were never scheduled. Re-running the migration replaces the jobs. Not yet run.
+- **000009:** `push_outbox`, statement-level triggers on `assignments` (new offer, released back to pool), `_push_kick()` (pg_net + vault entries `push_function_url` and `push_secret`), `_push_enqueue_escalations()`, `_push_tick()`, `push_claim_batch(int)`, `push_recipients(uuid, text)`, pg_cron jobs `push-escalations` (every minute) and `purge-push-outbox` (daily). Service role only.
+
+## 2026-11-22 (function privileges clean-up)
+
+- **Migration `20261122000011_function_privileges.sql`:** closes issue 11. `audit_row_hash`, `fn_export_latest_audit_hash`, the four trigger functions (`fn_audit_logs_hash_chain`, `fn_audit_logs_append_only`, `fn_assignment_sync_driver_location`, `auto_assign_request_district_id`) and any other non-RPC function in `public` (push and email OTP helpers included) are now `service_role` only. A sweep applies the rule to everything not on the client RPC list, and the migration fails and rolls back if `anon` or `authenticated` can still execute something outside its list.
+- **`is_admin()` stays executable by `anon` and `authenticated` on purpose:** RLS policies and the volunteer-docs storage policy call it as the requesting role. It returns false for anon.
+- **No payload or behaviour change for the apps.** Contract stays v1.4.
+- **New `scripts/check_function_privileges.sql`:** query 1 returns only violations (zero rows = pass); run it after every `supabase db push`.
+
+## 2026-11-22 (get-route complete)
+
+- **Migration `20261122000010_routes.sql`:** new `routes` table (user, optional `assignment_id`, origin and destination, costing, distance, duration, first-leg `shape`, all `legs` as jsonb). RLS: a user reads their own rows, admins read all; no client writes (the function uses the service role). Closes the routes-table gap.
+- **Edge Function `get-route`:** `save: true` now works and accepts an optional `assignment_id` (must be the caller's own assignment, or the caller is an admin). Response adds `legs` (one entry per leg) next to `shape`, so routes with three or more points (driver, hub, requester) are not cut to the first leg. Locations are limited to 2-10.
+- **Behaviour changes:** `strict_nepal` now defaults to true (send `false` to opt out). Suspended accounts get `403 account_suspended`. Valhalla error text is logged, not returned. Upstream calls time out after 15 s. `costing_options` must be a small object (`invalid_costing_options`). New error codes: `account_suspended`, `invalid_costing_options`, `invalid_assignment_id`, `not_found`.
+- **Contract:** v1.4. The planned `routes` item is removed.
+
+## 2026-11-22 (push notifications)
+
+- **Migration `20261122000009_push_outbox.sql`:** new `push_outbox` table (no client access), triggers that queue a `new_offer` row when an assignment is inserted as `offered` or released back to the pool, `_push_enqueue_escalations()` (tier A, once per assignment), `_push_kick()` (calls the function through `pg_net`), and service-role-only `push_claim_batch(p_limit)` and `push_recipients(p_assignment, p_kind)`. pg_cron job `push-escalations` runs every minute (queues escalations and retries failed rows); `purge-push-outbox` deletes finished rows after 7 days.
+- **Edge Function `send-push`** plus `_shared/fcm.ts` (FCM HTTP v1, service-account JWT, no SDK). Listed in `config.toml` with `verify_jwt = false`; it is protected by the `x-push-secret` header instead.
+- **Behaviour:** who gets a push uses the same rule as `my_offers`. Payload is IDs only (`type`, `assignment_id`, `request_id`); the OTP is never pushed. Dead tokens are removed. A row is tried up to 5 times.
+- **Setup (once per project):** secrets `PUSH_WEBHOOK_SECRET`, `FCM_SERVICE_ACCOUNT` (and `PUSH_DRY_RUN=true` locally only); two vault entries `push_function_url` and `push_secret`; `supabase functions deploy send-push`. Without the vault entries nothing is sent and the outbox just waits.
+- **Not audited on purpose:** no business state changes and the volume would flood the hash chain.
+- **Flutter (Person 1):** call `register_device_token` on start and on token refresh; handle `data.type` `new_offer | escalated` by opening the offer or refreshing `my_offers()`; create a high-importance Android channel.
+- **Contract:** v1.3. The Push notifications section replaces the planned item.
+
 ## 2026-11-22 (email OTP for sign-up and forgot password)
 
 - **Migration `20261122000008_email_otp.sql`:** new `email_otps` table (one row per email + purpose, HMAC hashes only, no client access), `auth_attempts.kind` now also allows `otp_send | otp_verify`, new column `volunteer_applications.email_verified_at`, `purge_email_otps()` and `revoke_user_sessions(uuid)` (both service role only).

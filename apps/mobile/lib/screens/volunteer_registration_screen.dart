@@ -5,6 +5,8 @@ import 'package:image_picker/image_picker.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../core/app_colors.dart';
+import 'volunteer_dashboard_screen.dart';
+import 'terms_and_conditions_screen.dart';
 
 class VolunteerRegistrationScreen extends StatefulWidget {
   const VolunteerRegistrationScreen({super.key});
@@ -24,49 +26,116 @@ class _VolunteerRegistrationScreenState
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   final _imagePicker = ImagePicker();
-  String? _contribution;
+  bool _passwordVisible = false;
+  bool _confirmPasswordVisible = false;
+  bool _agreedToVolunteer = false;
+  bool _transportManpowerSelected = false;
+  bool _healthWorkerSelected = false;
   XFile? _nidImage;
   Uint8List? _nidImageBytes;
+  XFile? _drivingLicenseImage;
+  Uint8List? _drivingLicenseImageBytes;
+  XFile? _medicalLicenseImage;
+  Uint8List? _medicalLicenseImageBytes;
   bool _documentError = false;
-  bool _contributionError = false;
+  bool _drivingLicenseError = false;
+  bool _medicalLicenseError = false;
+  bool _agreementError = false;
 
-  Future<void> _pickNidImage() async {
+  List<String> get _selectedRoles => [
+        'Human Manpower',
+        if (_transportManpowerSelected) 'Transport Manpower',
+        if (_healthWorkerSelected) 'Health Worker',
+      ];
+
+  Future<void> _pickDocumentImage({
+    required String documentName,
+    required void Function(XFile image, Uint8List bytes) onPicked,
+  }) async {
     try {
       final image = await _imagePicker.pickImage(
         source: ImageSource.gallery,
-        maxWidth: 2200,
-        imageQuality: 85,
       );
       if (image == null) return;
 
-      final imageBytes = await image.readAsBytes();
-      if (imageBytes.lengthInBytes > _maxNidImageBytes) {
+      final imageSize = await image.length();
+      if (imageSize > _maxNidImageBytes) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Choose an image no larger than 5 MB.'),
+            content: Text('Choose a JPG or PNG image no larger than 5 MB.'),
           ),
         );
         return;
       }
 
+      final imageBytes = await image.readAsBytes();
+      if (imageBytes.lengthInBytes > _maxNidImageBytes) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Choose an image no larger than 5 MB.')),
+        );
+        return;
+      }
+
       if (!mounted) return;
-      setState(() {
-        _nidImage = image;
-        _nidImageBytes = imageBytes;
-        _documentError = false;
-      });
+      onPicked(image, imageBytes);
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not open your photo library.')),
+        SnackBar(content: Text('Could not upload the $documentName image.')),
       );
     }
   }
 
+  Future<void> _pickNidImage() => _pickDocumentImage(
+        documentName: 'NID/Citizenship',
+        onPicked: (image, bytes) => setState(() {
+          _nidImage = image;
+          _nidImageBytes = bytes;
+          _documentError = false;
+        }),
+      );
+
+  Future<void> _pickDrivingLicenseImage() => _pickDocumentImage(
+        documentName: 'driving license',
+        onPicked: (image, bytes) => setState(() {
+          _drivingLicenseImage = image;
+          _drivingLicenseImageBytes = bytes;
+          _drivingLicenseError = false;
+        }),
+      );
+
+  Future<void> _pickMedicalLicenseImage() => _pickDocumentImage(
+        documentName: 'medical license',
+        onPicked: (image, bytes) => setState(() {
+          _medicalLicenseImage = image;
+          _medicalLicenseImageBytes = bytes;
+          _medicalLicenseError = false;
+        }),
+      );
+
   void _removeNidImage() => setState(() {
         _nidImage = null;
         _nidImageBytes = null;
+      });
+
+  void _toggleTransportManpower() => setState(() {
+        _transportManpowerSelected = !_transportManpowerSelected;
+        if (!_transportManpowerSelected) {
+          _drivingLicenseImage = null;
+          _drivingLicenseImageBytes = null;
+          _drivingLicenseError = false;
+        }
+      });
+
+  void _toggleHealthWorker() => setState(() {
+        _healthWorkerSelected = !_healthWorkerSelected;
+        if (!_healthWorkerSelected) {
+          _medicalLicenseImage = null;
+          _medicalLicenseImageBytes = null;
+          _medicalLicenseError = false;
+        }
       });
 
   @override
@@ -80,20 +149,35 @@ class _VolunteerRegistrationScreenState
 
   void _submit() {
     if (!_formKey.currentState!.validate()) return;
-    if (_nidImage == null || _contribution == null) {
+    final missingNid = _nidImage == null;
+    final missingAgreement = !_agreedToVolunteer;
+    final missingDrivingLicense =
+        _transportManpowerSelected && _drivingLicenseImage == null;
+    final missingMedicalLicense =
+        _healthWorkerSelected && _medicalLicenseImage == null;
+    if (missingNid ||
+        missingAgreement ||
+        missingDrivingLicense ||
+        missingMedicalLicense) {
       setState(() {
-        _documentError = _nidImage == null;
-        _contributionError = _contribution == null;
+        _documentError = missingNid;
+        _agreementError = missingAgreement;
+        _drivingLicenseError = missingDrivingLicense;
+        _medicalLicenseError = missingMedicalLicense;
       });
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Complete all required fields.')),
       );
       return;
     }
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Volunteer registration is not connected yet.'),
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute<void>(
+        builder: (_) => VolunteerDashboardScreen(
+          volunteerName: _nameController.text.trim(),
+          roles: _selectedRoles,
+        ),
       ),
+      (route) => route.isFirst,
     );
   }
 
@@ -196,7 +280,21 @@ class _VolunteerRegistrationScreenState
                     label: 'Password',
                     hint: 'Create a secure password',
                     controller: _passwordController,
-                    obscureText: true,
+                    obscureText: !_passwordVisible,
+                    suffixIcon: IconButton(
+                      onPressed: () => setState(
+                        () => _passwordVisible = !_passwordVisible,
+                      ),
+                      tooltip:
+                          _passwordVisible ? 'Hide password' : 'Show password',
+                      icon: Icon(
+                        _passwordVisible
+                            ? Icons.visibility_off_outlined
+                            : Icons.visibility_outlined,
+                        color: appMuted,
+                        size: 21,
+                      ),
+                    ),
                     helperText:
                         '8+ characters with uppercase, lowercase, number and symbol',
                     validator: _validatePassword,
@@ -206,7 +304,23 @@ class _VolunteerRegistrationScreenState
                     label: 'Confirm password',
                     hint: 'Re-enter your password',
                     controller: _confirmPasswordController,
-                    obscureText: true,
+                    obscureText: !_confirmPasswordVisible,
+                    suffixIcon: IconButton(
+                      onPressed: () => setState(
+                        () =>
+                            _confirmPasswordVisible = !_confirmPasswordVisible,
+                      ),
+                      tooltip: _confirmPasswordVisible
+                          ? 'Hide password'
+                          : 'Show password',
+                      icon: Icon(
+                        _confirmPasswordVisible
+                            ? Icons.visibility_off_outlined
+                            : Icons.visibility_outlined,
+                        color: appMuted,
+                        size: 21,
+                      ),
+                    ),
                     validator: (value) {
                       if (value == null || value.isEmpty) {
                         return 'Confirm your password';
@@ -220,20 +334,83 @@ class _VolunteerRegistrationScreenState
                   const SizedBox(height: 20),
                   _nidDocumentUpload(),
                   const SizedBox(height: 20),
+                  Material(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(14),
+                    child: InkWell(
+                      onTap: () => setState(() {
+                        _agreedToVolunteer = !_agreedToVolunteer;
+                        _agreementError = false;
+                      }),
+                      borderRadius: BorderRadius.circular(14),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 7,
+                        ),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                            color: _agreementError
+                                ? Colors.redAccent
+                                : const Color(0xFFE0E6EC),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Checkbox(
+                              value: _agreedToVolunteer,
+                              onChanged: (value) => setState(() {
+                                _agreedToVolunteer = value ?? false;
+                                _agreementError = false;
+                              }),
+                              activeColor: appNavy,
+                            ),
+                            const Expanded(
+                              child: Text(
+                                'I agree to be a volunteer',
+                                style: TextStyle(
+                                  color: appNavy,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                            const Text(
+                              'Required',
+                              style: TextStyle(color: appMuted, fontSize: 10),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  if (_agreementError) ...[
+                    const SizedBox(height: 6),
+                    const Text(
+                      'Agree to be a volunteer to continue.',
+                      style: TextStyle(color: Colors.redAccent, fontSize: 11),
+                    ),
+                  ],
+                  const SizedBox(height: 20),
                   const Text(
-                    'How would you like to contribute?',
+                    'Additional roles',
                     style: TextStyle(
                       color: appNavy,
                       fontSize: 14,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
-                  const SizedBox(height: 18),
+                  const SizedBox(height: 6),
                   const Text(
-                    'By joining, you agree to our Terms and Privacy Policy.',
-                    style: TextStyle(color: appMuted, fontSize: 11),
+                    'Transport and Health Worker roles include Human Manpower by default. You may select either or both.',
+                    style: TextStyle(
+                      color: appMuted,
+                      fontSize: 11,
+                      height: 1.4,
+                    ),
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 14),
                   LayoutBuilder(
                     builder: (context, constraints) {
                       final optionWidth = (constraints.maxWidth - 12) / 2;
@@ -243,42 +420,80 @@ class _VolunteerRegistrationScreenState
                         children: [
                           _ContributionOption(
                             width: optionWidth,
-                            title: 'Human Manpower',
-                            selected: _contribution == 'Human Manpower',
-                            onTap: () => setState(() {
-                              _contribution = 'Human Manpower';
-                              _contributionError = false;
-                            }),
-                          ),
-                          _ContributionOption(
-                            width: optionWidth,
                             title: 'Transport Manpower',
-                            selected: _contribution == 'Transport Manpower',
-                            onTap: () => setState(() {
-                              _contribution = 'Transport Manpower';
-                              _contributionError = false;
-                            }),
+                            selected: _transportManpowerSelected,
+                            onTap: _toggleTransportManpower,
                           ),
                           _ContributionOption(
                             width: optionWidth,
                             title: 'Health Worker',
-                            selected: _contribution == 'Health Worker',
-                            onTap: () => setState(() {
-                              _contribution = 'Health Worker';
-                              _contributionError = false;
-                            }),
+                            selected: _healthWorkerSelected,
+                            onTap: _toggleHealthWorker,
                           ),
                         ],
                       );
                     },
                   ),
-                  if (_contributionError) ...[
-                    const SizedBox(height: 6),
-                    const Text(
-                      'Choose how you would like to contribute.',
-                      style: TextStyle(color: Colors.redAccent, fontSize: 11),
+                  if (_transportManpowerSelected) ...[
+                    const SizedBox(height: 16),
+                    _documentUpload(
+                      title: 'Driving license (required)',
+                      image: _drivingLicenseImage,
+                      imageBytes: _drivingLicenseImageBytes,
+                      error: _drivingLicenseError,
+                      errorMessage: 'Upload your driving license image.',
+                      onPick: _pickDrivingLicenseImage,
+                      onRemove: () => setState(() {
+                        _drivingLicenseImage = null;
+                        _drivingLicenseImageBytes = null;
+                      }),
                     ),
                   ],
+                  if (_healthWorkerSelected) ...[
+                    const SizedBox(height: 16),
+                    _documentUpload(
+                      title: 'Medical license (required)',
+                      image: _medicalLicenseImage,
+                      imageBytes: _medicalLicenseImageBytes,
+                      error: _medicalLicenseError,
+                      errorMessage: 'Upload your medical license image.',
+                      onPick: _pickMedicalLicenseImage,
+                      onRemove: () => setState(() {
+                        _medicalLicenseImage = null;
+                        _medicalLicenseImageBytes = null;
+                      }),
+                    ),
+                  ],
+                  const SizedBox(height: 18),
+                  Wrap(
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      const Text(
+                        'By joining, you agree to our Terms and ',
+                        style: TextStyle(color: appMuted, fontSize: 11),
+                      ),
+                      GestureDetector(
+                        onTap: () => Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => const TermsAndConditionsScreen(),
+                          ),
+                        ),
+                        child: const Text(
+                          'Privacy Policy',
+                          style: TextStyle(
+                            color: appNavy,
+                            fontSize: 11,
+                            decoration: TextDecoration.underline,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      const Text(
+                        '.',
+                        style: TextStyle(color: appMuted, fontSize: 11),
+                      ),
+                    ],
+                  ),
                   const SizedBox(height: 20),
                   SizedBox(
                     width: double.infinity,
@@ -331,7 +546,7 @@ class _VolunteerRegistrationScreenState
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'NID/Citizenship',
+            'NID/Citizenship (required)',
             style: TextStyle(
               color: Color(0xFF263746),
               fontSize: 12,
@@ -388,7 +603,7 @@ class _VolunteerRegistrationScreenState
                                 ),
                                 SizedBox(height: 4),
                                 Text(
-                                  'JPG or PNG · up to 10 MB',
+                                  'JPG or PNG · up to 5 MB',
                                   style: TextStyle(
                                     color: appMuted,
                                     fontSize: 11,
@@ -467,6 +682,139 @@ class _VolunteerRegistrationScreenState
         ],
       );
 
+  Widget _documentUpload({
+    required String title,
+    required XFile? image,
+    required Uint8List? imageBytes,
+    required bool error,
+    required String errorMessage,
+    required VoidCallback onPick,
+    required VoidCallback onRemove,
+  }) =>
+      Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+              color: Color(0xFF263746),
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 9),
+          Material(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            child: InkWell(
+              onTap: onPick,
+              borderRadius: BorderRadius.circular(14),
+              child: Container(
+                width: double.infinity,
+                constraints: const BoxConstraints(minHeight: 82),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: error ? Colors.redAccent : const Color(0xFFE0E6EC),
+                  ),
+                ),
+                child: image == null
+                    ? Row(
+                        children: [
+                          Container(
+                            width: 42,
+                            height: 42,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFE8EFF4),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Icon(
+                              Icons.upload_file_rounded,
+                              color: appNavy,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          const Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(
+                                  'Upload document image',
+                                  style: TextStyle(
+                                    color: appNavy,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                SizedBox(height: 4),
+                                Text(
+                                  'JPG or PNG · up to 5 MB',
+                                  style: TextStyle(
+                                    color: appMuted,
+                                    fontSize: 11,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const Icon(
+                            Icons.add_photo_alternate_outlined,
+                            color: appTeal,
+                            size: 22,
+                          ),
+                        ],
+                      )
+                    : Row(
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(9),
+                            child: Image.memory(
+                              imageBytes!,
+                              width: 58,
+                              height: 58,
+                              fit: BoxFit.cover,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              image.name,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: appNavy,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                          IconButton(
+                            onPressed: onRemove,
+                            tooltip: 'Remove document image',
+                            visualDensity: VisualDensity.compact,
+                            icon: const Icon(
+                              Icons.delete_outline_rounded,
+                              color: appMuted,
+                              size: 20,
+                            ),
+                          ),
+                        ],
+                      ),
+              ),
+            ),
+          ),
+          if (error) ...[
+            const SizedBox(height: 6),
+            Text(
+              errorMessage,
+              style: const TextStyle(color: Colors.redAccent, fontSize: 11),
+            ),
+          ],
+        ],
+      );
+
   Widget _formField({
     required String label,
     required String hint,
@@ -475,6 +823,7 @@ class _VolunteerRegistrationScreenState
     TextInputType keyboardType = TextInputType.text,
     bool obscureText = false,
     String? helperText,
+    Widget? suffixIcon,
   }) =>
       Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -505,11 +854,7 @@ class _VolunteerRegistrationScreenState
               isDense: true,
               contentPadding:
                   const EdgeInsets.symmetric(horizontal: 14, vertical: 15),
-              suffixIcon: const Icon(
-                Icons.chevron_right_rounded,
-                color: appMuted,
-                size: 22,
-              ),
+              suffixIcon: suffixIcon,
               errorStyle: const TextStyle(fontSize: 11),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(14),
@@ -573,10 +918,10 @@ class _ContributionOption extends StatelessWidget {
               children: [
                 Icon(
                   selected
-                      ? Icons.radio_button_checked
-                      : Icons.radio_button_unchecked,
+                      ? Icons.check_box_rounded
+                      : Icons.check_box_outline_blank_rounded,
                   color: selected ? appNavy : appNavy,
-                  size: 14,
+                  size: 17,
                 ),
                 const SizedBox(width: 8),
                 Expanded(

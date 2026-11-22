@@ -3,12 +3,22 @@ import type { ApprovedItem, DetailResult, District, ListResult, RequestFilters, 
 import { PAGE_SIZE, TABS } from '../utils/requests';
 import { hasSession } from './session';
 
-/* ---- backend contract: confirm with Person 2 (admin_review_request is still a TODO in API-CONTRACT.md) ---- */
-export const REVIEW_RPC = 'admin_review_request';
+/* ---- backend contract (live): admin_approve_request(p_id, p_items) and admin_decline_request(p_id, p_reason) ---- */
 export const DECISION = { approve: 'approve', decline: 'decline' } as const;
-export const RPC_PARAMS = (id: string, decision: string, items: ApprovedItem[], reason: string) => ({
-  p_request_id: id, p_decision: decision, p_approved_items: items, p_reason: reason,
-});
+
+/** Approve or decline through the live RPCs. Shared with donationsService. Errors carry the RPC's code as message
+ *  (forbidden | not_found | invalid_state | invalid_items | invalid_reason | insufficient_stock ...). */
+export async function callReviewRpc(id: string, decision: 'approve' | 'decline', items: ApprovedItem[], reason: string) {
+  if (decision === 'decline') {
+    const { error } = await supabase.rpc('admin_decline_request', { p_id: id, p_reason: reason });
+    if (error) throw error;
+    return;
+  }
+  // null = approve everything as requested; otherwise only the items the admin changed, as { item_id, approved_qty }.
+  const p_items = items.length ? items.map((i) => ({ item_id: i.item_id, approved_qty: i.qty })) : null;
+  const { error } = await supabase.rpc('admin_approve_request', { p_id: id, p_items });
+  if (error) throw error;
+}
 const IN_STOCK_PHASES = ['received', 'processing', 'ready_to_ship'];
 
 const DAY = 864e5;
@@ -155,6 +165,5 @@ export async function reviewRequest(id: string, decision: 'approve' | 'decline',
     r.items.forEach((i) => { i.approvedQty = items.find((a) => a.item_id === i.id)?.qty ?? 0; });
     return;
   }
-  const { error } = await supabase.rpc(REVIEW_RPC, RPC_PARAMS(id, DECISION[decision], items, reason));
-  if (error) throw error;
+  await callReviewRpc(id, decision, items, reason);
 }

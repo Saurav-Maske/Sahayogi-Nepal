@@ -1,4 +1,4 @@
-# API Contract (v1.2, owned by Person 2: Rujan Dhamala, Aakash Thakur)
+# API Contract (v1.4, owned by Person 2: Rujan Dhamala, Aakash Thakur)
 
 Change this file in the same PR as the code, and add a line to `docs/CHANGELOG.md`.
 Auth, login and volunteer sign-up endpoints are in [`api-auth.md`](api-auth.md).
@@ -55,15 +55,18 @@ Atomic: the request and its items are created by the `submit_request` RPC in one
 Errors: `invalid_kind | invalid_name | invalid_phone | invalid_location | outside_service_area | invalid_urgency | invalid_volunteers_needed | invalid_items | too_many_requests (429) | bad_json | db_error (500)`.
 Keep `tracking_token`: only its hash is stored, so it cannot be shown again.
 
-### POST `/functions/v1/get-route`  (any signed-in user)
+### POST `/functions/v1/get-route`  (any signed-in, active user)
 
 ```json
-{ "locations": [ { "lat": 27.705, "lng": 85.32 }, { "lat": 27.72, "lng": 85.33 } ], "costing": "auto", "strict_nepal": true, "save": false }
+{ "locations": [ { "lat": 27.705, "lng": 85.32 }, { "lat": 27.72, "lng": 85.33 } ], "costing": "auto", "save": false }
 ```
 
-`costing`: `auto | bicycle | pedestrian | motorcycle`. Response `data`: `{ route_id, summary: { length (km), time (s) }, shape (encoded polyline), trip }`.
-Errors: `unauthorized | bad_json | invalid_locations | invalid_coordinate | out_of_bounds | routing_upstream_error | routing_network_error`.
-**Known gap:** `save: true` inserts into a `routes` table that has no migration yet, so keep `save` false until one is added.
+- `locations`: 2 to 10 points (`lng` or `lon`). All must be inside Nepal's rough box unless you send `strict_nepal: false` (default is strict).
+- `costing`: `auto | bicycle | pedestrian | motorcycle` (default `auto`). `costing_options`: optional small object passed to Valhalla.
+- `save: true` stores the route in `routes` (migration `20261122000010_routes.sql`) and returns its id. Optional `assignment_id` (only with `save: true`) links it to an assignment you hold; admins may link any.
+- Response `data`: `{ route_id, summary: { length (km), time (s) }, shape, legs: [{ shape, length, time }], trip }`. `shape` is the first leg's encoded polyline (precision 6) and is kept for older clients; with three or more points (driver, hub, requester) draw every entry of `legs`. `route_id` is `null` unless saved.
+- Clients can read their own saved rows from `routes` (RLS); admins read all. Only the function writes.
+Errors: `unauthorized (401) | account_suspended (403) | bad_json | invalid_locations | invalid_coordinate | out_of_bounds | invalid_costing_options | invalid_assignment_id | not_found (404) | routing_upstream_error (502) | routing_network_error (502) | db_insert_failed (500)`.
 
 ### Auth and volunteer functions
 
@@ -170,7 +173,7 @@ Call with the SDK: `supabase.rpc('<name>', { ...args })`. Unlike Edge Functions,
 - `admin_map_markers()` (admin): `{ hub, requests[], volunteers[] }`. `hub` is the `central_inventory` setting. `requests[]` are exact positions of everything open (including `pending_admin_review` and `partially_fulfilled`) plus fulfilled in the last 12 h (max 1000): `{ id, public_ref, kind, status, urgency, requester_name, district, lat, lng, open_incidents, assignments { total, claimed }, created_at, updated_at }`. `volunteers[]` are in-progress assignments that reported a position in the last 30 minutes: `{ assignment_id, request_id, public_ref, assignment_type, state, volunteer_id, volunteer_name, volunteer_phone, lat, lng, updated_at }`. Errors: `forbidden`.
 - `update_my_location(p_id, p_lat, p_lng)` (volunteer): live position for one of your own assignments; one row per assignment (upsert). Returns `{ ok: true, updated_at }`. Allowed while the assignment is `accepted`, `en_route_to_pickup`, `picked_up` or `en_route_to_destination` and the request is `assigned` or `in_progress`. Coordinates must be inside Nepal's rough box (lat 26.3-30.5, lng 80.0-88.3). Not audited (called every few seconds). Requesters only see it through `get_tracking` while `en_route_*`. Errors: `unauthorized | forbidden | invalid_location | not_found | invalid_state`.
 - `my_stats()` (volunteer): `{ claimed_total, active, completed, disputed, completed_last_30_days, last_completed_at, completed_by_type, declined_offers }`. Counts are zero (and `last_completed_at` null) for a volunteer with no assignments. Errors: `unauthorized | forbidden`.
-- `register_device_token(p_token, p_platform)` (volunteer): `p_platform` is `android | ios | web`; token 20-4096 characters, no whitespace. A token already stored moves to the caller. Only the 10 most recently seen tokens per volunteer are kept. Returns `{ id, platform }`. Errors: `unauthorized | forbidden | invalid_token | invalid_platform`. (Sending pushes is still PLANNED.)
+- `register_device_token(p_token, p_platform)` (volunteer): `p_platform` is `android | ios | web`; token 20-4096 characters, no whitespace. A token already stored moves to the caller. Only the 10 most recently seen tokens per volunteer are kept. Returns `{ id, platform }`. Errors: `unauthorized | forbidden | invalid_token | invalid_platform`. (Pushes are sent by the `send-push` function, see "Push notifications" below.)
 
 ### Inventory, incidents and audit (migration `20261122000007_rpc_inventory_incidents.sql`)
 
@@ -192,12 +195,27 @@ All admin only (`forbidden` for anyone else).
 
 Audit actions written by these RPCs: `otp_issued`, `otp_locked`, `donor_qty_changed`, `pickup_confirmed`, `delivery_completed`, `assignment_state_changed`, `incident_opened`, `stock_imported`, `lot_moved`, `incident_under_review`, `incident_resolved`, `incident_dismissed`.
 
+### Push notifications (migration `20261122000009_push_outbox.sql`, function `send-push`)
+
+Not an API the apps call. The database queues a push and the `send-push` Edge Function sends it through FCM to the tokens stored by `register_device_token`.
+
+| `data.type` | When | Who is told |
+| --- | --- | --- |
+| `new_offer` | An assignment is created as `offered`, or a volunteer releases an accepted one back to the pool | Volunteers who can see it in `my_offers` at that moment: tier A goes to exactly `{A}` first, tier B to holders of B, tier C to holders of C. Not anyone who declined it or already holds an assignment on the same request |
+| `escalated` | A tier A assignment is still unclaimed after `escalate_at` | Volunteers with A plus another category (the ones who could not see it before). Checked once a minute, so it can arrive up to a minute after `escalate_at` |
+
+- Payload `data`: `{ type, assignment_id, request_id }`, all strings. **IDs only**: no OTP, name, phone or location. The notification text is generic ("Delivery needs a driver", "Open the app to view and claim it."). The app opens the offer with `my_assignment_detail(assignment_id)` or refreshes `my_offers()`.
+- One push per volunteer per request, even when a manpower request needs several volunteers.
+- A push is a nudge, not the source of truth: it can be late or missed, so the app must still refresh `my_offers()` on open and while the offers screen is visible.
+- A token FCM reports as unregistered is deleted from `device_tokens`. The app should call `register_device_token` on every start and whenever FCM rotates the token.
+- Not covered yet: requester notifications (requesters have no account or token), pushes for state changes after a claim.
+- Function: `POST /functions/v1/send-push` with header `x-push-secret`. Responses: `200 { claimed, groups, sent, failed, invalid_tokens_removed, dry_run }`; errors `401 unauthorized | 500 misconfigured | claim_failed | 503 fcm_not_configured`.
+
 ## PLANNED
 
 Everything below is still to build; the UI should mock it.
 
-- Push notifications (FCM) that use the tokens stored by `register_device_token`.
-- A `routes` table for `get-route` with `save: true` (see the known gap above).
+- Nothing is planned right now.
 
 `submit_request(p jsonb, p_profile uuid)` is LIVE but **service role only**; it is called by the `submit-request` Edge Function, never from a client.
 
