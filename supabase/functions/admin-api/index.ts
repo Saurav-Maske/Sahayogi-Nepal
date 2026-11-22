@@ -11,6 +11,10 @@ serveApi("admin-api", {
   "requests/decline":   { rpc: "admin_decline_request", auth: "admin", spec: { id: "uuid", reason: "text" } },
   "requests/assign":    { rpc: "create_assignments",    auth: "admin", spec: { id: "uuid" } },
 
+  // Hub: count a picked-up donation (creates the stock), then issue the drop-off code the driver enters to finish.
+  "assignments/receive":   { rpc: "admin_receive_donation", auth: "admin", spec: { id: "uuid", items: "array" } },
+  "assignments/issue-otp": { rpc: "admin_issue_otp",        auth: "admin", spec: { id: "uuid" } },
+
   "stock/import":       { rpc: "admin_import_stock",    auth: "admin", spec: { items: "array" } },
   "stock/move-lot":     { rpc: "admin_move_lot",        auth: "admin", spec: { id: "uuid", phase: "text", qty: "num?", reason: "text?" } },
 

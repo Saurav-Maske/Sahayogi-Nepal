@@ -13,5 +13,6 @@ serveApi("volunteer-api", {
   "assignments/decline":  { rpc: "decline_assignment",     auth: "user", spec: { id: "uuid" } },
   "assignments/state":    { rpc: "update_assignment_state", auth: "user", spec: { id: "uuid", state: "text" } },
   "assignments/verify-otp": { rpc: "driver_verify_otp",    auth: "user", spec: { id: "uuid", purpose: "text", code: "text", confirmed: "bool?" } },
+  "assignments/report-issue": { rpc: "driver_report_issue",      auth: "user", spec: { id: "uuid", type: "text", note: "text" } },
   "assignments/location": { rpc: "update_my_location",     auth: "user", spec: { id: "uuid", lat: "num", lng: "num" } },
 });

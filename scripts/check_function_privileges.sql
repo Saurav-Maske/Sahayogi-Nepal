@@ -25,7 +25,7 @@ with fn as (
                       'admin_map_markers', 'update_my_location', 'my_stats', 'register_device_token',
                       'admin_import_stock', 'admin_move_lot', 'admin_list_incidents',
                       'admin_resolve_incident', 'admin_list_audit', 'admin_inventory_reconcile',
-                      'admin_list_reserve_levels', 'admin_set_reserve_level']), false
+                      'admin_list_reserve_levels', 'admin_set_reserve_level', 'driver_report_issue']), false
 )
 select fn.signature,
        case
