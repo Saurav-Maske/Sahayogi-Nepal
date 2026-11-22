@@ -388,7 +388,7 @@ try { ... } on FunctionException catch (e) {
 
 ### Email delivery
 
-OTP emails are sent by the Edge Functions through **Gmail SMTP** (`GMAIL_ADDRESS` + `GMAIL_APP_PASSWORD` in `supabase/functions/.env`). Gmail allows roughly 500 messages a day per account, which is plenty for the pilot. For local work without Gmail, set `OTP_DEV_LOG=true` and read the code in the terminal running `supabase functions serve`.
+OTP emails are sent by the Edge Functions through the **Resend API** (`RESEND_API_KEY` + `MAIL_FROM_ADDRESS` in `supabase/functions/.env`; the sending domain must be verified in Resend). Supabase's own invite and recovery emails go through Resend SMTP (`[auth.email.smtp]` in `config.toml` locally, Auth > SMTP Settings on the hosted project). For local work without Resend, set `OTP_DEV_LOG=true` and read the code in the terminal running `supabase functions serve`.
 
 ---
 
@@ -443,6 +443,6 @@ curl -s -X POST "$SUPABASE_URL/functions/v1/reset-password" -H "apikey: $KEY" -H
 curl -s -X POST "$SUPABASE_URL/functions/v1/auth-me" -H "apikey: $KEY" -H "Authorization: Bearer <access_token>"
 ```
 
-On Windows PowerShell, use `$env:KEY="..."` instead of `export`. Local invite emails appear in Inbucket: http://127.0.0.1:54324 (unless Gmail SMTP is enabled). OTP emails do not go through Inbucket: with `OTP_DEV_LOG=true` and no Gmail credentials the code is printed in the `functions serve` terminal.
+On Windows PowerShell, use `$env:KEY="..."` instead of `export`. Local invite emails appear in Inbucket: http://127.0.0.1:54324 (unless Resend SMTP is enabled). OTP emails do not go through Inbucket: with `OTP_DEV_LOG=true` and no Resend credentials the code is printed in the `functions serve` terminal.
 
 ---
