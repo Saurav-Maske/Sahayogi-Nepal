@@ -2,8 +2,10 @@ import 'package:material_ui/material_ui.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../core/app_colors.dart';
+import '../core/volunteer_auth_service.dart';
 import 'home_screen.dart';
 import 'onboarding_screen.dart';
+import 'volunteer_dashboard_screen.dart';
 
 class StartupScreen extends StatefulWidget {
   const StartupScreen({super.key});
@@ -24,12 +26,22 @@ class _StartupScreenState extends State<StartupScreen> {
     final prefs = await SharedPreferences.getInstance();
     if (!mounted) return;
 
+    Widget destination = prefs.getBool('onboarding_complete') == true
+        ? const HomeScreen()
+        : const OnboardingScreen();
+    if (prefs.getBool('onboarding_complete') == true &&
+        VolunteerAuthService.hasSession) {
+      try {
+        final account = await VolunteerAuthService.currentVolunteer();
+        destination = VolunteerDashboardScreen(account: account);
+      } catch (_) {
+        // Keep access to public screens while the session cannot be validated.
+      }
+    }
+    if (!mounted) return;
+
     Navigator.of(context).pushReplacement(
-      MaterialPageRoute<void>(
-        builder: (_) => prefs.getBool('onboarding_complete') == true
-            ? const HomeScreen()
-            : const OnboardingScreen(),
-      ),
+      MaterialPageRoute<void>(builder: (_) => destination),
     );
   }
 

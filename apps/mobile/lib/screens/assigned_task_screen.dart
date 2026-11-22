@@ -3,6 +3,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../core/app_colors.dart';
+import '../core/volunteer_session_guard.dart';
 import 'explore_screen.dart';
 import 'my_requests_screen.dart';
 import 'volunteer_login_screen.dart';
@@ -14,7 +15,9 @@ class AssignedTaskScreen extends StatelessWidget {
   static const _delivery = LatLng(27.7175, 85.3488);
 
   @override
-  Widget build(BuildContext context) => Scaffold(
+  Widget build(BuildContext context) => VolunteerSessionGuard(
+        onUnauthorized: () => openVolunteerLogin(context),
+        child: Scaffold(
         backgroundColor: appPaper,
         appBar: AppBar(
           backgroundColor: appPaper,
@@ -173,12 +176,17 @@ class AssignedTaskScreen extends StatelessWidget {
         bottomNavigationBar: _TaskNavigationBar(
           onHome: () => Navigator.of(context).pop(),
           onExplore: () => Navigator.of(context).push(
-            MaterialPageRoute<void>(builder: (_) => const ExploreScreen()),
+          MaterialPageRoute<void>(
+            builder: (_) => ExploreScreen(requireVolunteerSession: true),
+          ),
           ),
           onRequests: () => Navigator.of(context).push(
-            MaterialPageRoute<void>(builder: (_) => const MyRequestsScreen()),
+          MaterialPageRoute<void>(
+            builder: (_) => MyRequestsScreen(requireVolunteerSession: true),
+          ),
           ),
           onProfile: () => openVolunteerLogin(context),
+        ),
         ),
       );
 
