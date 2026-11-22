@@ -53,6 +53,10 @@ class _VolunteerProfileScreenState extends State<VolunteerProfileScreen> {
     });
   }
 
+  Future<void> _refreshProfileData() async {
+    await Future.wait([_refreshProfile(), _refreshStats()]);
+  }
+
   Future<void> _logout() async {
     setState(() => _isLoggingOut = true);
     try {
@@ -88,7 +92,10 @@ class _VolunteerProfileScreenState extends State<VolunteerProfileScreen> {
               style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
             ),
           ),
-          body: ListView(
+          body: RefreshIndicator(
+            onRefresh: _refreshProfileData,
+            child: ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.fromLTRB(24, 18, 24, 28),
             children: [
               Center(
@@ -220,6 +227,7 @@ class _VolunteerProfileScreenState extends State<VolunteerProfileScreen> {
                 ),
               ),
             ],
+          ),
           ),
           bottomNavigationBar: _VolunteerNavBar(
             onHome: () => Navigator.of(context).pop(),
