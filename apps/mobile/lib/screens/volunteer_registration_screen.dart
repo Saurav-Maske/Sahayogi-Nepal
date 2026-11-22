@@ -384,6 +384,7 @@ class _VolunteerRegistrationScreenState
                     label: 'Full name',
                     hint: 'John Dow',
                     controller: _nameController,
+                    enabled: !_signupOtpSent,
                     inputFormatters: [
                       FilteringTextInputFormatter.allow(
                         RegExp(r'[\p{L}\p{M} ]', unicode: true),
@@ -412,6 +413,7 @@ class _VolunteerRegistrationScreenState
                     label: 'Phone number',
                     hint: '10-digit phone number',
                     controller: _phoneController,
+                    enabled: !_signupOtpSent,
                     keyboardType: TextInputType.phone,
                     validator: (value) {
                       final phone = value?.trim() ?? '';
@@ -427,6 +429,7 @@ class _VolunteerRegistrationScreenState
                     hint: 'johndoe@email.com',
                     controller: _emailController,
                     keyboardType: TextInputType.emailAddress,
+                    enabled: !_signupOtpSent,
                     onChanged: (_) {
                       if (_emailVerificationToken != null || _signupOtpSent) {
                         setState(() {
@@ -446,42 +449,12 @@ class _VolunteerRegistrationScreenState
                       return null;
                     },
                   ),
-                  if (_signupOtpSent && _emailVerificationToken == null) ...[
-                    const SizedBox(height: 18),
-                    _formField(
-                      label: 'Email verification code',
-                      hint: 'Enter the 6-digit code',
-                      controller: _signupOtpController,
-                      keyboardType: TextInputType.number,
-                      maxLength: 6,
-                      onChanged: (_) {
-                        if (_otpErrorMessage != null) {
-                          setState(() => _otpErrorMessage = null);
-                        }
-                      },
-                      validator: (value) {
-                        if (!RegExp(r'^\d{6}$').hasMatch(value?.trim() ?? '')) {
-                          return 'Enter the 6-digit code from your email';
-                        }
-                        return null;
-                      },
-                    ),
-                    if (_otpErrorMessage != null) ...[
-                      const SizedBox(height: 6),
-                      Text(
-                        _otpErrorMessage!,
-                        style: const TextStyle(
-                          color: Colors.redAccent,
-                          fontSize: 11,
-                        ),
-                      ),
-                    ],
-                  ],
                   const SizedBox(height: 18),
                   _formField(
                     label: 'Citizenship number',
                     hint: 'Enter your citizenship number',
                     controller: _citizenshipNumberController,
+                    enabled: !_signupOtpSent,
                     validator: (value) {
                       final number = value?.trim() ?? '';
                       if (number.length < 4 || number.length > 30) {
@@ -497,7 +470,7 @@ class _VolunteerRegistrationScreenState
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(14),
                     child: InkWell(
-                      onTap: () => setState(() {
+                      onTap: _signupOtpSent ? null : () => setState(() {
                         _agreedToVolunteer = !_agreedToVolunteer;
                         _agreementError = false;
                       }),
@@ -519,7 +492,7 @@ class _VolunteerRegistrationScreenState
                           children: [
                             Checkbox(
                               value: _agreedToVolunteer,
-                              onChanged: (value) => setState(() {
+                              onChanged: _signupOtpSent ? null : (value) => setState(() {
                                 _agreedToVolunteer = value ?? false;
                                 _agreementError = false;
                               }),
@@ -581,13 +554,13 @@ class _VolunteerRegistrationScreenState
                             width: optionWidth,
                             title: 'Transport Manpower',
                             selected: _transportManpowerSelected,
-                            onTap: _toggleTransportManpower,
+                            onTap: _signupOtpSent ? null : _toggleTransportManpower,
                           ),
                           _ContributionOption(
                             width: optionWidth,
                             title: 'Health Worker',
                             selected: _healthWorkerSelected,
-                            onTap: _toggleHealthWorker,
+                            onTap: _signupOtpSent ? null : _toggleHealthWorker,
                           ),
                         ],
                       );
@@ -599,6 +572,7 @@ class _VolunteerRegistrationScreenState
                       label: 'Driving license number',
                       hint: 'Enter your license number',
                       controller: _drivingLicenseNumberController,
+                      enabled: !_signupOtpSent,
                       validator: (value) =>
                           value == null || value.trim().isEmpty
                               ? 'Enter your driving license number'
@@ -624,6 +598,7 @@ class _VolunteerRegistrationScreenState
                       label: 'Medical license number',
                       hint: 'Enter your medical license number',
                       controller: _medicalLicenseNumberController,
+                      enabled: !_signupOtpSent,
                       validator: (value) =>
                           value == null || value.trim().isEmpty
                               ? 'Enter your medical license number'
@@ -704,6 +679,38 @@ class _VolunteerRegistrationScreenState
                     ),
                     const SizedBox(height: 16),
                   ],
+                  if (_signupOtpSent && _emailVerificationToken == null) ...[
+                    const SizedBox(height: 18),
+                    _formField(
+                      label: 'Email verification code',
+                      hint: 'Enter the 6-digit code',
+                      controller: _signupOtpController,
+                      keyboardType: TextInputType.number,
+                      maxLength: 6,
+                      onChanged: (_) {
+                        if (_otpErrorMessage != null) {
+                          setState(() => _otpErrorMessage = null);
+                        }
+                      },
+                      validator: (value) {
+                        if (!RegExp(r'^\d{6}$').hasMatch(value?.trim() ?? '')) {
+                          return 'Enter the 6-digit code from your email';
+                        }
+                        return null;
+                      },
+                    ),
+                    if (_otpErrorMessage != null) ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        _otpErrorMessage!,
+                        style: const TextStyle(
+                          color: Colors.redAccent,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 18),
+                  ],
                   SizedBox(
                     width: double.infinity,
                     height: 52,
@@ -763,7 +770,7 @@ class _VolunteerRegistrationScreenState
             color: Colors.white,
             borderRadius: BorderRadius.circular(14),
             child: InkWell(
-              onTap: _pickNidImage,
+              onTap: _signupOtpSent ? null : _pickNidImage,
               borderRadius: BorderRadius.circular(14),
               child: Container(
                 width: double.infinity,
@@ -863,7 +870,7 @@ class _VolunteerRegistrationScreenState
                             ),
                           ),
                           IconButton(
-                            onPressed: _removeNidImage,
+                            onPressed: _signupOtpSent ? null : _removeNidImage,
                             tooltip: 'Remove document image',
                             visualDensity: VisualDensity.compact,
                             icon: const Icon(
@@ -1027,6 +1034,7 @@ class _VolunteerRegistrationScreenState
     required String? Function(String?) validator,
     TextInputType keyboardType = TextInputType.text,
     bool obscureText = false,
+    bool enabled = true,
     String? helperText,
     Widget? suffixIcon,
     void Function(String)? onChanged,
@@ -1049,6 +1057,7 @@ class _VolunteerRegistrationScreenState
             controller: controller,
             keyboardType: keyboardType,
             obscureText: obscureText,
+            enabled: enabled,
             maxLength: maxLength,
             inputFormatters: inputFormatters,
             onChanged: onChanged,
@@ -1104,7 +1113,7 @@ class _ContributionOption extends StatelessWidget {
   final double width;
   final String title;
   final bool selected;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) => Material(
