@@ -27,6 +27,17 @@ Future<List<Map<String, dynamic>>> loadSavedRequests() async {
   }
 }
 
+/// Request tokens belong to anonymous device tracking. Clear them when a
+/// volunteer signs in so one account never sees a previous user's local list.
+Future<void> clearSavedRequests() async {
+  try {
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.remove(_savedRequestsKey);
+  } catch (_) {
+    // A local cleanup failure must not prevent sign-in.
+  }
+}
+
 Future<void> saveSubmittedRequest({
   required Map<String, dynamic> response,
   required Map<String, dynamic> payload,
@@ -63,7 +74,8 @@ Future<void> updateSavedRequestStatus(String reference, String status) async {
   await updateSavedRequestStatuses({reference: status});
 }
 
-Future<void> updateSavedRequestStatuses(Map<String, String> statusByReference) async {
+Future<void> updateSavedRequestStatuses(
+    Map<String, String> statusByReference) async {
   try {
     final preferences = await SharedPreferences.getInstance();
     final records = await loadSavedRequests();

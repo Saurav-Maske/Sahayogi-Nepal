@@ -1,6 +1,8 @@
 import 'package:material_ui/material_ui.dart';
 
 import '../core/app_colors.dart';
+import '../core/api.dart';
+import '../core/request_submission.dart';
 import '../core/volunteer_auth_service.dart';
 import '../core/volunteer_session_guard.dart';
 import 'explore_screen.dart';
@@ -22,12 +24,15 @@ class VolunteerProfileScreen extends StatefulWidget {
 class _VolunteerProfileScreenState extends State<VolunteerProfileScreen> {
   bool _isLoggingOut = false;
   late VolunteerAccount _account;
+  Map<String, dynamic>? _stats;
+  bool _statsLoading = true;
 
   @override
   void initState() {
     super.initState();
     _account = widget.account;
     _refreshProfile();
+    _refreshStats();
   }
 
   Future<void> _refreshProfile() async {
@@ -39,10 +44,20 @@ class _VolunteerProfileScreenState extends State<VolunteerProfileScreen> {
     }
   }
 
+  Future<void> _refreshStats() async {
+    final result = await Api.getVolunteerStats();
+    if (!mounted) return;
+    setState(() {
+      _statsLoading = false;
+      _stats = result.ok ? result.data : null;
+    });
+  }
+
   Future<void> _logout() async {
     setState(() => _isLoggingOut = true);
     try {
       await VolunteerAuthService.signOut();
+      await clearSavedRequests();
       if (!mounted) return;
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute<void>(
@@ -63,135 +78,197 @@ class _VolunteerProfileScreenState extends State<VolunteerProfileScreen> {
   Widget build(BuildContext context) => VolunteerSessionGuard(
         onUnauthorized: () => openVolunteerLogin(context),
         child: Scaffold(
-        backgroundColor: appPaper,
-        appBar: AppBar(
           backgroundColor: appPaper,
-          foregroundColor: appNavy,
-          elevation: 0,
-          title: const Text(
-            'Volunteer profile',
-            style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
+          appBar: AppBar(
+            backgroundColor: appPaper,
+            foregroundColor: appNavy,
+            elevation: 0,
+            title: const Text(
+              'Volunteer profile',
+              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
+            ),
           ),
+          body: ListView(
+            padding: const EdgeInsets.fromLTRB(24, 18, 24, 28),
+            children: [
+              Center(
+                child: CircleAvatar(
+                  radius: 38,
+                  backgroundColor: appNavy,
+                  child: Text(
+                    _account.name.isEmpty
+                        ? 'V'
+                        : _account.name.substring(0, 1).toUpperCase(),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 28,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+              Text(
+                _account.name,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: appNavy,
+                  fontSize: 22,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 5),
+              const Text(
+                'Verified volunteer',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: appMuted, fontSize: 13),
+              ),
+              const SizedBox(height: 26),
+              Container(
+                padding: const EdgeInsets.all(18),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(color: const Color(0xFFE0E6EC)),
+                ),
+                child: Column(
+                  children: [
+                    _ProfileDetail(
+                      icon: Icons.person_outline_rounded,
+                      label: 'Full name',
+                      value: _account.name,
+                    ),
+                    const Divider(height: 25),
+                    _ProfileDetail(
+                      icon: Icons.email_outlined,
+                      label: 'Email address',
+                      value: _account.email,
+                    ),
+                    const Divider(height: 25),
+                    _ProfileDetail(
+                      icon: Icons.phone_outlined,
+                      label: 'Phone number',
+                      value: _account.phone.isEmpty
+                          ? 'Not provided'
+                          : _account.phone,
+                    ),
+                    const Divider(height: 25),
+                    _ProfileDetail(
+                      icon: Icons.volunteer_activism_outlined,
+                      label: 'Volunteer roles',
+                      value: _account.roles.join(', '),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 18),
+              const Text(
+                'Your impact',
+                style: TextStyle(
+                    color: appNavy, fontSize: 18, fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 10),
+              if (_statsLoading)
+                const Center(
+                    child: Padding(
+                  padding: EdgeInsets.all(16),
+                  child: CircularProgressIndicator(),
+                ))
+              else if (_stats == null)
+                const Text('Volunteer stats are unavailable right now.',
+                    style: TextStyle(color: appMuted))
+              else
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: [
+                    _ImpactCard(
+                        label: 'Completed',
+                        value: '${_stats!['completed'] ?? 0}'),
+                    _ImpactCard(
+                        label: 'Active', value: '${_stats!['active'] ?? 0}'),
+                    _ImpactCard(
+                        label: 'Last 30 days',
+                        value: '${_stats!['completed_last_30_days'] ?? 0}'),
+                    _ImpactCard(
+                        label: 'Disputed',
+                        value: '${_stats!['disputed'] ?? 0}'),
+                  ],
+                ),
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                height: 52,
+                child: OutlinedButton.icon(
+                  onPressed: _isLoggingOut ? null : _logout,
+                  icon: _isLoggingOut
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.logout_rounded),
+                  label: Text(_isLoggingOut ? 'Logging out…' : 'Log out'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFFB42318),
+                    side: const BorderSide(color: Color(0xFFE5A6A2)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(15),
+                    ),
+                    textStyle: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          bottomNavigationBar: _VolunteerNavBar(
+            onHome: () => Navigator.of(context).pop(),
+            onExplore: () {
+              Navigator.of(context).pop();
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => ExploreScreen(requireVolunteerSession: true),
+                ),
+              );
+            },
+            onRequests: () {
+              Navigator.of(context).pop();
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) =>
+                      MyRequestsScreen(requireVolunteerSession: true),
+                ),
+              );
+            },
+          ),
+        ),
+      );
+}
 
+class _ImpactCard extends StatelessWidget {
+  const _ImpactCard({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        width: 148,
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFFE0E6EC)),
         ),
-        body: ListView(
-          padding: const EdgeInsets.fromLTRB(24, 18, 24, 28),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Center(
-              child: CircleAvatar(
-                radius: 38,
-                backgroundColor: appNavy,
-                child: Text(
-                  _account.name.isEmpty
-                      ? 'V'
-                      : _account.name.substring(0, 1).toUpperCase(),
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 28,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 14),
-            Text(
-              _account.name,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: appNavy,
-                fontSize: 22,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-            const SizedBox(height: 5),
-            const Text(
-              'Verified volunteer',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: appMuted, fontSize: 13),
-            ),
-            const SizedBox(height: 26),
-            Container(
-              padding: const EdgeInsets.all(18),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: const Color(0xFFE0E6EC)),
-              ),
-              child: Column(
-                children: [
-                  _ProfileDetail(
-                    icon: Icons.person_outline_rounded,
-                    label: 'Full name',
-                    value: _account.name,
-                  ),
-                  const Divider(height: 25),
-                  _ProfileDetail(
-                    icon: Icons.email_outlined,
-                    label: 'Email address',
-                    value: _account.email,
-                  ),
-                  const Divider(height: 25),
-                  _ProfileDetail(
-                    icon: Icons.phone_outlined,
-                    label: 'Phone number',
-                    value: _account.phone.isEmpty
-                        ? 'Not provided'
-                        : _account.phone,
-                  ),
-                  const Divider(height: 25),
-                  _ProfileDetail(
-                    icon: Icons.volunteer_activism_outlined,
-                    label: 'Volunteer roles',
-                    value: _account.roles.join(', '),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 24),
-            SizedBox(
-              width: double.infinity,
-              height: 52,
-              child: OutlinedButton.icon(
-                onPressed: _isLoggingOut ? null : _logout,
-                icon: _isLoggingOut
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.logout_rounded),
-                label: Text(_isLoggingOut ? 'Logging out…' : 'Log out'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: const Color(0xFFB42318),
-                  side: const BorderSide(color: Color(0xFFE5A6A2)),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(15),
-                  ),
-                  textStyle: const TextStyle(fontWeight: FontWeight.w700),
-                ),
-              ),
-            ),
+            Text(value,
+                style: const TextStyle(
+                    color: appNavy, fontSize: 22, fontWeight: FontWeight.w800)),
+            const SizedBox(height: 4),
+            Text(label, style: const TextStyle(color: appMuted, fontSize: 12)),
           ],
-        ),
-        bottomNavigationBar: _VolunteerNavBar(
-          onHome: () => Navigator.of(context).pop(),
-          onExplore: () {
-            Navigator.of(context).pop();
-            Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => ExploreScreen(requireVolunteerSession: true),
-              ),
-            );
-          },
-          onRequests: () {
-            Navigator.of(context).pop();
-            Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => MyRequestsScreen(requireVolunteerSession: true),
-              ),
-            );
-          },
-        ),
         ),
       );
 }
@@ -322,8 +399,7 @@ class _NavItem extends StatelessWidget {
                 style: TextStyle(
                   color: selected ? appNavy : appMuted,
                   fontSize: 10,
-                  fontWeight:
-                      selected ? FontWeight.w700 : FontWeight.w400,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w400,
                 ),
               ),
             ],

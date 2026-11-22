@@ -9,6 +9,7 @@ import '../core/api.dart';
 import '../core/app_home_navigation.dart';
 import '../core/app_colors.dart';
 import '../core/request_submission.dart';
+import '../core/volunteer_auth_service.dart';
 import '../models/request_summary.dart';
 import 'explore_screen.dart';
 import 'volunteer_login_screen.dart';
@@ -28,6 +29,7 @@ class _RequestTrackingScreenState extends State<RequestTrackingScreen> {
   List<_VolunteerPosition> _volunteerPositions = const [];
   Timer? _trackingTimer;
   bool _refreshing = false;
+  bool _actionLoading = false;
 
   RequestSummaryData get request => _currentRequest;
 
@@ -97,10 +99,9 @@ class _RequestTrackingScreenState extends State<RequestTrackingScreen> {
         .map(_positionFromAssignment)
         .whereType<_VolunteerPosition>()
         .toList()
-      ..sort((a, b) =>
-          (b.updatedAt?.millisecondsSinceEpoch ?? 0).compareTo(
-                a.updatedAt?.millisecondsSinceEpoch ?? 0,
-              ));
+      ..sort((a, b) => (b.updatedAt?.millisecondsSinceEpoch ?? 0).compareTo(
+            a.updatedAt?.millisecondsSinceEpoch ?? 0,
+          ));
     setState(() {
       _refreshing = false;
       _tracking = data;
@@ -112,6 +113,298 @@ class _RequestTrackingScreenState extends State<RequestTrackingScreen> {
       );
     });
     await updateSavedRequestStatus(request.id, rawStatus);
+  }
+
+  Future<void> _issueRequesterCode() async {
+    final token = request.trackingToken;
+    if (token == null || token.isEmpty) return;
+    final purpose = '${_tracking?['otp_purpose'] ?? ''}';
+    if (purpose != 'pickup' && purpose != 'delivery') return;
+    setState(() => _actionLoading = true);
+    final result = await Api.requestTrackingOtp(
+      reference: request.id,
+      token: token,
+      purpose: purpose,
+    );
+    if (!mounted) return;
+    setState(() => _actionLoading = false);
+    if (!result.ok || result.data == null) {
+      _showActionError(result.errorMessage);
+      return;
+    }
+    final expires =
+        DateTime.tryParse('${result.data!['expires_at'] ?? ''}')?.toLocal();
+    await showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(purpose == 'pickup' ? 'Pickup code' : 'Delivery code'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Read this one-time code to the volunteer.'),
+            const SizedBox(height: 14),
+            Center(
+              child: SelectableText(
+                '${result.data!['code'] ?? ''}',
+                style: const TextStyle(
+                  color: appNavy,
+                  fontSize: 30,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 5,
+                ),
+              ),
+            ),
+            if (expires != null) ...[
+              const SizedBox(height: 8),
+              Text('Expires ${DateFormat('HH:mm').format(expires)}'),
+            ],
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Done'),
+          ),
+        ],
+      ),
+    );
+    await _refreshTracking(showErrors: false);
+  }
+
+  Future<void> _editDonationQuantities() async {
+    final token = request.trackingToken;
+    if (token == null || token.isEmpty) return;
+    final items = (_tracking?['items'] as List? ?? const [])
+        .whereType<Map>()
+        .map((item) => Map<String, dynamic>.from(item))
+        .toList();
+    final controllers = items.map((item) {
+      final qty = item['donor_qty'] ??
+          item['approved_qty'] ??
+          item['requested_qty'] ??
+          0;
+      return TextEditingController(text: '$qty');
+    }).toList();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Update pickup quantities'),
+        content: SizedBox(
+          width: 380,
+          child: ListView(
+            shrinkWrap: true,
+            children: [
+              const Text(
+                  'Enter the number of kits you can provide. At least one item must remain.'),
+              const SizedBox(height: 12),
+              ...List.generate(items.length, (index) {
+                final item = items[index];
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: TextField(
+                    controller: controllers[index],
+                    keyboardType: TextInputType.number,
+                    decoration: InputDecoration(
+                      labelText:
+                          '${_itemLabel(item['item_type']?.toString() ?? 'Item')} kits',
+                      border: const OutlineInputBorder(),
+                    ),
+                  ),
+                );
+              }),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Cancel')),
+          FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('Save')),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) {
+      for (final controller in controllers) {
+        controller.dispose();
+      }
+      return;
+    }
+    final updates = <Map<String, dynamic>>[];
+    for (var i = 0; i < items.length; i++) {
+      final id = items[i]['id'];
+      final qty = int.tryParse(controllers[i].text.trim());
+      final original = items[i]['donor_qty'] ??
+          items[i]['approved_qty'] ??
+          items[i]['requested_qty'];
+      if (id is! String ||
+          qty == null ||
+          qty < 0 ||
+          (original is num && qty > original)) {
+        for (final controller in controllers) {
+          controller.dispose();
+        }
+        _showActionError(
+            'Enter whole kit quantities within the approved amount.');
+        return;
+      }
+      if (qty != original) updates.add({'item_id': id, 'qty': qty});
+    }
+    for (final controller in controllers) {
+      controller.dispose();
+    }
+    if (updates.isEmpty) return;
+    setState(() => _actionLoading = true);
+    final result = await Api.updateDonationPickupQuantities(
+      reference: request.id,
+      token: token,
+      items: updates,
+    );
+    if (!mounted) return;
+    setState(() => _actionLoading = false);
+    if (!result.ok) {
+      _showActionError(result.errorMessage);
+      return;
+    }
+    await _refreshTracking(showErrors: false);
+  }
+
+  Future<void> _confirmDelivery(bool full) async {
+    final token = request.trackingToken;
+    if (token == null || token.isEmpty) return;
+    String? note;
+    if (!full) {
+      final controller = TextEditingController();
+      note = await showDialog<String>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Report a short delivery'),
+          content: TextField(
+            controller: controller,
+            minLines: 2,
+            maxLines: 4,
+            decoration: const InputDecoration(
+              labelText: 'What was missing?',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text('Cancel')),
+            FilledButton(
+                onPressed: () =>
+                    Navigator.pop(dialogContext, controller.text.trim()),
+                child: const Text('Submit')),
+          ],
+        ),
+      );
+      controller.dispose();
+      if (note == null || !mounted) return;
+      if (note.trim().length < 2) {
+        _showActionError('Add a short note about the missing items.');
+        return;
+      }
+    }
+    setState(() => _actionLoading = true);
+    final result = await Api.confirmRequestDelivery(
+      reference: request.id,
+      token: token,
+      full: full,
+      note: note,
+    );
+    if (!mounted) return;
+    setState(() => _actionLoading = false);
+    if (!result.ok) {
+      _showActionError(result.errorMessage);
+      return;
+    }
+    await _refreshTracking(showErrors: false);
+    if (!full && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text('Short delivery reported to the response team.')),
+      );
+    }
+  }
+
+  void _showActionError(String? message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message ?? 'Could not complete this action.')),
+    );
+  }
+
+  String _itemLabel(String type) => type.replaceAll('_', ' ');
+
+  Widget _requesterActions() {
+    if (_tracking == null || request.trackingToken?.isNotEmpty != true) {
+      return const SizedBox.shrink();
+    }
+    final purpose = '${_tracking!['otp_purpose'] ?? ''}';
+    final canEditPickup = _tracking!['can_update_pickup_qty'] == true;
+    final canConfirmDelivery = request.requestKind == 'resource_request' &&
+        _tracking!['status'] == 'fulfilled' &&
+        '${_tracking!['incident_status'] ?? ''}' != 'open';
+    if (!canEditPickup && purpose.isEmpty && !canConfirmDelivery) {
+      return const SizedBox.shrink();
+    }
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFE0E6EC)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Actions',
+              style: TextStyle(
+                  color: appNavy, fontSize: 17, fontWeight: FontWeight.w700)),
+          const SizedBox(height: 10),
+          if (purpose == 'pickup' || purpose == 'delivery')
+            SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: _actionLoading ? null : _issueRequesterCode,
+                  icon: const Icon(Icons.password_rounded),
+                  label: Text(_actionLoading
+                      ? 'Please wait…'
+                      : 'Get ${purpose == 'pickup' ? 'pickup' : 'delivery'} code'),
+                )),
+          if (canEditPickup)
+            SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: _actionLoading ? null : _editDonationQuantities,
+                  icon: const Icon(Icons.edit_outlined),
+                  label: const Text('Update donation quantities'),
+                )),
+          if (canConfirmDelivery) ...[
+            const Text('Did the delivered items arrive as expected?',
+                style: TextStyle(color: appMuted, fontSize: 13)),
+            const SizedBox(height: 6),
+            SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed:
+                      _actionLoading ? null : () => _confirmDelivery(true),
+                  child: const Text('Confirm full delivery'),
+                )),
+            SizedBox(
+                width: double.infinity,
+                child: TextButton(
+                  onPressed:
+                      _actionLoading ? null : () => _confirmDelivery(false),
+                  child: const Text('Report missing items'),
+                )),
+          ],
+        ],
+      ),
+    );
   }
 
   _VolunteerPosition? _positionFromAssignment(Map<String, dynamic> assignment) {
@@ -133,8 +426,8 @@ class _RequestTrackingScreenState extends State<RequestTrackingScreen> {
     return _VolunteerPosition(
       name: '${assignment['volunteer_first_name'] ?? 'Volunteer'}',
       point: LatLng(latitude, longitude),
-      updatedAt: DateTime.tryParse('${rawLocation['updated_at'] ?? ''}')
-          ?.toLocal(),
+      updatedAt:
+          DateTime.tryParse('${rawLocation['updated_at'] ?? ''}')?.toLocal(),
     );
   }
 
@@ -151,8 +444,8 @@ class _RequestTrackingScreenState extends State<RequestTrackingScreen> {
       };
 
   bool get _hasAssignedVolunteer {
-    final assignments = (_tracking?['assignments'] as List? ?? const [])
-        .whereType<Map>();
+    final assignments =
+        (_tracking?['assignments'] as List? ?? const []).whereType<Map>();
     return assignments.any((assignment) {
       final firstName = assignment['volunteer_first_name'];
       final state = '${assignment['state'] ?? ''}';
@@ -295,6 +588,10 @@ class _RequestTrackingScreenState extends State<RequestTrackingScreen> {
                     ),
                     const SizedBox(height: 20),
                     _RequestInfoCard(request: request),
+                    if (_tracking != null) ...[
+                      const SizedBox(height: 16),
+                      _requesterActions(),
+                    ],
                     const SizedBox(height: 22),
                     const Text(
                       'Assigned volunteer location',
@@ -621,7 +918,8 @@ class _VolunteerLocationMap extends StatelessWidget {
       } else if (!trackingTokenAvailable) {
         message = 'A tracking token is unavailable for this request.';
       } else if (!trackingLoaded) {
-        message = 'Could not load live location. Refresh tracking to try again.';
+        message =
+            'Could not load live location. Refresh tracking to try again.';
       } else if (hasAssignedVolunteer) {
         message =
             'Waiting for the assigned volunteer to share a live location.';
@@ -870,7 +1168,7 @@ class _TrackingNavigationBar extends StatelessWidget {
                 ),
                 _TrackingNavigationItem(
                   icon: Icons.person_outline_rounded,
-                  label: 'Profile',
+                  label: VolunteerAuthService.hasSession ? 'Profile' : 'Join',
                   onTap: onProfile,
                 ),
               ],

@@ -14,6 +14,7 @@ import '../core/app_home_navigation.dart';
 import '../core/app_colors.dart';
 import '../core/volunteer_auth_service.dart';
 import '../core/volunteer_session_guard.dart';
+import '../core/request_submission.dart';
 import 'assigned_task_screen.dart';
 import 'my_requests_screen.dart';
 import 'volunteer_assignment_screen.dart';
@@ -72,10 +73,23 @@ class _ExploreScreenState extends State<ExploreScreen>
 
   bool get _canViewNearbyRequests => VolunteerAuthService.hasSession;
 
+  Future<void> _validateVolunteerSession() async {
+    try {
+      await VolunteerAuthService.currentVolunteer();
+    } catch (_) {
+      await VolunteerAuthService.signOut();
+      await clearSavedRequests();
+      if (mounted) setState(() {});
+    }
+  }
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    if (VolunteerAuthService.hasSession) {
+      unawaited(_validateVolunteerSession());
+    }
     _loadMapRequests();
     _requestLocationAccess();
     if (_canViewNearbyRequests) {
@@ -221,10 +235,8 @@ class _ExploreScreenState extends State<ExploreScreen>
       for (final offer in offersResult.data ?? const []) {
         final requestId = offer['request_id'];
         if (requestId is! String || requestId.isEmpty) continue;
-        final markerKey = sha256
-            .convert(utf8.encode(requestId))
-            .toString()
-            .substring(0, 12);
+        final markerKey =
+            sha256.convert(utf8.encode(requestId)).toString().substring(0, 12);
         offersByMarkerKey.putIfAbsent(markerKey, () => []).add(offer);
       }
     }
@@ -294,21 +306,27 @@ class _ExploreScreenState extends State<ExploreScreen>
     if (latitude == null || longitude == null) return null;
     final layer = '${marker['layer'] ?? ''}';
     final kindCode = '${marker['kind'] ?? ''}';
-    if (layer == 'fulfilled') {
+    if (layer == 'fulfilled' || layer == 'pickup') {
       final completedAt = DateTime.tryParse('${marker['at'] ?? ''}')?.toUtc();
       if (completedAt == null) return null;
-      final retention = kindCode == 'resource_request'
+      final validPair =
+          (layer == 'fulfilled' && kindCode == 'resource_request') ||
+              (layer == 'pickup' && kindCode == 'donation_offer');
+      if (!validPair) return null;
+      final retention = layer == 'pickup'
           ? const Duration(hours: 6)
           : const Duration(hours: 12);
       final age = DateTime.now().toUtc().difference(completedAt);
       if (age.isNegative || age > retention) return null;
+    } else if (layer != 'need') {
+      return null;
     }
     final itemTypes = (marker['item_types'] as List? ?? const [])
         .map((item) => '$item')
         .toList();
     final status = switch (layer) {
       'fulfilled' => _RequestStatus.closed,
-      'pickup' || 'donation' => _RequestStatus.onTheWay,
+      'pickup' => _RequestStatus.onTheWay,
       _ => _RequestStatus.needed,
     };
     final kind = switch (kindCode) {
@@ -429,7 +447,7 @@ class _ExploreScreenState extends State<ExploreScreen>
           Text(
             'Status: ${request.statusLabel}',
             style: TextStyle(
-              color: request.status.color,
+              color: request.statusColor,
               fontSize: 12,
               fontWeight: FontWeight.w700,
             ),
@@ -502,399 +520,411 @@ class _ExploreScreenState extends State<ExploreScreen>
   @override
   Widget build(BuildContext context) {
     final screen = Scaffold(
-        backgroundColor: appPaper,
-        body: _canViewNearbyRequests
-            ? SafeArea(
-          bottom: false,
-          child: Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-                child: Row(
-                  children: [
-                    IconButton(
-                      onPressed: () => Navigator.of(context).maybePop(),
-                      icon:
-                          const Icon(Icons.arrow_back_rounded, color: appNavy),
-                    ),
-                    Expanded(
-                      child: Align(
-                        alignment: Alignment.centerLeft,
-                        child: SizedBox(
-                          height: 34,
-                          child: SvgPicture.asset(
-                            'assets/images/HorizontalLogo.svg',
-                            fit: BoxFit.contain,
+      backgroundColor: appPaper,
+      body: _canViewNearbyRequests
+          ? SafeArea(
+              bottom: false,
+              child: Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                    child: Row(
+                      children: [
+                        IconButton(
+                          onPressed: () => Navigator.of(context).maybePop(),
+                          icon: const Icon(Icons.arrow_back_rounded,
+                              color: appNavy),
+                        ),
+                        Expanded(
+                          child: Align(
                             alignment: Alignment.centerLeft,
-                            semanticsLabel: 'Sahayogi Nepal',
+                            child: SizedBox(
+                              height: 34,
+                              child: SvgPicture.asset(
+                                'assets/images/HorizontalLogo.svg',
+                                fit: BoxFit.contain,
+                                alignment: Alignment.centerLeft,
+                                semanticsLabel: 'Sahayogi Nepal',
+                              ),
+                            ),
                           ),
                         ),
-                      ),
-                    ),
-                    IconButton(
-                      onPressed: _refreshExplore,
-                      tooltip: 'Refresh location',
-                      icon:
-                          const Icon(Icons.my_location_rounded, color: appTeal),
-                    ),
-                  ],
-                ),
-              ),
-              Expanded(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(24, 0, 24, 18),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      const Padding(
-                        padding: EdgeInsets.only(bottom: 12),
-                        child: Text(
-                          'Explore relief map',
-                          style: TextStyle(
-                            color: appNavy,
-                            fontSize: 18,
-                            fontWeight: FontWeight.w700,
-                          ),
+                        IconButton(
+                          onPressed: _refreshExplore,
+                          tooltip: 'Refresh location',
+                          icon: const Icon(Icons.my_location_rounded,
+                              color: appTeal),
                         ),
-                      ),
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(18),
-                        child: SizedBox(
-                          height: 310,
-                          child: Stack(
-                            children: [
-                              FlutterMap(
-                                options: MapOptions(
-                                  initialCenter: _currentPosition == null
-                                      ? _defaultSampleAnchor
-                                      : LatLng(
-                                          _currentPosition!.latitude,
-                                          _currentPosition!.longitude,
-                                        ),
-                                  initialZoom: 13,
-                                  minZoom: 5,
-                                  maxZoom: 19,
-                                ),
+                      ],
+                    ),
+                  ),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.fromLTRB(24, 0, 24, 18),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          const Padding(
+                            padding: EdgeInsets.only(bottom: 12),
+                            child: Text(
+                              'Explore relief map',
+                              style: TextStyle(
+                                color: appNavy,
+                                fontSize: 18,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(18),
+                            child: SizedBox(
+                              height: 310,
+                              child: Stack(
                                 children: [
-                                  TileLayer(
-                                    urlTemplate:
-                                        'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                                    userAgentPackageName:
-                                        'np.sahayogi.sahayogi_mobile',
-                                    maxZoom: 19,
-                                  ),
-                                  MarkerLayer(
-                                    markers: _nearbyRequests
-                                        .map(
-                                          (request) => Marker(
-                                            point: request.position,
-                                            width: 46,
-                                            height: 46,
-                                            child: GestureDetector(
-                                              onTap: () =>
-                                                  _showRequestDetails(request),
-                                              child: _RequestMapMarker(
-                                                request: request,
-                                              ),
+                                  FlutterMap(
+                                    options: MapOptions(
+                                      initialCenter: _currentPosition == null
+                                          ? _defaultSampleAnchor
+                                          : LatLng(
+                                              _currentPosition!.latitude,
+                                              _currentPosition!.longitude,
                                             ),
-                                          ),
-                                        )
-                                        .toList(),
+                                      initialZoom: 13,
+                                      minZoom: 5,
+                                      maxZoom: 19,
+                                    ),
+                                    children: [
+                                      TileLayer(
+                                        urlTemplate:
+                                            'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                                        userAgentPackageName:
+                                            'np.sahayogi.sahayogi_mobile',
+                                        maxZoom: 19,
+                                      ),
+                                      MarkerLayer(
+                                        markers: _nearbyRequests
+                                            .map(
+                                              (request) => Marker(
+                                                point: request.position,
+                                                width: 46,
+                                                height: 46,
+                                                child: GestureDetector(
+                                                  onTap: () =>
+                                                      _showRequestDetails(
+                                                          request),
+                                                  child: _RequestMapMarker(
+                                                    request: request,
+                                                  ),
+                                                ),
+                                              ),
+                                            )
+                                            .toList(),
+                                      ),
+                                      if (_locationAllowed)
+                                        const CurrentLocationLayer(
+                                          alignPositionOnUpdate:
+                                              AlignOnUpdate.always,
+                                          alignDirectionOnUpdate:
+                                              AlignOnUpdate.never,
+                                        ),
+                                    ],
                                   ),
-                                  if (_locationAllowed)
-                                    const CurrentLocationLayer(
-                                      alignPositionOnUpdate:
-                                          AlignOnUpdate.always,
-                                      alignDirectionOnUpdate:
-                                          AlignOnUpdate.never,
+                                  Positioned(
+                                    top: 12,
+                                    right: 12,
+                                    child: DecoratedBox(
+                                      decoration: BoxDecoration(
+                                        color:
+                                            Colors.white.withValues(alpha: 0.8),
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: const Padding(
+                                        padding: EdgeInsets.symmetric(
+                                          horizontal: 7,
+                                          vertical: 4,
+                                        ),
+                                        child: Text(
+                                          'N ↑',
+                                          style: TextStyle(
+                                            color: appMuted,
+                                            fontSize: 11,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  Positioned(
+                                    left: 12,
+                                    bottom: 8,
+                                    child: DecoratedBox(
+                                      decoration: BoxDecoration(
+                                        color:
+                                            Colors.white.withValues(alpha: 0.8),
+                                        borderRadius: BorderRadius.circular(5),
+                                      ),
+                                      child: const Padding(
+                                        padding: EdgeInsets.symmetric(
+                                          horizontal: 7,
+                                          vertical: 4,
+                                        ),
+                                        child: Text(
+                                          'Community relief network · Sample map',
+                                          style: TextStyle(
+                                            color: appMuted,
+                                            fontSize: 9,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  Positioned(
+                                    right: 8,
+                                    bottom: 8,
+                                    child: DecoratedBox(
+                                      decoration: BoxDecoration(
+                                        color:
+                                            Colors.white.withValues(alpha: 0.9),
+                                        borderRadius: BorderRadius.circular(5),
+                                      ),
+                                      child: const Padding(
+                                        padding: EdgeInsets.symmetric(
+                                          horizontal: 7,
+                                          vertical: 4,
+                                        ),
+                                        child: Text(
+                                          '© OpenStreetMap',
+                                          style: TextStyle(
+                                            color: appNavy,
+                                            fontSize: 9,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  if (_checkingPermission || !_locationAllowed)
+                                    Positioned(
+                                      top: 10,
+                                      left: 10,
+                                      right: 68,
+                                      child: Material(
+                                        color: Colors.white
+                                            .withValues(alpha: 0.96),
+                                        borderRadius: BorderRadius.circular(12),
+                                        child: Padding(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 10,
+                                            vertical: 8,
+                                          ),
+                                          child: Row(
+                                            children: [
+                                              if (_checkingPermission)
+                                                const SizedBox(
+                                                  width: 15,
+                                                  height: 15,
+                                                  child:
+                                                      CircularProgressIndicator(
+                                                    strokeWidth: 2,
+                                                  ),
+                                                )
+                                              else
+                                                const Icon(
+                                                  Icons.location_off_outlined,
+                                                  color: appTeal,
+                                                  size: 17,
+                                                ),
+                                              const SizedBox(width: 8),
+                                              Expanded(
+                                                child: Text(
+                                                  _checkingPermission
+                                                      ? 'Getting location…'
+                                                      : _locationServiceEnabled
+                                                          ? 'Enable location for your live dot'
+                                                          : 'Turn on location services for your live dot',
+                                                  style: const TextStyle(
+                                                    color: appNavy,
+                                                    fontSize: 10,
+                                                  ),
+                                                ),
+                                              ),
+                                              if (!_checkingPermission)
+                                                TextButton(
+                                                  onPressed: _locationServiceEnabled
+                                                      ? _permissionPermanentlyDenied
+                                                          ? _openLocationSettings
+                                                          : _requestLocationAccess
+                                                      : _openLocationSettings,
+                                                  style: TextButton.styleFrom(
+                                                    padding: const EdgeInsets
+                                                        .symmetric(
+                                                        horizontal: 6),
+                                                    minimumSize: Size.zero,
+                                                    tapTargetSize:
+                                                        MaterialTapTargetSize
+                                                            .shrinkWrap,
+                                                  ),
+                                                  child: Text(
+                                                    _locationServiceEnabled &&
+                                                            !_permissionPermanentlyDenied
+                                                        ? 'Allow'
+                                                        : 'Settings',
+                                                    style: const TextStyle(
+                                                      fontSize: 11,
+                                                      fontWeight:
+                                                          FontWeight.w700,
+                                                    ),
+                                                  ),
+                                                ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
                                     ),
                                 ],
                               ),
-                              Positioned(
-                                top: 12,
-                                right: 12,
-                                child: DecoratedBox(
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withValues(alpha: 0.8),
-                                    borderRadius: BorderRadius.circular(6),
-                                  ),
-                                  child: const Padding(
-                                    padding: EdgeInsets.symmetric(
-                                      horizontal: 7,
-                                      vertical: 4,
-                                    ),
-                                    child: Text(
-                                      'N ↑',
-                                      style: TextStyle(
-                                        color: appMuted,
-                                        fontSize: 11,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              Positioned(
-                                left: 12,
-                                bottom: 8,
-                                child: DecoratedBox(
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withValues(alpha: 0.8),
-                                    borderRadius: BorderRadius.circular(5),
-                                  ),
-                                  child: const Padding(
-                                    padding: EdgeInsets.symmetric(
-                                      horizontal: 7,
-                                      vertical: 4,
-                                    ),
-                                    child: Text(
-                                      'Community relief network · Sample map',
-                                      style: TextStyle(
-                                        color: appMuted,
-                                        fontSize: 9,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              Positioned(
-                                right: 8,
-                                bottom: 8,
-                                child: DecoratedBox(
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withValues(alpha: 0.9),
-                                    borderRadius: BorderRadius.circular(5),
-                                  ),
-                                  child: const Padding(
-                                    padding: EdgeInsets.symmetric(
-                                      horizontal: 7,
-                                      vertical: 4,
-                                    ),
-                                    child: Text(
-                                      '© OpenStreetMap',
-                                      style: TextStyle(
-                                        color: appNavy,
-                                        fontSize: 9,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              if (_checkingPermission || !_locationAllowed)
-                                Positioned(
-                                  top: 10,
-                                  left: 10,
-                                  right: 68,
-                                  child: Material(
-                                    color: Colors.white.withValues(alpha: 0.96),
-                                    borderRadius: BorderRadius.circular(12),
-                                    child: Padding(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 10,
-                                        vertical: 8,
-                                      ),
-                                      child: Row(
-                                        children: [
-                                          if (_checkingPermission)
-                                            const SizedBox(
-                                              width: 15,
-                                              height: 15,
-                                              child: CircularProgressIndicator(
-                                                strokeWidth: 2,
-                                              ),
-                                            )
-                                          else
-                                            const Icon(
-                                              Icons.location_off_outlined,
-                                              color: appTeal,
-                                              size: 17,
-                                            ),
-                                          const SizedBox(width: 8),
-                                          Expanded(
-                                            child: Text(
-                                              _checkingPermission
-                                                  ? 'Getting location…'
-                                                  : _locationServiceEnabled
-                                                      ? 'Enable location for your live dot'
-                                                      : 'Turn on location services for your live dot',
-                                              style: const TextStyle(
-                                                color: appNavy,
-                                                fontSize: 10,
-                                              ),
-                                            ),
-                                          ),
-                                          if (!_checkingPermission)
-                                            TextButton(
-                                              onPressed: _locationServiceEnabled
-                                                  ? _permissionPermanentlyDenied
-                                                      ? _openLocationSettings
-                                                      : _requestLocationAccess
-                                                  : _openLocationSettings,
-                                              style: TextButton.styleFrom(
-                                                padding:
-                                                    const EdgeInsets.symmetric(
-                                                        horizontal: 6),
-                                                minimumSize: Size.zero,
-                                                tapTargetSize:
-                                                    MaterialTapTargetSize
-                                                        .shrinkWrap,
-                                              ),
-                                              child: Text(
-                                                _locationServiceEnabled &&
-                                                        !_permissionPermanentlyDenied
-                                                    ? 'Allow'
-                                                    : 'Settings',
-                                                style: const TextStyle(
-                                                  fontSize: 11,
-                                                  fontWeight: FontWeight.w700,
-                                                ),
-                                              ),
-                                            ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                            ],
+                            ),
                           ),
-                        ),
-                      ),
-                      if (_canViewNearbyRequests) ...[
-                        const SizedBox(height: 12),
-                        const Wrap(
-                          spacing: 12,
-                          runSpacing: 6,
-                          children: [
-                            _MapLegendItem(
-                              color: Color(0xFFE53935),
-                              label: 'Currently needed',
-                            ),
-                            _MapLegendItem(
-                              color: Color(0xFFF4BD32),
-                              label: 'Help on the way',
-                            ),
-                            _MapLegendItem(
-                              color: Color(0xFF159B68),
-                              label: 'Request closed',
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        Container(
-                        padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          border: Border.all(color: const Color(0xFFE0E6EC)),
-                          borderRadius: BorderRadius.circular(18),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            Row(
+                          if (_canViewNearbyRequests) ...[
+                            const SizedBox(height: 12),
+                            const Wrap(
+                              spacing: 12,
+                              runSpacing: 6,
                               children: [
-                                const Icon(
-                                  Icons.radar_rounded,
-                                  size: 17,
-                                  color: appTeal,
+                                _MapLegendItem(
+                                  color: Color(0xFFE53935),
+                                  label: 'Currently needed',
                                 ),
-                                const SizedBox(width: 7),
-                                const Expanded(
-                                  child: Text(
-                                    'Nearby requests',
-                                    style: TextStyle(
-                                      color: appNavy,
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
+                                _MapLegendItem(
+                                  color: Color(0xFFF4BD32),
+                                  label: 'Recently picked up / help on way',
                                 ),
-                                Text(
-                                  '${_nearbyRequests.length} within 100 km',
-                                  style: const TextStyle(
-                                    color: appMuted,
-                                    fontSize: 10,
-                                  ),
+                                _MapLegendItem(
+                                  color: Color(0xFF159B68),
+                                  label: 'Request closed',
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 5),
-                            Text(
-                              _requestLoadError == null
-                                  ? 'Approved requests shared by the community.'
-                                  : 'Could not load live requests. Pull to refresh.',
-                              style: const TextStyle(
-                                color: appMuted,
-                                fontSize: 11,
+                            const SizedBox(height: 12),
+                            Container(
+                              padding: const EdgeInsets.all(14),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                border:
+                                    Border.all(color: const Color(0xFFE0E6EC)),
+                                borderRadius: BorderRadius.circular(18),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  Row(
+                                    children: [
+                                      const Icon(
+                                        Icons.radar_rounded,
+                                        size: 17,
+                                        color: appTeal,
+                                      ),
+                                      const SizedBox(width: 7),
+                                      const Expanded(
+                                        child: Text(
+                                          'Nearby requests',
+                                          style: TextStyle(
+                                            color: appNavy,
+                                            fontSize: 15,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                      ),
+                                      Text(
+                                        '${_nearbyRequests.length} within 100 km',
+                                        style: const TextStyle(
+                                          color: appMuted,
+                                          fontSize: 10,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 5),
+                                  Text(
+                                    _requestLoadError == null
+                                        ? 'Approved requests shared by the community.'
+                                        : 'Could not load live requests. Pull to refresh.',
+                                    style: const TextStyle(
+                                      color: appMuted,
+                                      fontSize: 11,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 10),
+                                  SizedBox(
+                                    height: 236,
+                                    child: _loadingRequests
+                                        ? const Center(
+                                            child: CircularProgressIndicator(),
+                                          )
+                                        : _nearbyRequests.isEmpty
+                                            ? Center(
+                                                child: Padding(
+                                                  padding:
+                                                      const EdgeInsets.all(16),
+                                                  child: Text(
+                                                    _currentPosition == null
+                                                        ? 'Allow location access to find requests within 100 km.'
+                                                        : _requestLoadError ??
+                                                            'There are no approved requests within 100 km of your location.',
+                                                    textAlign: TextAlign.center,
+                                                    style: const TextStyle(
+                                                      color: appMuted,
+                                                      fontSize: 12,
+                                                    ),
+                                                  ),
+                                                ),
+                                              )
+                                            : ListView.separated(
+                                                itemCount:
+                                                    _nearbyRequests.length,
+                                                separatorBuilder: (_, __) =>
+                                                    const Divider(height: 1),
+                                                itemBuilder: (context, index) {
+                                                  final request =
+                                                      _nearbyRequests[index];
+                                                  return InkWell(
+                                                    onTap: () =>
+                                                        _showRequestDetails(
+                                                            request),
+                                                    child: Padding(
+                                                      padding: const EdgeInsets
+                                                          .symmetric(
+                                                        vertical: 9,
+                                                      ),
+                                                      child: _requestSummary(
+                                                          request),
+                                                    ),
+                                                  );
+                                                },
+                                              ),
+                                  ),
+                                ],
                               ),
                             ),
-                            const SizedBox(height: 10),
-                            SizedBox(
-                              height: 236,
-                              child: _loadingRequests
-                                  ? const Center(
-                                      child: CircularProgressIndicator(),
-                                    )
-                                  : _nearbyRequests.isEmpty
-                                      ? Center(
-                                          child: Padding(
-                                            padding: const EdgeInsets.all(16),
-                                            child: Text(
-                                              _currentPosition == null
-                                                  ? 'Allow location access to find requests within 100 km.'
-                                                  : _requestLoadError ??
-                                                      'There are no approved requests within 100 km of your location.',
-                                              textAlign: TextAlign.center,
-                                              style: const TextStyle(
-                                                color: appMuted,
-                                                fontSize: 12,
-                                              ),
-                                            ),
-                                          ),
-                                        )
-                                      : ListView.separated(
-                                          itemCount: _nearbyRequests.length,
-                                          separatorBuilder: (_, __) =>
-                                              const Divider(height: 1),
-                                          itemBuilder: (context, index) {
-                                            final request =
-                                                _nearbyRequests[index];
-                                            return InkWell(
-                                              onTap: () =>
-                                                  _showRequestDetails(request),
-                                              child: Padding(
-                                                padding:
-                                                    const EdgeInsets.symmetric(
-                                                  vertical: 9,
-                                                ),
-                                                child: _requestSummary(request),
-                                              ),
-                                            );
-                                          },
-                                        ),
-                            ),
                           ],
-                        ),
-                        ),
-                      ],
-                    ],
+                        ],
+                      ),
+                    ),
                   ),
-                ),
+                ],
               ),
-            ],
-          ),
-        )
-            : _buildGuestMapView(),
-        bottomNavigationBar: _ExploreNavigationBar(
-          onHome: () => openRoleAwareHome(context),
-          onRequests: () => Navigator.of(context).push(
-            MaterialPageRoute<void>(
-              builder: (_) => MyRequestsScreen(
-                requireVolunteerSession: widget.requireVolunteerSession,
-              ),
+            )
+          : _buildGuestMapView(),
+      bottomNavigationBar: _ExploreNavigationBar(
+        onHome: () => openRoleAwareHome(context),
+        onRequests: () => Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) => MyRequestsScreen(
+              requireVolunteerSession: widget.requireVolunteerSession,
             ),
           ),
-          onProfile: () => openVolunteerLogin(context),
         ),
-      );
+        onProfile: () => openVolunteerLogin(context),
+      ),
+    );
     if (!widget.requireVolunteerSession) return screen;
     return VolunteerSessionGuard(
       onUnauthorized: () => openVolunteerLogin(context),
@@ -1001,8 +1031,7 @@ class _ExploreScreenState extends State<ExploreScreen>
                                 if (_locationAllowed)
                                   const CurrentLocationLayer(
                                     alignPositionOnUpdate: AlignOnUpdate.always,
-                                    alignDirectionOnUpdate:
-                                        AlignOnUpdate.never,
+                                    alignDirectionOnUpdate: AlignOnUpdate.never,
                                   ),
                               ],
                             ),
@@ -1153,9 +1182,16 @@ class _ReliefRequest {
         joinOffers: joinOffers ?? this.joinOffers,
       );
 
+  Color get statusColor =>
+      status == _RequestStatus.onTheWay && kind == 'Community donation'
+          ? const Color(0xFF2878B5)
+          : status.color;
+
   String get statusLabel => switch (status) {
         _RequestStatus.needed => 'Currently needed',
-        _RequestStatus.onTheWay => 'Help on the way',
+        _RequestStatus.onTheWay => kind == 'Community donation'
+            ? 'Donation picked up'
+            : 'Help on the way',
         _RequestStatus.closed => 'Request closed',
       };
 }
@@ -1181,7 +1217,7 @@ class _RequestMapMarker extends StatelessWidget {
         width: size,
         height: size,
         decoration: BoxDecoration(
-          color: request.status.color,
+          color: request.statusColor,
           shape: BoxShape.circle,
           border: Border.all(color: Colors.white, width: 3),
           boxShadow: const [
@@ -1265,7 +1301,7 @@ class _ExploreNavigationBar extends StatelessWidget {
                 ),
                 _ExploreNavigationItem(
                   icon: Icons.person_outline_rounded,
-                  label: 'Profile',
+                  label: VolunteerAuthService.hasSession ? 'Profile' : 'Join',
                   onTap: onProfile,
                 ),
               ],

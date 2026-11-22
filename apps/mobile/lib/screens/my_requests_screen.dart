@@ -35,7 +35,24 @@ class _MyRequestsScreenState extends State<MyRequestsScreen> {
   }
 
   Future<void> _loadRequests() async {
-    final saved = await loadSavedRequests();
+    var saved = await loadSavedRequests();
+    if (VolunteerAuthService.hasSession) {
+      final localByReference = {
+        for (final record in saved)
+          if (record['public_ref'] is String) record['public_ref']: record,
+      };
+      final history = await Api.getVolunteerRequestHistory();
+      if (history.ok && history.data != null) {
+        saved = history.data!.map((record) {
+          final local = localByReference[record['public_ref']];
+          return {
+            ...record,
+            if (local?['tracking_token'] is String)
+              'tracking_token': local!['tracking_token'],
+          };
+        }).toList();
+      }
+    }
     if (!mounted) return;
     setState(() {
       _records = saved.map(RequestSummaryData.fromSavedSubmission).toList();
@@ -107,124 +124,122 @@ class _MyRequestsScreenState extends State<MyRequestsScreen> {
   @override
   Widget build(BuildContext context) {
     final screen = Scaffold(
-        backgroundColor: appPaper,
-        body: SafeArea(
-          bottom: false,
-          child: Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-                child: Row(
-                  children: [
-                    IconButton(
-                      onPressed: () => Navigator.of(context).maybePop(),
-                      icon: const Icon(
-                        Icons.arrow_back_rounded,
-                        color: appNavy,
-                      ),
+      backgroundColor: appPaper,
+      body: SafeArea(
+        bottom: false,
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+              child: Row(
+                children: [
+                  IconButton(
+                    onPressed: () => Navigator.of(context).maybePop(),
+                    icon: const Icon(
+                      Icons.arrow_back_rounded,
+                      color: appNavy,
                     ),
-                    const Expanded(
-                      child: Text(
-                        'My Requests',
-                        style: TextStyle(
-                          color: appNavy,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                    IconButton(
-                      onPressed: _loading ? null : _loadRequests,
-                      tooltip: 'Refresh requests',
-                      icon: const Icon(Icons.refresh_rounded, color: appTeal),
-                    ),
-                    const Icon(
-                      Icons.verified_user_outlined,
-                      color: appTeal,
-                      size: 20,
-                    ),
-                  ],
-                ),
-              ),
-              Expanded(
-                child: ListView(
-                  padding: const EdgeInsets.fromLTRB(24, 12, 24, 20),
-                  children: [
-                    const Text(
-                      'Support, every step.',
+                  ),
+                  const Expanded(
+                    child: Text(
+                      'My Requests',
                       style: TextStyle(
                         color: appNavy,
-                        fontSize: 24,
-                        height: 1.2,
-                        fontWeight: FontWeight.w800,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
-                    const SizedBox(height: 20),
-                    SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: Row(
-                        children: [
-                          _filterChip('All', _records.length),
-                          const SizedBox(width: 8),
-                          _filterChip(
-                              'Active', _records.where(_isActive).length),
-                          const SizedBox(width: 8),
-                          _filterChip(
-                            'Fulfilled',
-                            _records
-                                .where(
-                                    (request) => request.status == 'Fulfilled')
-                                .length,
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    if (_loading)
-                      const Center(
-                        child: Padding(
-                          padding: EdgeInsets.all(32),
-                          child: CircularProgressIndicator(),
-                        ),
-                      )
-                    else if (_visibleRequests.isEmpty)
-                      Center(
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 32),
-                          child: Text(
-                            _records.isEmpty
-                                ? 'Requests you submit from this device will appear here.'
-                                : 'No requests in this category.',
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              color: appMuted,
-                              fontSize: 14,
-                            ),
-                          ),
-                        ),
-                      )
-                    else
-                      ..._visibleRequests.map(
-                        (request) => Padding(
-                          padding: const EdgeInsets.only(bottom: 18),
-                          child: _RequestCard(
-                            request: request,
-                            onTap: () => _showRequest(request),
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
+                  ),
+                  IconButton(
+                    onPressed: _loading ? null : _loadRequests,
+                    tooltip: 'Refresh requests',
+                    icon: const Icon(Icons.refresh_rounded, color: appTeal),
+                  ),
+                  const Icon(
+                    Icons.verified_user_outlined,
+                    color: appTeal,
+                    size: 20,
+                  ),
+                ],
               ),
-            ],
-          ),
+            ),
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(24, 12, 24, 20),
+                children: [
+                  const Text(
+                    'Support, every step.',
+                    style: TextStyle(
+                      color: appNavy,
+                      fontSize: 24,
+                      height: 1.2,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        _filterChip('All', _records.length),
+                        const SizedBox(width: 8),
+                        _filterChip('Active', _records.where(_isActive).length),
+                        const SizedBox(width: 8),
+                        _filterChip(
+                          'Fulfilled',
+                          _records
+                              .where((request) => request.status == 'Fulfilled')
+                              .length,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  if (_loading)
+                    const Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(32),
+                        child: CircularProgressIndicator(),
+                      ),
+                    )
+                  else if (_visibleRequests.isEmpty)
+                    Center(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 32),
+                        child: Text(
+                          _records.isEmpty
+                              ? 'Requests you submit from this device will appear here.'
+                              : 'No requests in this category.',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color: appMuted,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ),
+                    )
+                  else
+                    ..._visibleRequests.map(
+                      (request) => Padding(
+                        padding: const EdgeInsets.only(bottom: 18),
+                        child: _RequestCard(
+                          request: request,
+                          onTap: () => _showRequest(request),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
         ),
-        bottomNavigationBar: _RequestsNavigationBar(
-          onHome: () => openRoleAwareHome(context),
-          onExplore: _openExplore,
-          onProfile: () => openVolunteerLogin(context),
-        ),
-      );
+      ),
+      bottomNavigationBar: _RequestsNavigationBar(
+        onHome: () => openRoleAwareHome(context),
+        onExplore: _openExplore,
+        onProfile: () => openVolunteerLogin(context),
+      ),
+    );
     if (!widget.requireVolunteerSession) return screen;
     return VolunteerSessionGuard(
       onUnauthorized: () => openVolunteerLogin(context),
@@ -355,8 +370,7 @@ class _RequestCard extends StatelessWidget {
           ),
         ),
       );
-  }
-
+}
 
 class _RequestsNavigationBar extends StatelessWidget {
   const _RequestsNavigationBar({
@@ -398,7 +412,7 @@ class _RequestsNavigationBar extends StatelessWidget {
                 ),
                 _RequestsNavigationItem(
                   icon: Icons.person_outline_rounded,
-                  label: 'Profile',
+                  label: VolunteerAuthService.hasSession ? 'Profile' : 'Join',
                   onTap: onProfile,
                 ),
               ],

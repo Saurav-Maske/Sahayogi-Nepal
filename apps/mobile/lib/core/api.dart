@@ -31,8 +31,8 @@ class Api {
         final error = Map<String, dynamic>.from(rawError);
         return ApiResult(
           errorCode: error['code']?.toString() ?? 'volunteer_api_failed',
-          errorMessage:
-              error['message']?.toString() ?? 'The request could not be completed.',
+          errorMessage: error['message']?.toString() ??
+              'The request could not be completed.',
         );
       }
       if (!envelope.containsKey('data')) {
@@ -60,7 +60,8 @@ class Api {
     }
   }
 
-  static Future<ApiResult<List<Map<String, dynamic>>>> getVolunteerOffers() async {
+  static Future<ApiResult<List<Map<String, dynamic>>>>
+      getVolunteerOffers() async {
     final result = await volunteerAction('offers');
     if (!result.ok) {
       return ApiResult(
@@ -82,7 +83,8 @@ class Api {
     );
   }
 
-  static Future<ApiResult<List<Map<String, dynamic>>>> getNearbyVolunteerOffers({
+  static Future<ApiResult<List<Map<String, dynamic>>>>
+      getNearbyVolunteerOffers({
     required double latitude,
     required double longitude,
     double radiusKm = 100,
@@ -123,18 +125,16 @@ class Api {
     if (responseData is! List) {
       return const ApiResult(
         errorCode: 'invalid_response',
-        errorMessage: 'The server returned an unexpected nearby offers response.',
+        errorMessage:
+            'The server returned an unexpected nearby offers response.',
       );
     }
     return ApiResult(
-      data: responseData
-          .whereType<Map>()
-          .map((offer) {
-            final normalized = Map<String, dynamic>.from(offer);
-            normalized['id'] ??= normalized['assignment_id'];
-            return normalized;
-          })
-          .toList(),
+      data: responseData.whereType<Map>().map((offer) {
+        final normalized = Map<String, dynamic>.from(offer);
+        normalized['id'] ??= normalized['assignment_id'];
+        return normalized;
+      }).toList(),
     );
   }
 
@@ -143,10 +143,35 @@ class Api {
     return _mapResult(result, 'stats');
   }
 
+  static Future<ApiResult<List<Map<String, dynamic>>>>
+      getVolunteerRequestHistory() async {
+    final result = await volunteerAction('requests');
+    if (!result.ok) {
+      return ApiResult(
+        errorCode: result.errorCode,
+        errorMessage: result.errorMessage,
+      );
+    }
+    if (result.data is! List) {
+      return const ApiResult(
+        errorCode: 'invalid_response',
+        errorMessage:
+            'The server returned an unexpected request history response.',
+      );
+    }
+    return ApiResult(
+      data: (result.data as List)
+          .whereType<Map>()
+          .map((row) => Map<String, dynamic>.from(row))
+          .toList(),
+    );
+  }
+
   static Future<ApiResult<Map<String, dynamic>>> getVolunteerAssignment(
     String id,
   ) async {
-    final result = await volunteerAction('assignments/detail', body: {'id': id});
+    final result =
+        await volunteerAction('assignments/detail', body: {'id': id});
     return _mapResult(result, 'assignment');
   }
 
@@ -200,7 +225,8 @@ class Api {
         errorMessage: body['message']?.toString() ?? error.toString(),
       );
     } catch (error) {
-      return ApiResult(errorCode: 'route_failed', errorMessage: error.toString());
+      return ApiResult(
+          errorCode: 'route_failed', errorMessage: error.toString());
     }
   }
 
@@ -238,6 +264,18 @@ class Api {
       },
     );
     return _mapResult(result, 'OTP verification');
+  }
+
+  static Future<ApiResult<Map<String, dynamic>>> reportVolunteerIssue({
+    required String id,
+    required String type,
+    required String note,
+  }) async {
+    final result = await volunteerAction(
+      'assignments/report-issue',
+      body: {'id': id, 'type': type, 'note': note},
+    );
+    return _mapResult(result, 'issue report');
   }
 
   static Future<ApiResult<Map<String, dynamic>>> updateVolunteerLocation({
@@ -333,6 +371,105 @@ class Api {
     } catch (e) {
       return ApiResult(errorCode: 'network', errorMessage: e.toString());
     }
+  }
+
+  /// Public requester actions. These functions intentionally work without a
+  /// volunteer session; the ref and one-time tracking token authorize them.
+  static Future<ApiResult<dynamic>> publicTrackingAction(
+    String action, {
+    required String reference,
+    required String token,
+    Map<String, dynamic> body = const {},
+  }) async {
+    try {
+      final response = await _sb.functions.invoke(
+        'public-api/tracking/$action',
+        body: {'ref': reference, 'token': token, ...body},
+      );
+      final envelope = response.data is Map
+          ? Map<String, dynamic>.from(response.data as Map)
+          : <String, dynamic>{};
+      final rawError = envelope['error'];
+      if (rawError is Map) {
+        final error = Map<String, dynamic>.from(rawError);
+        return ApiResult(
+          errorCode: error['code']?.toString() ?? 'tracking_action_failed',
+          errorMessage:
+              error['message']?.toString() ?? 'Could not complete this action.',
+        );
+      }
+      if (!envelope.containsKey('data')) {
+        return const ApiResult(
+          errorCode: 'invalid_response',
+          errorMessage: 'The server returned an unexpected response.',
+        );
+      }
+      return ApiResult<dynamic>(data: envelope['data']);
+    } on FunctionException catch (error) {
+      final details = error.details;
+      final envelope = details is Map
+          ? Map<String, dynamic>.from(details)
+          : <String, dynamic>{};
+      final rawError = envelope['error'];
+      final body = rawError is Map
+          ? Map<String, dynamic>.from(rawError)
+          : <String, dynamic>{};
+      return ApiResult(
+        errorCode: body['code']?.toString() ?? 'tracking_action_failed',
+        errorMessage: body['message']?.toString() ?? error.toString(),
+      );
+    } catch (error) {
+      return ApiResult(errorCode: 'network', errorMessage: error.toString());
+    }
+  }
+
+  static Future<ApiResult<Map<String, dynamic>>> requestTrackingOtp({
+    required String reference,
+    required String token,
+    required String purpose,
+  }) async {
+    final result = await publicTrackingAction(
+      'otp',
+      reference: reference,
+      token: token,
+      body: {'purpose': purpose},
+    );
+    return _mapResult(result, 'OTP');
+  }
+
+  static Future<ApiResult<Map<String, dynamic>>>
+      updateDonationPickupQuantities({
+    required String reference,
+    required String token,
+    required List<Map<String, dynamic>> items,
+  }) async {
+    final result = await publicTrackingAction(
+      'pickup-qty',
+      reference: reference,
+      token: token,
+      body: {'items': items},
+    );
+    return _mapResult(result, 'pickup quantities');
+  }
+
+  static Future<ApiResult<Map<String, dynamic>>> confirmRequestDelivery({
+    required String reference,
+    required String token,
+    required bool full,
+    String? note,
+    List<Map<String, dynamic>>? shortfall,
+  }) async {
+    final result = await publicTrackingAction(
+      'confirm-delivery',
+      reference: reference,
+      token: token,
+      body: {
+        'full': full,
+        if (note != null) 'note': note,
+        if (shortfall != null) 'shortfall': shortfall,
+      },
+    );
+    return _mapResult(result, 'delivery confirmation');
   }
 
   /// Anonymous public intake via Edge Function (no direct table insert).

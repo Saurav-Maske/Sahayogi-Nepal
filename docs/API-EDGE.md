@@ -41,6 +41,7 @@ HTTP status for RPC error codes: `unauthorized` 401, `forbidden` 403, `not_found
 | `offers`                 | my_offers               | none                                          |
 | `offers/nearby`          | nearby_offers           | `lat`, `lng`, `radius_km?`            |
 | `stats`                  | my_stats                | none                                          |
+| `requests`               | my_requests             | none                                          |
 | `device-token`           | register_device_token   | `token`, `platform`                       |
 | `assignments/detail`     | my_assignment_detail    | `id`                                        |
 | `assignments/claim`      | claim_assignment        | `id`                                        |
