@@ -402,16 +402,8 @@ class _VolunteerLoginScreenState extends State<VolunteerLoginScreen> {
                     children: [
                       IconButton(
                         onPressed: () => Navigator.of(context).pop(),
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints.tightFor(
-                          width: 32,
-                          height: 40,
-                        ),
-                        icon: const Icon(
-                          Icons.arrow_back_rounded,
-                          color: appNavy,
-                          size: 22,
-                        ),
+                        tooltip: 'Back',
+                        icon: const Icon(Icons.arrow_back_rounded),
                       ),
                       const SizedBox(width: 8),
                       const Text(
@@ -448,16 +440,7 @@ class _VolunteerLoginScreenState extends State<VolunteerLoginScreen> {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Sign in to continue helping your community.',
-                    style: TextStyle(
-                      color: appMuted,
-                      fontSize: 14,
-                      height: 1.45,
-                    ),
-                  ),
-                  const SizedBox(height: 30),
+                  const SizedBox(height: 24),
                   _loginField(
                     label: 'Email address',
                     hint: 'johndoe@email.com',
