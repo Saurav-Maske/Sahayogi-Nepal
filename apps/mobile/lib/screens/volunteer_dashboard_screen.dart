@@ -2,6 +2,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../core/app_colors.dart';
+import '../core/volunteer_auth_service.dart';
 
 class VolunteerDashboardScreen extends StatelessWidget {
   const VolunteerDashboardScreen({
@@ -20,14 +21,31 @@ class VolunteerDashboardScreen extends StatelessWidget {
           child: ListView(
             padding: const EdgeInsets.fromLTRB(24, 16, 24, 28),
             children: [
-              SizedBox(
-                height: 42,
-                child: SvgPicture.asset(
-                  'assets/images/HorizontalLogo.svg',
-                  alignment: Alignment.centerLeft,
-                  fit: BoxFit.contain,
-                  semanticsLabel: 'Sahayogi Nepal',
-                ),
+              Row(
+                children: [
+                  Expanded(
+                    child: SizedBox(
+                      height: 42,
+                      child: SvgPicture.asset(
+                        'assets/images/HorizontalLogo.svg',
+                        alignment: Alignment.centerLeft,
+                        fit: BoxFit.contain,
+                        semanticsLabel: 'Sahayogi Nepal',
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: 'Log out',
+                    onPressed: () async {
+                      await VolunteerAuthService.signOut();
+                      if (context.mounted) {
+                        Navigator.of(context)
+                            .popUntil((route) => route.isFirst);
+                      }
+                    },
+                    icon: const Icon(Icons.logout_rounded, color: appNavy),
+                  ),
+                ],
               ),
               const SizedBox(height: 22),
               Container(
