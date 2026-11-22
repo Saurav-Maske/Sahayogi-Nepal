@@ -95,8 +95,8 @@ Deno.serve(async (req) => {
       headers,
       signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
       body: JSON.stringify({
-        locations, costing,
-        ...(costingOptions ? { costing_options: costingOptions } : {}),
+        locations, costing,shape_format:"polyline5",
+
         directions_options: { units: "kilometers" },
       }),
     });
