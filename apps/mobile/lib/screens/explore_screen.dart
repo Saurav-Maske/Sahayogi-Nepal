@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:convert';
 
+import 'package:crypto/crypto.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_map_location_marker/flutter_map_location_marker.dart';
@@ -12,7 +14,9 @@ import '../core/app_home_navigation.dart';
 import '../core/app_colors.dart';
 import '../core/volunteer_auth_service.dart';
 import '../core/volunteer_session_guard.dart';
+import 'assigned_task_screen.dart';
 import 'my_requests_screen.dart';
+import 'volunteer_assignment_screen.dart';
 import 'volunteer_login_screen.dart';
 
 class ExploreScreen extends StatefulWidget {
@@ -41,6 +45,7 @@ class _ExploreScreenState extends State<ExploreScreen>
   StreamSubscription<Position>? _positionSubscription;
 
   List<_ReliefRequest> get _nearbyRequests {
+    if (!_canViewNearbyRequests) return const [];
     final position = _currentPosition;
     if (position == null) return const [];
 
@@ -62,6 +67,8 @@ class _ExploreScreenState extends State<ExploreScreen>
     nearby.sort((a, b) => a.distanceKm!.compareTo(b.distanceKm!));
     return nearby;
   }
+
+  bool get _canViewNearbyRequests => VolunteerAuthService.hasSession;
 
   @override
   void initState() {
@@ -165,13 +172,28 @@ class _ExploreScreenState extends State<ExploreScreen>
   }
 
   Future<void> _loadMapRequests() async {
+    if (!_canViewNearbyRequests) {
+      if (mounted) {
+        setState(() {
+          _mapRequests = const [];
+          _loadingRequests = false;
+          _requestLoadError = null;
+        });
+      }
+      return;
+    }
     if (mounted) {
       setState(() {
         _loadingRequests = true;
         _requestLoadError = null;
       });
     }
-    final result = await Api.getMapMarkers();
+    final results = await Future.wait([
+      Api.getMapMarkers(),
+      Api.getVolunteerOffers(),
+    ]);
+    final result = results[0] as ApiResult<List<Map<String, dynamic>>>;
+    final offersResult = results[1] as ApiResult<List<Map<String, dynamic>>>;
     if (!mounted) return;
     if (!result.ok || result.data == null) {
       setState(() {
@@ -181,8 +203,23 @@ class _ExploreScreenState extends State<ExploreScreen>
       });
       return;
     }
+    final offersByMarkerKey = <String, List<Map<String, dynamic>>>{};
+    if (offersResult.ok) {
+      for (final offer in offersResult.data ?? const []) {
+        final requestId = offer['request_id'];
+        if (requestId is! String || requestId.isEmpty) continue;
+        final markerKey = sha256
+            .convert(utf8.encode(requestId))
+            .toString()
+            .substring(0, 12);
+        offersByMarkerKey.putIfAbsent(markerKey, () => []).add(offer);
+      }
+    }
     final parsed = result.data!
-        .map(_requestFromMarker)
+        .map((marker) => _requestFromMarker(
+              marker,
+              joinOffers: offersByMarkerKey['${marker['key']}'] ?? const [],
+            ))
         .whereType<_ReliefRequest>()
         .toList();
     final groups = <String, _ReliefRequest>{};
@@ -202,6 +239,7 @@ class _ExploreScreenState extends State<ExploreScreen>
           status: status,
           icon: null,
           isMultiple: true,
+          joinOffers: [...existing.joinOffers, ...request.joinOffers],
         );
       }
     }
@@ -211,12 +249,24 @@ class _ExploreScreenState extends State<ExploreScreen>
     });
   }
 
-  _ReliefRequest? _requestFromMarker(Map<String, dynamic> marker) {
+  _ReliefRequest? _requestFromMarker(
+    Map<String, dynamic> marker, {
+    List<Map<String, dynamic>> joinOffers = const [],
+  }) {
     final latitude = (marker['lat'] as num?)?.toDouble();
     final longitude = (marker['lng'] as num?)?.toDouble();
     if (latitude == null || longitude == null) return null;
     final layer = '${marker['layer'] ?? ''}';
     final kindCode = '${marker['kind'] ?? ''}';
+    if (layer == 'fulfilled') {
+      final completedAt = DateTime.tryParse('${marker['at'] ?? ''}')?.toUtc();
+      if (completedAt == null) return null;
+      final retention = kindCode == 'resource_request'
+          ? const Duration(hours: 6)
+          : const Duration(hours: 12);
+      final age = DateTime.now().toUtc().difference(completedAt);
+      if (age.isNegative || age > retention) return null;
+    }
     final itemTypes = (marker['item_types'] as List? ?? const [])
         .map((item) => '$item')
         .toList();
@@ -255,6 +305,7 @@ class _ExploreScreenState extends State<ExploreScreen>
       icon: _markerIcon(kindCode, itemTypes),
       isMultiple: itemTypes.length > 1,
       key: '${marker['key'] ?? ''}',
+      joinOffers: joinOffers,
     );
   }
 
@@ -296,6 +347,28 @@ class _ExploreScreenState extends State<ExploreScreen>
     }
   }
 
+  Future<void> _joinOffer(Map<String, dynamic> offer) async {
+    final assignmentId = offer['id'];
+    if (assignmentId is! String || assignmentId.isEmpty) return;
+    final joined = await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(
+        builder: (_) => VolunteerAssignmentScreen(
+          assignmentId: assignmentId,
+          initialOffer: offer,
+        ),
+      ),
+    );
+    if (!mounted) return;
+    _loadMapRequests();
+    if (joined == true) {
+      await Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => AssignedTaskScreen(assignmentId: assignmentId),
+        ),
+      );
+    }
+  }
+
   void _showRequestDetails(_ReliefRequest request) {
     showModalBottomSheet<void>(
       context: context,
@@ -334,6 +407,51 @@ class _ExploreScreenState extends State<ExploreScreen>
             'The map uses an approximate location. Requester details are kept private.',
             style: TextStyle(color: appNavy, fontSize: 14, height: 1.4),
           ),
+          const SizedBox(height: 18),
+          if (request.joinOffers.isEmpty)
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  ScaffoldMessenger.of(this.context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        'No claimable task is available for this request right now.',
+                      ),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.volunteer_activism_outlined),
+                label: const Text('Join now'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: appGold,
+                  foregroundColor: appNavy,
+                ),
+              ),
+            )
+          else ...[
+            ...request.joinOffers.map(
+              (offer) => Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                      _joinOffer(offer);
+                    },
+                    icon: const Icon(Icons.volunteer_activism_outlined),
+                    label: const Text('Join now'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: appGold,
+                      foregroundColor: appNavy,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
         ],
       );
 
@@ -370,7 +488,8 @@ class _ExploreScreenState extends State<ExploreScreen>
   Widget build(BuildContext context) {
     final screen = Scaffold(
         backgroundColor: appPaper,
-        body: SafeArea(
+        body: _canViewNearbyRequests
+            ? SafeArea(
           bottom: false,
           child: Column(
             children: [
@@ -624,27 +743,28 @@ class _ExploreScreenState extends State<ExploreScreen>
                           ),
                         ),
                       ),
-                      const SizedBox(height: 12),
-                      const Wrap(
-                        spacing: 12,
-                        runSpacing: 6,
-                        children: [
-                          _MapLegendItem(
-                            color: Color(0xFFE53935),
-                            label: 'Currently needed',
-                          ),
-                          _MapLegendItem(
-                            color: Color(0xFFF4BD32),
-                            label: 'Help on the way',
-                          ),
-                          _MapLegendItem(
-                            color: Color(0xFF159B68),
-                            label: 'Request closed',
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      Container(
+                      if (_canViewNearbyRequests) ...[
+                        const SizedBox(height: 12),
+                        const Wrap(
+                          spacing: 12,
+                          runSpacing: 6,
+                          children: [
+                            _MapLegendItem(
+                              color: Color(0xFFE53935),
+                              label: 'Currently needed',
+                            ),
+                            _MapLegendItem(
+                              color: Color(0xFFF4BD32),
+                              label: 'Help on the way',
+                            ),
+                            _MapLegendItem(
+                              color: Color(0xFF159B68),
+                              label: 'Request closed',
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Container(
                         padding: const EdgeInsets.all(14),
                         decoration: BoxDecoration(
                           color: Colors.white,
@@ -738,14 +858,16 @@ class _ExploreScreenState extends State<ExploreScreen>
                             ),
                           ],
                         ),
-                      ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
               ),
             ],
           ),
-        ),
+        )
+            : _buildGuestMapView(),
         bottomNavigationBar: _ExploreNavigationBar(
           onHome: () => openRoleAwareHome(context),
           onRequests: () => Navigator.of(context).push(
@@ -764,6 +886,187 @@ class _ExploreScreenState extends State<ExploreScreen>
       child: screen,
     );
   }
+
+  Widget _buildGuestMapView() => SafeArea(
+        bottom: false,
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+              child: Row(
+                children: [
+                  IconButton(
+                    onPressed: () => Navigator.of(context).maybePop(),
+                    tooltip: 'Back',
+                    icon: const Icon(Icons.arrow_back_rounded, color: appNavy),
+                  ),
+                  Expanded(
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: SizedBox(
+                        height: 34,
+                        child: SvgPicture.asset(
+                          'assets/images/HorizontalLogo.svg',
+                          fit: BoxFit.contain,
+                          alignment: Alignment.centerLeft,
+                          semanticsLabel: 'Sahayogi Nepal',
+                        ),
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: _refreshExplore,
+                    tooltip: 'Refresh location',
+                    icon: const Icon(Icons.my_location_rounded, color: appTeal),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const Text(
+                      'Explore relief map',
+                      style: TextStyle(
+                        color: appNavy,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      height: (MediaQuery.sizeOf(context).height * 0.62)
+                          .clamp(360.0, 540.0)
+                          .toDouble(),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(20),
+                        child: Stack(
+                          children: [
+                            FlutterMap(
+                              options: MapOptions(
+                                initialCenter: _currentPosition == null
+                                    ? _defaultSampleAnchor
+                                    : LatLng(
+                                        _currentPosition!.latitude,
+                                        _currentPosition!.longitude,
+                                      ),
+                                initialZoom: 13,
+                                minZoom: 5,
+                                maxZoom: 19,
+                              ),
+                              children: [
+                                TileLayer(
+                                  urlTemplate:
+                                      'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                                  userAgentPackageName:
+                                      'np.sahayogi.sahayogi_mobile',
+                                  maxZoom: 19,
+                                ),
+                                if (_locationAllowed)
+                                  const CurrentLocationLayer(
+                                    alignPositionOnUpdate: AlignOnUpdate.always,
+                                    alignDirectionOnUpdate:
+                                        AlignOnUpdate.never,
+                                  ),
+                              ],
+                            ),
+                            if (_checkingPermission || !_locationAllowed)
+                              Positioned(
+                                left: 10,
+                                right: 10,
+                                top: 10,
+                                child: Material(
+                                  color: Colors.white.withValues(alpha: 0.96),
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 8,
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        if (_checkingPermission)
+                                          const SizedBox(
+                                            width: 16,
+                                            height: 16,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                            ),
+                                          )
+                                        else
+                                          const Icon(
+                                            Icons.location_off_outlined,
+                                            color: appTeal,
+                                            size: 18,
+                                          ),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: Text(
+                                            _checkingPermission
+                                                ? 'Getting your location…'
+                                                : 'Enable location to show your live position',
+                                            style: const TextStyle(
+                                              color: appNavy,
+                                              fontSize: 11,
+                                            ),
+                                          ),
+                                        ),
+                                        if (!_checkingPermission)
+                                          TextButton(
+                                            onPressed: _locationServiceEnabled
+                                                ? _permissionPermanentlyDenied
+                                                    ? _openLocationSettings
+                                                    : _requestLocationAccess
+                                                : _openLocationSettings,
+                                            child: Text(
+                                              _permissionPermanentlyDenied
+                                                  ? 'Settings'
+                                                  : 'Allow',
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            const Positioned(
+                              right: 8,
+                              bottom: 8,
+                              child: DecoratedBox(
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius:
+                                      BorderRadius.all(Radius.circular(5)),
+                                ),
+                                child: Padding(
+                                  padding: EdgeInsets.symmetric(
+                                    horizontal: 7,
+                                    vertical: 4,
+                                  ),
+                                  child: Text(
+                                    '© OpenStreetMap',
+                                    style: TextStyle(
+                                      color: appNavy,
+                                      fontSize: 9,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
 }
 
 class _ReliefRequest {
@@ -778,6 +1081,7 @@ class _ReliefRequest {
     this.isMultiple = false,
     this.key = '',
     this.distanceKm,
+    this.joinOffers = const [],
   });
 
   final LatLng position;
@@ -790,6 +1094,7 @@ class _ReliefRequest {
   final bool isMultiple;
   final String key;
   final double? distanceKm;
+  final List<Map<String, dynamic>> joinOffers;
 
   _ReliefRequest copyWith({
     String? title,
@@ -799,6 +1104,7 @@ class _ReliefRequest {
     _RequestStatus? status,
     bool? isMultiple,
     double? distanceKm,
+    List<Map<String, dynamic>>? joinOffers,
   }) =>
       _ReliefRequest(
         position: position,
@@ -811,6 +1117,7 @@ class _ReliefRequest {
         isMultiple: isMultiple ?? this.isMultiple,
         key: key,
         distanceKm: distanceKm ?? this.distanceKm,
+        joinOffers: joinOffers ?? this.joinOffers,
       );
 
   String get statusLabel => switch (status) {
