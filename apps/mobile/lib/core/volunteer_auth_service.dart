@@ -15,10 +15,27 @@ class VolunteerAuthException implements Exception {
 }
 
 class VolunteerAccount {
-  const VolunteerAccount({required this.name, required this.roles});
+  const VolunteerAccount({
+    required this.name,
+    required this.email,
+    required this.phone,
+    required this.roles,
+  });
 
   final String name;
+  final String email;
+  final String phone;
   final List<String> roles;
+}
+
+class VolunteerApplicationSubmission {
+  const VolunteerApplicationSubmission({
+    required this.applicationId,
+    required this.status,
+  });
+
+  final String applicationId;
+  final String status;
 }
 
 class VolunteerDocument {
@@ -64,6 +81,8 @@ class VolunteerAuthService {
     await _client.auth.setSession(refreshToken);
     return VolunteerAccount(
       name: '${profile['full_name'] ?? 'Volunteer'}',
+      email: '${profile['email'] ?? email}'.trim(),
+      phone: '${profile['phone'] ?? ''}'.trim(),
       roles: _rolesFromProfile(profile),
     );
   }
@@ -82,6 +101,8 @@ class VolunteerAuthService {
     }
     return VolunteerAccount(
       name: '${profile['full_name'] ?? 'Volunteer'}',
+      email: '${profile['email'] ?? ''}'.trim(),
+      phone: '${profile['phone'] ?? ''}'.trim(),
       roles: _rolesFromProfile(profile),
     );
   }
@@ -145,7 +166,7 @@ class VolunteerAuthService {
     return token;
   }
 
-  static Future<void> submitApplication({
+  static Future<VolunteerApplicationSubmission> submitApplication({
     required String fullName,
     required String email,
     required String phone,
@@ -204,7 +225,7 @@ class VolunteerAuthService {
       paths[kind] = path;
     }
 
-    await _invoke('submit-volunteer-application', {
+    final result = await _invoke('submit-volunteer-application', {
       'full_name': fullName.trim(),
       'email': email.trim().toLowerCase(),
       'email_verification_token': emailVerificationToken,
@@ -220,6 +241,35 @@ class VolunteerAuthService {
       if (paths['service_card'] != null)
         'service_card_photo_path': paths['service_card'],
     });
+    final applicationId = result['application_id'];
+    if (applicationId is! String || applicationId.isEmpty) {
+      throw const VolunteerAuthException(
+        'The application was submitted, but the server did not return its reference.',
+      );
+    }
+    return VolunteerApplicationSubmission(
+      applicationId: applicationId,
+      status: '${result['status'] ?? 'submitted'}',
+    );
+  }
+
+  static Future<String> viewVolunteerApplication({
+    required String applicationId,
+  }) async {
+    final data = await _invoke('view-volunteer-application', {
+      'application_id': applicationId,
+    });
+    final application = _asMap(data['application']);
+    final status = data['status'] ??
+        data['review_status'] ??
+        application['status'] ??
+        application['review_status'];
+    if (status is! String || status.isEmpty) {
+      throw const VolunteerAuthException(
+        'The server did not return an application status.',
+      );
+    }
+    return status;
   }
 
   static Future<Map<String, dynamic>> _invoke(

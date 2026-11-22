@@ -13,10 +13,7 @@ Future<void> openVolunteerLogin(BuildContext context) async {
       if (!context.mounted) return;
       Navigator.of(context).push(
         MaterialPageRoute<void>(
-          builder: (_) => VolunteerDashboardScreen(
-            volunteerName: account.name,
-            roles: account.roles,
-          ),
+          builder: (_) => VolunteerDashboardScreen(account: account),
         ),
       );
       return;
@@ -69,10 +66,7 @@ class _VolunteerLoginScreenState extends State<VolunteerLoginScreen> {
       if (!mounted) return;
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute<void>(
-          builder: (_) => VolunteerDashboardScreen(
-            volunteerName: account.name,
-            roles: account.roles,
-          ),
+          builder: (_) => VolunteerDashboardScreen(account: account),
         ),
         (route) => route.isFirst,
       );
