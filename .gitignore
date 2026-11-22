@@ -19,3 +19,4 @@ key.properties
 supabase/functions/node_modules
 scripts/tests/last-run.json
 reports/
+supabase/functions/service-account.json
