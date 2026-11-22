@@ -5,9 +5,9 @@ export interface AnalyticsKpis {
   districtsCovered: number;
   volunteerHours: number | null; // null = not tracked yet
   volunteerHoursChangePct: number | null;
-  deliverySuccessPct: number;
+  deliverySuccessPct: number | null;
   completedJobs: number;
-  avgApprovalHours: number;
+  avgApprovalHours: number | null;
   avgApprovalChangeMin: number | null; // negative = faster
 }
 

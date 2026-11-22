@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import QuickAction from '../components/dashboard/QuickAction';
+import AdminDialog from '../components/overlay/AdminDialog';
+import FeedbackDialog from '../components/overlay/FeedbackDialog';
 import StatusBadge from '../components/requests/StatusBadge';
 import { useRequest } from '../hooks/useRequests';
-import { reviewRequest } from '../services/requestsService';
+import { offerRequestToVolunteers, reviewRequest } from '../services/requestsService';
 import type { RequestItem, ServiceRequest } from '../types/requests';
 import { humanize, kindLabel } from '../utils/labels';
 import { buildHistory, fmtDate, fmtTime, isApproved, isPending } from '../utils/requests';
@@ -24,8 +26,6 @@ function Stepper({ item, value, editable, onChange }: { item: RequestItem; value
               onChange={(e) => set(Number(e.target.value))} />
             <span>{item.unit}</span>
             <span className="qty__btns">
-              <button type="button" aria-label="Decrease" onClick={() => set(value - 1)} disabled={value <= 0}>−</button>
-              <button type="button" aria-label="Increase" onClick={() => set(value + 1)} disabled={value >= max}>+</button>
             </span>
           </>
         ) : (
@@ -44,21 +44,36 @@ function Stepper({ item, value, editable, onChange }: { item: RequestItem; value
 
 export default function RequestReviewPage() {
   const { id = '' } = useParams();
-  const navigate = useNavigate();
   const { data, loading, error, reload } = useRequest(id);
   const r: ServiceRequest | undefined = data?.request;
 
   const [qtys, setQtys] = useState<Record<string, number>>({});
   const [notes, setNotes] = useState('');
-  const [declining, setDeclining] = useState(false);
+  const [confirming, setConfirming] = useState<'approve' | 'decline' | null>(null);
   const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [distributionError, setDistributionError] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<{ title: string; message: string } | null>(null);
 
   useEffect(() => {
     if (!r) return;
     setQtys(Object.fromEntries(r.items.map((i) => [i.id, i.approvedQty ?? maxFor(i)])));
   }, [r?.id, r?.status]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!r || !isApproved(r.status)) return;
+    let active = true;
+    void offerRequestToVolunteers(r.id)
+      .then(() => {
+        if (active) setDistributionError(null);
+        if (active && r.status === 'approved') reload();
+      })
+      .catch((e) => {
+        if (active) setDistributionError(e instanceof Error ? e.message : 'Could not share this request with volunteers.');
+      });
+    return () => { active = false; };
+  }, [r?.id, r?.status]);
 
   if (loading && !r) return <div className="skeleton-wrap" aria-busy="true"><div className="skeleton skeleton--title" /><div className="skeleton" style={{ height: 320 }} /></div>;
   if (error || !r) {
@@ -73,14 +88,25 @@ export default function RequestReviewPage() {
   const pending = isPending(r.status);
   const approved = isApproved(r.status);
   const total = r.items.reduce((s, i) => s + (qtys[i.id] ?? 0), 0);
+  const needsItemQuantities = r.kind === 'resource_request' || r.kind === 'donation_offer';
+  const canApprove = !busy && (!needsItemQuantities || total > 0);
   const title = pending ? 'Review request' : approved ? 'Request approved' : r.status === 'declined' ? 'Request declined' : 'Request';
+  const itemSummary = r.items.map((item) => `${qtys[item.id] ?? 0} ${humanize(item.itemType)}`).join(' and ');
 
   const run = async (decision: 'approve' | 'decline') => {
     setBusy(true);
     setActionError(null);
     try {
       await reviewRequest(r.id, decision, r.items.map((i) => ({ item_id: i.id, qty: qtys[i.id] ?? 0 })), decision === 'decline' ? reason.trim() : notes.trim());
-      setDeclining(false);
+      setDistributionError(null);
+      if (decision === 'approve') {
+        try { await offerRequestToVolunteers(r.id); }
+        catch (e) { setDistributionError(e instanceof Error ? e.message : 'Could not share this request with volunteers.'); }
+      }
+      setConfirming(null);
+      setFeedback({ title: decision === 'approve' ? 'Request approved' : 'Request declined', message: decision === 'approve'
+        ? `${r.publicRef} · ${r.requesterName}. Eligible volunteers can claim the request in the mobile app.`
+        : `${r.publicRef} · ${r.requesterName}. The request status has been updated.` });
       reload();
     } catch (e: any) {
       setActionError(e?.message ?? 'Something went wrong. Please try again.');
@@ -133,18 +159,16 @@ export default function RequestReviewPage() {
 
         <section className="card">
           <h2 className="card__title">{pending ? 'Review approved quantities' : 'Approved quantities'}</h2>
-          <p className="card__sub">Approved quantities cannot exceed available stock.</p>
+          <p className="card__sub">{needsItemQuantities ? 'Approved quantities cannot exceed available stock.' : 'This request does not require inventory quantities.'}</p>
 
-          {r.items.length === 0 && <p className="empty">This request has no items.</p>}
+          {r.items.length === 0 && <p className="empty">{needsItemQuantities ? 'This request has no item quantities to review.' : 'No item quantities are required for this request.'}</p>}
           {r.items.map((i) => (
             <Stepper key={i.id} item={i} value={qtys[i.id] ?? 0} editable={pending} onChange={(v) => setQtys((q) => ({ ...q, [i.id]: v }))} />
           ))}
 
           {pending && (
-            <label className="qty">
-              <span className="qty__title">Approval notes</span>
-              <textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="e.g. Prioritise delivery before 16:00 today." />
-              <span className="qty__hint">Visible to coordinating administrators</span>
+            <label className="qty review__notes">
+            <textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="e.g. Prioritise delivery before 16:00 today." />
             </label>
           )}
 
@@ -152,35 +176,52 @@ export default function RequestReviewPage() {
 
           <div className="callout">
             <strong>Approval does not dispatch stock</strong>
-            <p>Reserve and record an inventory movement when an assignment is confirmed.</p>
+            <p>Approved quantities are reserved when applicable. Eligible volunteers receive the request and claim it themselves; dispatch is recorded through the audited inventory workflow.</p>
           </div>
 
-          {declining && (
-            <label className="qty">
-              <span className="qty__title">Reason for declining (required)</span>
-              <textarea rows={2} value={reason} onChange={(e) => setReason(e.target.value)} autoFocus />
-            </label>
+          {approved && (
+            <div className={distributionError ? 'callout callout--bad' : 'callout'} role={distributionError ? 'alert' : undefined}>
+              <strong>{distributionError ? 'Could not share with volunteers' : 'Volunteer distribution'}</strong>
+              <p>{distributionError ?? 'Volunteers choose and accept their own offers; administrators do not select an individual volunteer.'}</p>
+              {distributionError && <button className="btn" disabled={busy} onClick={() => {
+                setBusy(true);
+                void offerRequestToVolunteers(r.id).then(() => { setDistributionError(null); reload(); })
+                  .catch((e) => setDistributionError(e instanceof Error ? e.message : 'Could not share this request with volunteers.'))
+                  .finally(() => setBusy(false));
+              }}>Retry sharing</button>}
+            </div>
           )}
-          {actionError && <p className="auth-error" role="alert">{actionError}</p>}
 
           <div className="review__actions">
-            {pending && !declining && (
+            {pending && (
               <>
-                <button className="btn btn--primary" disabled={busy || total <= 0} onClick={() => run('approve')}>{busy ? 'Saving…' : 'Approve request'}</button>
-                <button className="btn btn--danger" disabled={busy} onClick={() => setDeclining(true)}>Decline</button>
+                <button className="btn btn--primary" disabled={!canApprove} onClick={() => { setActionError(null); setConfirming('approve'); }}>Approve request</button>
+                <button className="btn btn--danger" disabled={busy} onClick={() => { setActionError(null); setConfirming('decline'); }}>Decline</button>
               </>
             )}
-            {pending && declining && (
-              <>
-                <button className="btn btn--danger" disabled={busy || !reason.trim()} onClick={() => run('decline')}>{busy ? 'Saving…' : 'Confirm decline'}</button>
-                <button className="btn" disabled={busy} onClick={() => setDeclining(false)}>Cancel</button>
-              </>
-            )}
-            {approved && <button className="btn btn--primary" onClick={() => navigate(`/assignments?request=${r.id}`)}>Assign volunteer</button>}
             {!pending && <Link className="btn" to="/requests">Back to requests</Link>}
           </div>
         </section>
       </div>
+      <AdminDialog
+        open={confirming !== null}
+        title={confirming === 'approve' ? `Approve request ${r.publicRef}?` : 'Decline this request?'}
+        description={confirming === 'approve'
+          ? `${r.requesterName}${itemSummary ? ` · ${itemSummary}` : ''}. Approval does not reserve or dispatch stock.`
+          : 'A clear reason is required and will be shared with the requester.'}
+        onClose={() => !busy && setConfirming(null)}
+        actions={confirming === 'approve' ? [
+          { label: busy ? 'Approving…' : 'Approve request', variant: 'primary', disabled: !canApprove, onClick: () => void run('approve') },
+          { label: 'Cancel', onClick: () => setConfirming(null), disabled: busy },
+        ] : confirming === 'decline' ? [
+          { label: busy ? 'Declining…' : 'Decline request', variant: 'danger', disabled: busy || reason.trim().length < 2, onClick: () => void run('decline') },
+          { label: 'Cancel', onClick: () => setConfirming(null), disabled: busy },
+        ] : []}
+      >
+        {confirming === 'decline' && <label className="admin-dialog__field"><span>Decline reason</span><textarea rows={3} value={reason} onChange={(event) => setReason(event.target.value)} autoFocus/><small>Required · Keep the reason concise and respectful.</small></label>}
+        {actionError && <p className="admin-dialog__error" role="alert">{actionError}</p>}
+      </AdminDialog>
+      <FeedbackDialog feedback={feedback} onClose={() => setFeedback(null)} />
     </>
   );
 }

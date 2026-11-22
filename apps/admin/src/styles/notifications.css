@@ -26,7 +26,7 @@
   background: transparent;
   color: var(--muted);
   font: inherit;
-  font-size: 12px;
+  font-size: 16px;
   font-weight: 500;
   cursor: pointer;
   transition: color .15s;
@@ -45,9 +45,9 @@
   padding: 0 5px;
   margin-left: 0;
   border-radius: 99px;
-  background: #eaf1f7;
+  background: var(--info-bg);
   color: var(--teal);
-  font-size: 10px;
+  font-size: 14px;
   font-weight: 600;
 }
 
@@ -80,7 +80,7 @@
 .notification-symbol {
   flex: none;
   width: 16px;
-  font-size: 14px;
+  font-size: 17px;
   font-weight: 600;
   line-height: 20px;
   text-align: center;
@@ -90,20 +90,10 @@
 .notification-item--success .notification-symbol { color: var(--good); }
 
 .notification-copy { display: flex; flex-direction: column; min-width: 0; }
-.notification-copy strong { font-size: 12px; line-height: 18px; font-weight: 600; color: var(--navy); }
-.notification-detail { margin-top: 2px; font-size: 11px; line-height: 16px; color: var(--muted); }
+.notification-copy strong { font-size: 16px; line-height: 18px; font-weight: 600; color: var(--navy); }
+.notification-detail { margin-top: 2px; font-size: 15px; line-height: 16px; color: var(--muted); }
 
-.notification-unread-dot {
-  flex: none;
-  width: 8px;
-  height: 8px;
-  margin: 6px 4px 0 auto;
-  border-radius: 50%;
-  background: var(--blue);
-}
-.notification-item.is-unread .notification-copy strong { font-weight: 700; }
-
-.notification-empty { padding: 24px 18px; font-size: 12px; color: var(--muted); }
+.notification-empty { padding: 24px 18px; font-size: 16px; color: var(--muted); }
 
 /* ---------- responsive (same breakpoints as admin) ---------- */
 @media (max-width: 900px) {
@@ -112,4 +102,42 @@
 }
 @media (max-width: 520px) {
   .notification-item { padding: 12px 8px; } /* bigger tap target */
+}
+
+/* Navy and teal fade treatment */
+.page .notification-tabs {
+  border: 1px solid rgba(191, 211, 222, .5);
+  background: rgba(215, 230, 238, .48);
+  box-shadow: none;
+}
+.page .notification-tabs button.is-active { color: var(--teal); box-shadow: inset 0 -2px var(--teal); }
+.page .notification-feed {
+  border: 1px solid rgba(177, 200, 213, .42);
+  background: linear-gradient(122deg, #dceaf2 0%, #e4eef3 52%, #ebf2f6 100%);
+}
+.page .notification-item {
+  border-bottom: 1px solid rgba(177, 200, 213, .42);
+  border-radius: 0;
+  padding: 14px 8px;
+}
+.page .notification-item:last-child { border-bottom: 0; }
+.page .notification-item:hover { background: rgba(202, 222, 232, .48); }
+
+/* Route-scoped selectors win over the admin-wide notification defaults. */
+.page .notifications-page .notification-tabs {
+  border-color: rgba(177, 200, 213, .42);
+  background: linear-gradient(112deg, #dceaf2 0%, #e5eef3 58%, #ebf2f6 100%);
+}
+.page .notifications-page .notification-feed {
+  border-color: rgba(164, 191, 205, .42);
+  background: linear-gradient(118deg, #d8e7ef 0%, #e1edf3 50%, #eaf2f6 100%);
+  box-shadow: none;
+}
+.page .notifications-page .notification-feed .notification-item {
+  border-bottom-color: rgba(157, 186, 200, .5);
+  background: transparent;
+}
+.page .notifications-page .notification-feed .notification-item:last-child { border-bottom: 0; }
+.page .notifications-page .notification-feed .notification-item:hover {
+  background: rgba(193, 216, 228, .42);
 }

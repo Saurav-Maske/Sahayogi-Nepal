@@ -2,12 +2,13 @@ import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import QuickAction from '../components/dashboard/QuickAction';
 import DocumentCard from '../components/volunteers/DocumentCard';
+import AdminDialog from '../components/overlay/AdminDialog';
+import FeedbackDialog from '../components/overlay/FeedbackDialog';
 import { useVolunteer } from '../hooks/useVolunteers';
 import { reviewVolunteer } from '../services/volunteersService';
 import type { VolunteerDecision } from '../types/volunteers';
 import { categoryInfo, isSuspended, maskId } from '../utils/volunteers';
 import '../styles/requests.css';
-import '../styles/volunteers.css';
 
 export default function VolunteerProfilePage() {
   const { id = '' } = useParams();
@@ -18,7 +19,8 @@ export default function VolunteerProfilePage() {
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
-  const [saved, setSaved] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<{ title: string; message: string } | null>(null);
+  const [confirming, setConfirming] = useState<VolunteerDecision | null>(null);
 
   useEffect(() => { if (v) setNote(v.reviewNote ?? ''); }, [v?.id, v?.reviewStatus, v?.accountStatus]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -43,8 +45,8 @@ export default function VolunteerProfilePage() {
   const sub = pending ? `${c.name} · Permissions ${c.perms}` : approved ? `Approved · ${c.perms}` : suspended ? `Suspended · ${c.perms}` : `Rejected · ${c.name}`;
 
   const run = async (decision: VolunteerDecision, done: string) => {
-    setBusy(true); setActionError(null); setSaved(null);
-    try { await reviewVolunteer(v.id, decision, note.trim()); setSaved(done); reload(); }
+    setBusy(true); setActionError(null); setFeedback(null);
+    try { await reviewVolunteer(v.id, decision, note.trim()); setFeedback({ title: done.replace(/\.$/, ''), message: `${v.fullName}'s volunteer record has been updated.` }); setConfirming(null); reload(); }
     catch (e: any) { setActionError(e?.message ?? 'Something went wrong. Please try again.'); }
     finally { setBusy(false); }
   };
@@ -86,23 +88,22 @@ export default function VolunteerProfilePage() {
           <label className="qty">
             <span className="qty__title">Internal admin note</span>
             {rejected ? <span className="note-readonly">{v.reviewNote ?? '—'}</span> : (
-              <textarea rows={2} value={note} onChange={(e) => setNote(e.target.value)} placeholder="e.g. Identity and driving licence reviewed." />
+              <textarea className="qty__textarea" rows={2} value={note} onChange={(e) => setNote(e.target.value)} placeholder="e.g. Identity and driving licence reviewed." />
             )}
             <span className="qty__hint">Restricted to volunteer administrators{!rejected && ' · A note is required to reject or suspend'}</span>
           </label>
 
-          {actionError && <p className="auth-error" role="alert">{actionError}</p>}
-          {saved && !actionError && <p className="saved" role="status">{saved}</p>}
+          {actionError && !confirming && <p className="auth-error" role="alert">{actionError}</p>}
 
           <div className="review__actions">
             {pending && (
               <>
-                <button className="btn btn--primary" disabled={busy} onClick={() => run('approve', 'Application approved.')}>{busy ? 'Saving…' : 'Approve application'}</button>
-                <button className="btn btn--danger" disabled={busy || noteBlocked('reject')} onClick={() => run('reject', 'Application rejected.')}>Reject</button>
+                <button className="btn btn--primary" disabled={busy} onClick={() => { setActionError(null); setConfirming('approve'); }}>Approve application</button>
+                <button className="btn btn--danger" disabled={busy} onClick={() => { setActionError(null); setConfirming('reject'); }}>Reject</button>
               </>
             )}
-            {approved && <button className="btn btn--danger" disabled={busy || noteBlocked('suspend')} onClick={() => run('suspend', 'Volunteer suspended.')}>Suspend volunteer</button>}
-            {suspended && <button className="btn btn--primary" disabled={busy} onClick={() => run('reinstate', 'Volunteer reinstated.')}>Reinstate volunteer</button>}
+            {approved && <button className="btn btn--danger" disabled={busy} onClick={() => { setActionError(null); setConfirming('suspend'); }}>Suspend volunteer</button>}
+            {suspended && <button className="btn btn--primary" disabled={busy} onClick={() => { setActionError(null); setConfirming('reinstate'); }}>Reinstate volunteer</button>}
             {!pending && <Link className="btn" to="/volunteers">Back to volunteers</Link>}
           </div>
         </section>
@@ -115,6 +116,26 @@ export default function VolunteerProfilePage() {
           {(v.serviceCardNo || v.serviceCardPath) && <DocumentCard title="Service card photograph" path={v.serviceCardPath} />}
         </section>
       </div>
+      <AdminDialog
+        open={confirming !== null}
+        title={confirming === 'approve' ? `Approve ${v.fullName}?` : confirming === 'reject' ? 'Reject this application?' : confirming === 'suspend' ? 'Suspend volunteer access?' : 'Reinstate volunteer access?'}
+        description={confirming === 'approve'
+          ? `An account activation and password setup email will be sent to ${v.email}. No plaintext password is displayed or emailed.`
+          : confirming === 'reject'
+            ? 'The applicant will receive a message explaining the next steps.'
+            : confirming === 'suspend'
+              ? 'Complete an investigation first. Active assignments must be safely reassigned before suspension.'
+              : `Restore active volunteer access for ${v.fullName}?`}
+        onClose={() => !busy && setConfirming(null)}
+        actions={confirming ? [
+          { label: busy ? 'Saving…' : confirming === 'approve' ? 'Approve & send email' : confirming === 'reject' ? 'Reject application' : confirming === 'suspend' ? 'Suspend volunteer' : 'Reinstate volunteer', variant: confirming === 'reject' || confirming === 'suspend' ? 'danger' : 'primary', disabled: busy || noteBlocked(confirming), onClick: () => void run(confirming, confirming === 'approve' ? 'Application approved.' : confirming === 'reject' ? 'Application rejected.' : confirming === 'suspend' ? 'Volunteer suspended.' : 'Volunteer reinstated.') },
+          { label: 'Cancel', onClick: () => setConfirming(null), disabled: busy },
+        ] : []}
+      >
+        {(confirming === 'reject' || confirming === 'suspend') && <label className="admin-dialog__field"><span>{confirming === 'reject' ? 'Rejection reason' : 'Investigation reason'}</span><textarea rows={3} value={note} onChange={(event) => setNote(event.target.value)} autoFocus/><small>{confirming === 'reject' ? 'Required · The applicant can reapply with a clearer document.' : 'Required · Restricted internal audit record.'}</small></label>}
+        {actionError && confirming && <p className="admin-dialog__error" role="alert">{actionError}</p>}
+      </AdminDialog>
+      <FeedbackDialog feedback={feedback} onClose={() => setFeedback(null)} />
     </>
   );
 }

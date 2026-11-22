@@ -45,7 +45,7 @@ const mapRow = (r: any): ServiceRequest => ({
 });
 
 async function countRequests(statuses?: string[]) {
-  let q: any = supabase.from('requests').select('*', { count: 'exact', head: true });
+  let q: any = supabase.from('requests').select('*', { count: 'exact', head: true }).neq('kind', 'donation_offer');
   if (statuses) q = q.in('status', statuses);
   const { count, error } = await q;
   if (error) throw error;
@@ -56,7 +56,7 @@ async function countRequests(statuses?: string[]) {
 export async function listRequests(f: RequestFilters): Promise<ListResult> {
   if (!(await hasSession())) throw new Error('Sign in as an administrator to view requests.');
 
-  let q: any = supabase.from('requests').select(LIST_SELECT, { count: 'exact' });
+  let q: any = supabase.from('requests').select(LIST_SELECT, { count: 'exact' }).neq('kind', 'donation_offer');
   const statuses = TABS.find((t) => t.key === f.tab)?.statuses;
   if (statuses) q = q.in('status', statuses);
   const s = f.q.trim().replace(/[%,()]/g, '');
@@ -106,4 +106,26 @@ export async function getDistricts(): Promise<District[]> {
 export async function reviewRequest(id: string, decision: 'approve' | 'decline', items: ApprovedItem[], reason: string) {
   if (!(await hasSession())) throw new Error('Sign in as an administrator to review requests.');
   await callReviewRpc(id, decision, items, reason);
+}
+
+/** Make an approved request visible as claimable offers; volunteers choose for themselves. */
+export async function offerRequestToVolunteers(id: string) {
+  if (!(await hasSession())) throw new Error('Sign in as an administrator to share requests with volunteers.');
+  const { count, error: lookupError } = await supabase
+    .from('assignments')
+    .select('id', { count: 'exact', head: true })
+    .eq('request_id', id);
+  if (lookupError) throw lookupError;
+  if ((count ?? 0) > 0) return;
+
+  const { error } = await supabase.rpc('create_assignments', { p_id: id });
+  if (!error) return;
+
+  // Avoid a false failure if two admin clients publish at the same time.
+  const { count: retryCount, error: retryLookupError } = await supabase
+    .from('assignments')
+    .select('id', { count: 'exact', head: true })
+    .eq('request_id', id);
+  if (!retryLookupError && (retryCount ?? 0) > 0) return;
+  throw error;
 }

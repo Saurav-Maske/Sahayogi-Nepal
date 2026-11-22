@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import '../styles/login.css';
 
 export default function LoginPage() {
-  const { session, isAdmin, loading, signIn, devBypassAvailable, enterDevMode } = useAuth();
+  const { session, isAdmin, loading, signIn } = useAuth();
   const location = useLocation();
   const from = (location.state as { from?: string } | null)?.from ?? '/';
 
@@ -27,7 +27,7 @@ export default function LoginPage() {
   return (
     <div className="login">
       <section className="login__brand">
-        <img className="login__logo" src={`${import.meta.env.BASE_URL}images/HorizontalLogoOnBlue.svg`} alt="Sahayogi Nepal" />
+        <img className="login__logo" src={`${import.meta.env.BASE_URL}images/HorizontalLogo.svg`} alt="Sahayogi Nepal" />
         <p className="login__console">OPERATIONS CONSOLE</p>
         <p className="login__tagline">Support that reaches further.</p>
       </section>
@@ -56,11 +56,6 @@ export default function LoginPage() {
             {submitting ? 'Signing in…' : 'Sign in'}
           </button>
 
-          {devBypassAvailable && (
-            <button type="button" className="btn auth-submit" onClick={enterDevMode}>
-              Continue as Dev Admin (dev only)
-            </button>
-          )}
         </form>
       </section>
     </div>

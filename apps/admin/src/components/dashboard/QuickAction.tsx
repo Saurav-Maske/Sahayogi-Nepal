@@ -5,7 +5,7 @@ const ACTIONS = [
   { to: '/requests?review=pending', label: 'Review pending requests' },
   { to: '/volunteers?tab=applications', label: 'Review volunteer applications' },
   { to: '/inventory?action=add', label: 'Add inventory' },
-  { to: '/assignments?action=new', label: 'Create assignment' },
+  { to: '/assignments', label: 'Monitor assignments' },
   { to: '/incidents', label: 'Investigate an incident' },
 ];
 

@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import QuickAction from '../components/dashboard/QuickAction';
+import EmptyState from '../components/feedback/EmptyState';
+import DatePicker from '../components/fields/DatePicker';
 import Pagination from '../components/requests/Pagination';
 import RequestDrawer from '../components/requests/RequestDrawer';
 import StatusBadge from '../components/requests/StatusBadge';
@@ -89,10 +91,9 @@ export default function RequestsPage() {
           <option value="">Category: All</option>
           {Object.entries(KIND_LABELS).map(([k, label]) => <option key={k} value={k}>{label}</option>)}
         </select>
-        <div className="filters__field filters__dates">
-          <input type="date" aria-label="From date" value={filters.from} max={filters.to || undefined} onChange={(e) => update({ from: e.target.value || null })} />
-          <span>–</span>
-          <input type="date" aria-label="To date" value={filters.to} min={filters.from || undefined} onChange={(e) => update({ to: e.target.value || null })} />
+        <div className="filters__dates">
+          <DatePicker label="Start date" value={filters.from} max={filters.to || undefined} onChange={(value) => update({ from: value || null })}/>
+          <DatePicker label="End date" value={filters.to} min={filters.from || undefined} onChange={(value) => update({ to: value || null })}/>
         </div>
       </div>
 
@@ -134,12 +135,11 @@ export default function RequestsPage() {
                 ))}
               </tbody>
             </table>
-            {!loading && data?.rows.length === 0 && (
-              <div className="table-msg">
-                <p className="empty">No requests match these filters.</p>
-                {hasFilters && <button className="btn" onClick={() => setParams(filters.tab === 'all' ? {} : { status: filters.tab })}>Clear filters</button>}
-              </div>
-            )}
+            {!loading && data?.rows.length === 0 && <EmptyState
+              title="No requests found"
+              description={hasFilters ? 'No requests match the current filters. Adjust or clear the filters to see more results.' : 'New help requests will appear here when they are submitted.'}
+              action={hasFilters && <button className="btn" onClick={() => setParams(filters.tab === 'all' ? {} : { status: filters.tab })}>Clear filters</button>}
+            />}
             {loading && !data && <p className="empty table-msg">Loading requests…</p>}
           </div>
         )}
