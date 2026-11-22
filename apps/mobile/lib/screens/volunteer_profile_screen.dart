@@ -72,13 +72,7 @@ class _VolunteerProfileScreenState extends State<VolunteerProfileScreen> {
             'Volunteer profile',
             style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
           ),
-          actions: [
-            IconButton(
-              tooltip: 'Refresh profile',
-              onPressed: _refreshProfile,
-              icon: const Icon(Icons.refresh_rounded),
-            ),
-          ],
+
         ),
         body: ListView(
           padding: const EdgeInsets.fromLTRB(24, 18, 24, 28),
