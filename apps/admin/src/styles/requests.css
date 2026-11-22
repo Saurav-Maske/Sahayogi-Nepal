@@ -14,7 +14,7 @@
   border-bottom: 2px solid transparent;
   padding: 14px 0;
   font: inherit;
-  font-size: 12px;
+  font-size: 16px;
   color: var(--muted);
   cursor: pointer;
   white-space: nowrap;
@@ -44,7 +44,7 @@
   border-radius: 8px;
   padding: 0 12px;
   font: inherit;
-  font-size: 12px;
+  font-size: 16px;
   color: var(--text);
   min-width: 0;
 }
@@ -63,7 +63,7 @@
   border: 0;
   background: transparent;
   font: inherit;
-  font-size: 12px;
+  font-size: 16px;
   color: var(--text);
   min-width: 0;
   flex: 1;
@@ -81,13 +81,13 @@
 .table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 12px;
+  font-size: 16px;
   min-width: 900px;
 }
 .table th {
   text-align: left;
   font-weight: 500;
-  font-size: 11px;
+  font-size: 15px;
   color: var(--muted);
   background: var(--surface-2);
   padding: 12px 16px;
@@ -126,7 +126,7 @@
   border: 0;
   padding: 0;
   font: inherit;
-  font-size: 12px;
+  font-size: 16px;
   font-weight: 500;
   color: var(--teal);
   cursor: pointer;
@@ -138,7 +138,7 @@
 
 .badge {
   display: inline-block;
-  font-size: 11px;
+  font-size: 15px;
   font-weight: 500;
   padding: 2px 9px;
   border-radius: 99px;
@@ -172,7 +172,7 @@
   gap: 12px;
   flex-wrap: wrap;
   margin-top: 14px;
-  font-size: 11px;
+  font-size: 15px;
   color: var(--muted);
 }
 .pager nav {
@@ -184,7 +184,7 @@
   background: none;
   border: 0;
   font: inherit;
-  font-size: 11px;
+  font-size: 15px;
   color: var(--muted);
   padding: 4px 8px;
   border-radius: 6px;
@@ -236,17 +236,17 @@ a.btn {
   color: var(--navy);
 }
 .drawer__auth {
-  font-size: 11px;
+  font-size: 15px;
   color: var(--teal);
   margin: 4px 0 18px;
 }
 .drawer__line {
-  font-size: 13px;
+  font-size: 16px;
   line-height: 22px;
 }
 .drawer__sub {
   margin: 22px 0 6px;
-  font-size: 13px;
+  font-size: 16px;
   font-weight: 600;
   color: var(--navy);
 }
@@ -254,7 +254,7 @@ a.btn {
   list-style: none;
   margin: 0;
   padding: 0;
-  font-size: 12px;
+  font-size: 16px;
   line-height: 22px;
   color: var(--muted);
 }
@@ -283,7 +283,7 @@ a.btn {
   margin: 16px 0;
   display: grid;
   gap: 2px;
-  font-size: 13px;
+  font-size: 16px;
 }
 .review__facts div {
   display: flex;
@@ -298,7 +298,7 @@ a.btn {
 }
 .review__sub {
   margin: 22px 0 12px;
-  font-size: 16px;
+  font-size: 17px;
   font-weight: 600;
   color: var(--navy);
 }
@@ -320,7 +320,7 @@ a.btn {
   border-radius: 8px;
   padding: 14px 16px;
   margin-top: 16px;
-  font-size: 12px;
+  font-size: 16px;
   color: var(--teal);
 }
 .callout strong {
@@ -344,7 +344,7 @@ a.btn {
 .timeline li {
   position: relative;
   padding-left: 20px;
-  font-size: 12px;
+  font-size: 16px;
 }
 .timeline li::before {
   content: "";
@@ -360,14 +360,14 @@ a.btn {
   background: var(--good);
 }
 .timeline strong {
-  font-size: 13px;
+  font-size: 16px;
   color: var(--navy);
 }
 .timeline p,
 .timeline time {
   display: block;
   color: var(--muted);
-  font-size: 11px;
+  font-size: 15px;
   margin-top: 2px;
 }
 
@@ -377,11 +377,11 @@ a.btn {
   border-radius: 8px;
   padding: 12px 14px;
   margin-top: 12px;
-  font-size: 12px;
+  font-size: 16px;
 }
 .qty__title {
   display: block;
-  font-size: 11px;
+  font-size: 15px;
   color: var(--muted);
 }
 .qty__row {
@@ -389,7 +389,7 @@ a.btn {
   align-items: center;
   gap: 10px;
   margin: 8px 0 4px;
-  font-size: 14px;
+  font-size: 17px;
 }
 .qty__row input,
 .qty textarea {
@@ -397,7 +397,7 @@ a.btn {
   border-radius: 6px;
   padding: 6px 8px;
   font: inherit;
-  font-size: 13px;
+  font-size: 16px;
   color: var(--text);
 }
 .page .qty__row input[type="number"] {
@@ -407,7 +407,7 @@ a.btn {
   border-radius: 8px;
   background: var(--surface);
   color: var(--navy);
-  font-size: 14px;
+  font-size: 17px;
   font-weight: 600;
 }
 .page .qty__row input[type="number"]:focus-visible {
@@ -431,7 +431,7 @@ a.btn {
   border: 1px solid var(--border);
   background: var(--surface);
   border-radius: 6px;
-  font-size: 15px;
+  font-size: 17px;
   cursor: pointer;
 }
 .qty__btns button:hover:not(:disabled) {
@@ -443,7 +443,7 @@ a.btn {
 }
 .qty__hint {
   display: block;
-  font-size: 10px;
+  font-size: 14px;
   color: var(--muted);
   margin-top: 4px;
 }
@@ -511,7 +511,7 @@ a.btn {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  font-size: 13px;
+  font-size: 16px;
   line-height: 20px;
 }
 .records__item strong {
@@ -521,7 +521,7 @@ a.btn {
   margin: 0;
 }
 .driver {
-  font-size: 13px;
+  font-size: 16px;
   line-height: 20px;
   margin: 0;
 }
@@ -530,7 +530,7 @@ a.btn {
 }
 .saved {
   margin-top: 12px;
-  font-size: 12px;
+  font-size: 16px;
   color: var(--good);
 }
 
@@ -551,19 +551,19 @@ a.btn {
 }
 
 .contact {
-  font-size: 13px;
+  font-size: 16px;
   line-height: 22px;
   margin: 16px 0 0;
 }
 .stats-lines p {
   margin: 0;
-  font-size: 13px;
+  font-size: 16px;
   line-height: 22px;
 }
 .note-readonly {
   display: block;
   margin-top: 6px;
-  font-size: 13px;
+  font-size: 16px;
 }
 
 .doc {
@@ -573,18 +573,18 @@ a.btn {
   margin-top: 14px;
 }
 .doc__title {
-  font-size: 14px;
+  font-size: 17px;
   font-weight: 600;
   color: var(--navy);
   margin: 0 0 8px;
 }
 .doc__text {
-  font-size: 11px;
+  font-size: 15px;
   color: var(--muted);
   margin: 0 0 12px;
 }
 .doc__demo {
-  font-size: 15px;
+  font-size: 17px;
   font-weight: 700;
   color: var(--muted);
   letter-spacing: 0.04em;

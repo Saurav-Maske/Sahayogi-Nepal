@@ -1,12 +1,8 @@
 import AttentionPanel from '../components/dashboard/AttentionPanel';
-import BarChart from '../components/dashboard/BarChart';
 import QuickAction from '../components/dashboard/QuickAction';
 import RecentActivity from '../components/dashboard/RecentActivity';
 import StatCard from '../components/dashboard/StatCard';
 import { useDashboard } from '../hooks/useDashboard';
-
-const time = (iso: string) =>
-  new Date(iso).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
 
 export default function DashboardPage() {
   const { data, loading, error, reload } = useDashboard();
@@ -56,13 +52,6 @@ export default function DashboardPage() {
           note={`${s.driversEnRoute} drivers en route`} />
         <StatCard to="/incidents" label="Open incidents" value={s.openIncidents}
           note={`${s.urgentIncidents} need urgent review`} tone={s.urgentIncidents > 0 ? 'bad' : 'good'} />
-      </div>
-
-      <div className="grid-charts">
-        <BarChart title="Requests by category" points={data.byCategory}
-          caption={`Last 30 days · Updated ${time(data.updatedAt)} NPT`} />
-        <BarChart title="Requests fulfilled over time" points={data.fulfilledOverTime}
-          caption={`Last 7 days · Updated ${time(data.updatedAt)} NPT`} />
       </div>
 
       <div className="grid-bottom">

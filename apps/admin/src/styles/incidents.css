@@ -7,11 +7,11 @@
   padding: 14px 16px;
   background: var(--info-bg);
   border-radius: 8px;
-  font-size: 12px;
+  font-size: 16px;
   color: var(--navy);
 }
-.incident-alert strong { font-size: 12px; font-weight: 600; }
-.incident-alert p { margin-top: 4px; font-size: 11px; line-height: 16px; color: var(--muted); }
+.incident-alert strong { font-size: 16px; font-weight: 600; }
+.incident-alert p { margin-top: 4px; font-size: 15px; line-height: 16px; color: var(--muted); }
 
 .incident-filters {
   display: grid;
@@ -29,7 +29,7 @@
   background: var(--surface);
   color: var(--text);
   font: inherit;
-  font-size: 12px;
+  font-size: 16px;
 }
 .incident-filters input::placeholder { color: var(--muted); }
 
@@ -42,13 +42,13 @@
   width: 100%;
   min-width: 740px;
   border-collapse: collapse;
-  font-size: 12px;
+  font-size: 16px;
 }
 .incident-table th {
   padding: 12px;
   background: var(--surface-2);
   color: var(--muted);
-  font-size: 11px;
+  font-size: 15px;
   font-weight: 500;
   text-align: left;
   white-space: nowrap;
@@ -73,8 +73,8 @@
 .incident-status--resolved     { color: var(--good); }
 .incident-status--dismissed    { color: var(--muted); }
 
-.incident-demo-note { margin-top: 12px; font-size: 10px; color: var(--muted); }
-.incident-error { margin: 8px 0; font-size: 12px; color: var(--bad); }
+.incident-demo-note { margin-top: 12px; font-size: 14px; color: var(--muted); }
+.incident-error { margin: 8px 0; font-size: 16px; color: var(--bad); }
 
 /* ---------- incidents: detail ---------- */
 .incident-detail-grid {
@@ -85,12 +85,12 @@
 .incident-detail-grid > .card { min-height: 442px; }
 
 .incident-report .card__sub { margin-top: 6px; }
-.reporter-details { margin-top: 16px; font-size: 12px; line-height: 18px; }
+.reporter-details { margin-top: 16px; font-size: 16px; line-height: 18px; }
 .reporter-details p { display: grid; grid-template-columns: minmax(0, 72px) minmax(0, 1fr); gap: 8px; padding: 2px 0; }
 .reporter-details strong { font-weight: 500; color: var(--navy); }
-.reporter-details blockquote { margin: 2px 0 0; font-size: 12px; color: var(--text); }
+.reporter-details blockquote { margin: 2px 0 0; font-size: 16px; color: var(--text); }
 
-.quantity-review { margin: 16px 0 0; font-size: 12px; line-height: 18px; }
+.quantity-review { margin: 16px 0 0; font-size: 16px; line-height: 18px; }
 .quantity-review div { display: grid; grid-template-columns: minmax(0, 145px) minmax(0, 1fr); gap: 8px; padding: 3px 0; }
 .quantity-review dt,
 .quantity-review dd { margin: 0; min-width: 0; font-weight: 500; color: var(--navy); overflow-wrap: anywhere; }
@@ -102,8 +102,8 @@
 
 /* resolution card */
 .incident-resolution > .card__title { margin-bottom: 16px; }
-.incident-activity { margin: 0 0 18px 10px; font-size: 11px; color: var(--muted); }
-.incident-activity strong { font-size: 12px; color: var(--navy); }
+.incident-activity { margin: 0 0 18px 10px; font-size: 15px; color: var(--muted); }
+.incident-activity strong { font-size: 16px; color: var(--navy); }
 .incident-activity p { margin-top: 4px; }
 .incident-activity time { display: block; margin-top: 4px; }
 
@@ -113,7 +113,7 @@
   padding: 0;
   border: 0;
 }
-.incident-input-card > span { display: block; margin-bottom: 7px; font-size: 13px; font-weight: 600; color: var(--navy); }
+.incident-input-card > span { display: block; margin-bottom: 7px; font-size: 16px; font-weight: 600; color: var(--navy); }
 .incident-input-card textarea,
 .incident-input-card input,
 .incident-input-card select {
@@ -128,13 +128,13 @@
   background: var(--surface);
   color: var(--text);
   font: inherit;
-  font-size: 14px;
+  font-size: 17px;
   line-height: 1.5;
 }
 .incident-input-card textarea { min-height: 118px; resize: vertical; }
 .incident-input-card :is(input, textarea, select):focus { border-color: var(--blue); box-shadow: none; }
 .incident-input-card :is(input, textarea, select):disabled { background: var(--bg); color: var(--muted); cursor: not-allowed; }
-.incident-input-card small { display: block; margin-top: 6px; font-size: 12px; line-height: 1.45; color: var(--muted); }
+.incident-input-card small { display: block; margin-top: 6px; font-size: 16px; line-height: 1.45; color: var(--muted); }
 
 .incident-resolution .btn--primary {
   display: flex;
@@ -155,7 +155,7 @@
   .incident-filters { grid-template-columns: minmax(0, 1fr); }
   .incident-filters input,
   .incident-filters select,
-  .incident-input-card :is(input, textarea, select) { font-size: 16px; } /* stops iOS zoom on focus */
+  .incident-input-card :is(input, textarea, select) { font-size: 17px; } /* stops iOS zoom on focus */
 }
 
 /* Navy and teal fade treatment */
