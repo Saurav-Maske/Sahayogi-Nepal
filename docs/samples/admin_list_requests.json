@@ -1,0 +1,46 @@
+{
+  "call": "supabase.rpc('admin_list_requests', { p_status: 'pending_admin_review', p_kind: null })",
+  "response": [
+    {
+      "id": "3f1c2a52-8d0e-4b7a-9c61-2b7e5a0d1f01",
+      "public_ref": "AB12CD34",
+      "kind": "resource_request",
+      "status": "pending_admin_review",
+      "requester_name": "Test Person",
+      "requester_phone": "9800000000",
+      "urgency": "high",
+      "notes": null,
+      "address_note": "Near the temple gate",
+      "volunteers_needed": null,
+      "decline_reason": null,
+      "district": "KATHMANDU",
+      "lat": 27.7172,
+      "lng": 85.324,
+      "created_at": "2026-11-22T06:10:00Z",
+      "approved_at": null,
+      "picked_up_at": null,
+      "fulfilled_at": null,
+      "items": [
+        {
+          "id": "a1b2c3d4-0001-4e5f-8a9b-0c1d2e3f4a01",
+          "item_type": "drinking_water",
+          "unit": "litre",
+          "requested_qty": 50,
+          "approved_qty": null,
+          "donor_qty": null,
+          "confirmed_qty": null
+        }
+      ],
+      "assignments": {
+        "total": 0,
+        "open": 0,
+        "claimed": 0
+      }
+    }
+  ],
+  "errors": [
+    "forbidden",
+    "invalid_status",
+    "invalid_kind"
+  ]
+}

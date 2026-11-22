@@ -1,4 +1,3 @@
-
 # Sahayogi Nepal
 
 Mobile coordination platform for community requests, donations, volunteers and emergency supplies.
@@ -30,7 +29,7 @@ React + Vite + TypeScript (admin) · Valhalla routing (via the `get-route` funct
 | ------------------------ | ---------------------------------------------------------------------------------------------- |
 | `apps/mobile/`         | Flutter app                                                                                    |
 | `apps/admin/`          | React + Vite admin web panel                                                                   |
-| `supabase/migrations/` | Schema, RLS, audit log, districts, settings. **Never edit an applied migration.**        |
+| `supabase/migrations/` | Schema, RLS, audit log, districts, settings, RPCs. **Never edit an applied migration.**        |
 | `supabase/functions/`  | Edge Functions (`submit-request`, `*-login`, `approve-volunteer`, `get-route`, ...)    |
 | `supabase/seeds/`      | `nepal_districts.sql` (77 districts with polygons, idempotent)                               |
 | `scripts/`             | Demo seeding and reset (`seed_demo.mjs`, `seed_extra.mjs`, `reset_demo_remote.mjs`, ...) |
@@ -77,7 +76,7 @@ The Android emulator reaches your machine at `10.0.2.2`; the iOS simulator uses 
 |                                   | `DEMO_PASSWORD`                                          | 10+ chars with upper, lower, digit and symbol. Required for remote seeding.                                         |
 |                                   | `ALLOW_DEMO_SEED=yes`                                    | Safety switch: scripts refuse to touch a non-local project without it.                                              |
 |                                   | `CONFIRM_PROJECT_REF`                                    | Only for `reset_demo_remote.mjs`: the `<ref>` in `https://<ref>.supabase.co`.                                 |
-| `supabase/functions/.env`       | `SET_PASSWORD_URL`, `ALLOWED_ORIGIN`, `VALHALLA_URL` | Edge Function secrets. Push to the hosted project with `supabase secrets set --env-file supabase/functions/.env`. |
+| `supabase/functions/.env`       | `SET_PASSWORD_URL`, `ALLOWED_ORIGIN`, `VALHALLA_URL`, `PUSH_WEBHOOK_SECRET`, `FCM_SERVICE_ACCOUNT` | Edge Function secrets. Push to the hosted project with `supabase secrets set --env-file supabase/functions/.env`. |
 | `apps/admin/.env`               | `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`          | Anon key only.                                                                                                      |
 
 On Windows PowerShell, `VAR=value command` does not work. Put variables in `.env` instead.
@@ -93,7 +92,7 @@ node --env-file=.env scripts/seed_demo.mjs
 node --env-file=.env scripts/seed_extra.mjs
 ```
 
-Full steps, the rehearsal reset and troubleshooting are in [`docs/REMOTE-SEED.md`](docs/REMOTE-SEED.md).
+Full steps, the rehearsal reset and troubleshooting are in [`docs/REMOTE_SEED.md`](docs/REMOTE_SEED.md).
 
 ## Demo accounts
 
@@ -112,18 +111,22 @@ Demo emails do not receive mail. Local invite and reset emails appear in Inbucke
 
 Done: schema and base RLS, private document bucket, volunteer application and approval flow, login /
 password-reset functions, hash-chained audit log, Nepal districts with polygons, `get-route`,
-`submit-request`, seed and reset scripts for local and hosted projects.
+`submit-request`, seed and reset scripts for local and hosted projects, and the SQL RPC layer:
+approval and stock reservation, assignment and claim, delivery progress, OTP, requester tracking, map
+markers, volunteer location and stats, device tokens, inventory import and moves, incidents and the audit
+timeline (migrations `...000003` to `...000007`, each RPC granted explicitly).
 
-Not built yet: the SQL RPC layer (approval, stock reservation, assignment, claim, OTP, tracking,
-map markers, incidents), function privileges (revoke/grant), push notifications. Until the RPCs
-exist, demo rows are inserted straight into the tables by the seed scripts.
-Details: [`docs/API-CONTRACT.md`](docs/API-CONTRACT.md).
+Push notifications are built (`send-push`, migration `...000009`); setup steps are in `docs/CHANGELOG.md` and the header of that migration.
+Not built yet: the `routes` table for
+`get-route` with `save: true`, and a clean-up migration that revokes the default public execute right on
+older helper functions. The admin app still calls a few RPC names that do not exist (see
+`docs/CHANGELOG.md`). Details: [`docs/API-CONTRACT.md`](docs/API-CONTRACT.md).
 
 ## Working together
 
 Read `CONTRIBUTING.md` and `docs/OWNERSHIP.md`.
 
-- UIs can build against the seeded data and `docs/API-CONTRACT.md` until the RPCs are live.
+- UIs build against `docs/API-CONTRACT.md`; every RPC listed there as LIVE is in the migrations.
 - **Schema changes only through migrations** (`supabase migration new <name>`), never in the dashboard.
 - Never commit secrets. Demo data is fictional only.
 - Responses always look like `{ "data": ..., "error": ... }`.

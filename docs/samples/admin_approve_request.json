@@ -1,0 +1,33 @@
+{
+  "call": "supabase.rpc('admin_approve_request', { p_id, p_items })",
+  "request": {
+    "p_id": "3f1c2a52-8d0e-4b7a-9c61-2b7e5a0d1f01",
+    "p_items": [
+      {
+        "item_id": "a1b2c3d4-0001-4e5f-8a9b-0c1d2e3f4a01",
+        "approved_qty": 40
+      }
+    ]
+  },
+  "response": {
+    "request_id": "3f1c2a52-8d0e-4b7a-9c61-2b7e5a0d1f01",
+    "status": "approved",
+    "items": [
+      {
+        "id": "a1b2c3d4-0001-4e5f-8a9b-0c1d2e3f4a01",
+        "item_type": "drinking_water",
+        "unit": "litre",
+        "requested_qty": 50,
+        "approved_qty": 40
+      }
+    ]
+  },
+  "errors": [
+    "forbidden",
+    "not_found",
+    "invalid_state",
+    "invalid_items",
+    "nothing_approved",
+    "insufficient_stock"
+  ]
+}

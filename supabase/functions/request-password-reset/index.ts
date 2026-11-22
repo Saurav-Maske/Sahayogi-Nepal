@@ -1,12 +1,15 @@
 import { corsHeaders, fail, ok } from "../_shared/cors.ts";
-import { adminClient, anonClient, clientIp, EMAIL_RE, readJson, recordAttempt, sha256, tooMany } from "../_shared/auth.ts";
+import { adminClient, clientIp, EMAIL_RE, readJson, recordAttempt, sha256, tooMany } from "../_shared/auth.ts";
+import { CODE_TTL_MIN, issueOtp } from "../_shared/otp.ts";
+import { sendOtpEmail } from "../_shared/mailer.ts";
 
 declare const Deno: {
   env: { get(name: string): string | undefined };
   serve(handler: (req: Request) => Response | Promise<Response>): void;
 };
 
-const GENERIC = { message: "If that email belongs to an account, a link to set your password has been sent." };
+// Same answer whether or not the account exists, so this endpoint cannot be used to find out who has an account.
+const GENERIC = { message: "If that email belongs to an account, a 6-digit code has been sent.", expires_in: CODE_TTL_MIN * 60, resend_after: 60 };
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -20,15 +23,18 @@ Deno.serve(async (req) => {
   const ip = clientIp(req);
   const idHash = await sha256(email);
 
-  if (await tooMany(sb, { kind: "reset", identHash: idHash, ip, identMax: 3, ipMax: 10, windowMin: 60 })) {
+  if (await tooMany(sb, { kind: "reset", identHash: idHash, ip, identMax: 5, ipMax: 15, windowMin: 60 })) {
     return fail("too_many_attempts", "Too many requests. Try again later.", 429);
   }
   await recordAttempt(sb, "reset", idHash, ip, false);
 
   const { data: p } = await sb.from("profiles").select("id, account_status").eq("email", email).maybeSingle();
   if (p && p.account_status === "active") {
-    const { error } = await anonClient().auth.resetPasswordForEmail(email, { redirectTo: Deno.env.get("SET_PASSWORD_URL")! });
-    if (error) console.error("resetPasswordForEmail failed:", error.message); // never leak to the caller
+    const issued = await issueOtp(sb, email, "reset", ip);
+    // A cooldown or a send failure is logged, never shown: the caller must not learn whether the account exists.
+    if ("code" in issued) {
+      if (!(await sendOtpEmail(email, issued.code, "reset", CODE_TTL_MIN))) console.error("reset OTP email not sent");
+    }
   }
   return ok(GENERIC);
 });

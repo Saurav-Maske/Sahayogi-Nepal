@@ -60,6 +60,14 @@ verify_jwt = false
 verify_jwt = false
 [functions.request-password-reset]
 verify_jwt = false
+[functions.verify-reset-otp]
+verify_jwt = false
+[functions.reset-password]
+verify_jwt = false
+[functions.send-signup-otp]
+verify_jwt = false
+[functions.verify-signup-otp]
+verify_jwt = false
 [functions.create-upload-urls]
 verify_jwt = false
 [functions.submit-volunteer-application]
@@ -70,6 +78,17 @@ verify_jwt = false
 verify_jwt = false
 # get-route checks the caller itself (requireUser), like the rest. Listed explicitly so behaviour is not left to defaults.
 [functions.get-route]
+verify_jwt = false
+# send-push is called by the database (pg_net) with a shared secret in x-push-secret, not by users.
+[functions.send-push]
+verify_jwt = false
+
+# Role-aware API over the RPCs. Each route checks the caller (admin / signed-in user / none) and forwards the caller's JWT to Postgres.
+[functions.admin-api]
+verify_jwt = false
+[functions.volunteer-api]
+verify_jwt = false
+[functions.public-api]
 verify_jwt = false
 
 [db.seed]

@@ -1,0 +1,76 @@
+{
+  "call": "supabase.rpc('driver_verify_otp', { p_id, p_purpose, p_code, p_confirmed })  // wrong or unusable codes return ok:false, they do not raise",
+  "request": {
+    "p_id": "7c9d1e20-5b3a-4f68-a2d4-91e0b6c3d811",
+    "p_purpose": "pickup",
+    "p_code": "742167",
+    "p_confirmed": true
+  },
+  "response": {
+    "ok": true,
+    "state": "picked_up",
+    "quantity_changed": true,
+    "items": [
+      {
+        "item_type": "food",
+        "qty": 30,
+        "unit": "kg"
+      },
+      {
+        "item_type": "cloth",
+        "qty": 20,
+        "unit": "pcs"
+      }
+    ]
+  },
+  "errors": [
+    "unauthorized",
+    "forbidden",
+    "not_found",
+    "invalid_purpose",
+    "invalid_state",
+    "nothing_to_pick_up"
+  ],
+  "other_responses": {
+    "wrong_code": {
+      "ok": false,
+      "reason": "invalid_otp",
+      "attempts_left": 4
+    },
+    "locked": {
+      "ok": false,
+      "reason": "otp_locked",
+      "attempts_left": 0
+    },
+    "expired": {
+      "ok": false,
+      "reason": "otp_expired"
+    },
+    "used": {
+      "ok": false,
+      "reason": "otp_used"
+    },
+    "not_issued": {
+      "ok": false,
+      "reason": "otp_not_issued"
+    },
+    "quantity_changed_first_call": {
+      "ok": false,
+      "reason": "quantity_changed",
+      "items": [
+        {
+          "item_id": "a1b2c3d4-0001-4000-8000-000000000001",
+          "item_type": "food",
+          "unit": "kg",
+          "expected_qty": 50,
+          "qty": 30
+        }
+      ]
+    },
+    "delivery_success": {
+      "ok": true,
+      "state": "delivered",
+      "request_status": "fulfilled"
+    }
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "call": "supabase.rpc('requester_get_otp', { p_ref, p_token, p_purpose })  // anon allowed; every call issues a new code",
+  "request": {
+    "p_ref": "AB12CD34",
+    "p_token": "<tracking_token>",
+    "p_purpose": "delivery"
+  },
+  "response": {
+    "code": "742167",
+    "purpose": "delivery",
+    "expires_at": "2026-11-22T06:46:00Z"
+  },
+  "errors": [
+    "not_found",
+    "invalid_purpose",
+    "otp_not_available",
+    "too_many_requests"
+  ]
+}
