@@ -20,6 +20,16 @@ export const anonClient = () =>
 export const EMAIL_RE = /^[^\s@]{1,64}@[^\s@]+\.[^\s@]{2,}$/;
 export const NEPAL_PHONE_RE = /^(\+977)?9[6-8][0-9]{8}$/; // same rule as submit_request in the playbook
 
+// Same rule as config.toml (minimum_password_length = 10, lower_upper_letters_digits_symbols). Returns a message or null.
+export function passwordProblem(p: string): string | null {
+  if (p.length < 10) return "Password must be at least 10 characters.";
+  if (p.length > 128) return "Password must be at most 128 characters.";
+  if (!/[a-z]/.test(p) || !/[A-Z]/.test(p) || !/[0-9]/.test(p) || !/[^A-Za-z0-9]/.test(p)) {
+    return "Password needs a lowercase letter, an uppercase letter, a number and a symbol.";
+  }
+  return null;
+}
+
 export async function sha256(s: string): Promise<string> {
   const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
   return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, "0")).join("");
@@ -74,7 +84,7 @@ export async function requireAdmin(req: Request) {
   return p && p.role === "admin" ? { id: p.id } : null;
 }
 
-export type ThrottleKind = "login" | "reset" | "apply" | "upload";
+export type ThrottleKind = "login" | "reset" | "apply" | "upload" | "otp_send" | "otp_verify";
 
 export async function tooMany(
   sb: ReturnType<typeof adminClient>,

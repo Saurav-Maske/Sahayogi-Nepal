@@ -4,16 +4,14 @@ import { PAGE_SIZE } from '../utils/requests';
 import { hasSession } from './session';
 
 /* ---- backend contract: confirm with Person 2 ---- */
-const REVIEW = { pending: 'pending', approved: 'approved', rejected: 'rejected' }; // review_status enum values (guess)
-const SUSPENDED = 'suspended'; // profiles.account_status (guess)
-const BUCKET = 'identity-docs'; // private bucket from the migration
-/**
- * PROPOSED RPC, not in API-CONTRACT.md. Approving must also update the profile (role, volunteer_type,
- * categories, account_status) and trigger account activation, so it has to run server-side.
- */
-const REVIEW_RPC = 'admin_review_volunteer';
-const RPC_PARAMS = (id: string, decision: VolunteerDecision, note: string) => ({ p_application_id: id, p_decision: decision, p_note: note });
-
+// UI-level review states. DB enum review_status is ('submitted','under_review','approved','declined'):
+// pending = submitted | under_review, rejected = declined. Translated at the DB boundary (mapRow / queries below).
+const REVIEW = { pending: 'pending', approved: 'approved', rejected: 'rejected' };
+const DB_PENDING = ['submitted', 'under_review'];
+const DB_DECLINED = 'declined';
+const uiReview = (v: string) => (DB_PENDING.includes(v) ? REVIEW.pending : v === DB_DECLINED ? REVIEW.rejected : v);
+const SUSPENDED = 'suspended'; // profiles.account_status check ('active','suspended')
+const BUCKET = 'volunteer-docs'; // private bucket from migration 20261121000004_storage_docs.sql
 const DAY = 864e5;
 const one = (v: any) => (Array.isArray(v) ? v[0] : v);
 
@@ -26,12 +24,14 @@ const mapRow = (r: any): Volunteer => ({
   citizenshipNo: r.citizenship_no ?? null, citizenshipPath: r.citizenship_photo_path ?? null,
   licenseNo: r.license_no ?? null, licensePath: r.license_photo_path ?? null,
   serviceCardNo: r.service_card_no ?? null, serviceCardPath: r.service_card_photo_path ?? null,
-  reviewStatus: r.review_status, reviewNote: r.review_note ?? null, reviewedAt: r.reviewed_at ?? null,
+  reviewStatus: uiReview(r.review_status), reviewNote: r.review_note ?? null, reviewedAt: r.reviewed_at ?? null,
   createdAt: r.created_at, accountStatus: one(r.profiles)?.account_status ?? null,
 });
 
 async function countApps(status: string) {
-  const { count, error } = await supabase.from('volunteer_applications').select('*', { count: 'exact', head: true }).eq('review_status', status);
+  let q: any = supabase.from('volunteer_applications').select('*', { count: 'exact', head: true });
+  q = status === REVIEW.pending ? q.in('review_status', DB_PENDING) : q.eq('review_status', status);
+  const { count, error } = await q;
   if (error) throw error;
   return count ?? 0;
 }
@@ -79,9 +79,9 @@ export async function listVolunteers(f: VolunteerFilters): Promise<VolunteerList
 
   const select = f.tab === 'suspended' ? SELECT.replace('profiles!profile_id(', 'profiles!profile_id!inner(') : SELECT;
   let q: any = supabase.from('volunteer_applications').select(select, { count: 'exact' });
-  if (f.tab === 'pending') q = q.eq('review_status', REVIEW.pending);
+  if (f.tab === 'pending') q = q.in('review_status', DB_PENDING);
   else if (f.tab === 'approved') q = q.eq('review_status', REVIEW.approved);
-  else if (f.tab === 'declined') q = q.eq('review_status', REVIEW.rejected);
+  else if (f.tab === 'declined') q = q.eq('review_status', DB_DECLINED);
   else q = q.eq('profiles.account_status', SUSPENDED);
 
   const s = f.q.trim().replace(/[%,()]/g, '');
@@ -144,8 +144,27 @@ export async function reviewVolunteer(id: string, decision: VolunteerDecision, n
     else v.accountStatus = 'active';
     return;
   }
-  const { error } = await supabase.rpc(REVIEW_RPC, RPC_PARAMS(id, decision, note));
+  if (decision === 'approve' || decision === 'reject') {
+    // approve-volunteer (admin only): creates the account, sets categories, sends the invite email.
+    await callFunction('approve-volunteer', { application_id: id, decision: decision === 'approve' ? 'approve' : 'decline', note });
+    return;
+  }
+  // suspend / reinstate act on the volunteer's account, not the application.
+  const { data, error } = await supabase.from('volunteer_applications').select('profile_id').eq('id', id).single();
   if (error) throw error;
+  if (!data?.profile_id) throw new Error('This volunteer has no account yet.');
+  await callFunction('admin-set-account-status', {
+    user_id: data.profile_id, status: decision === 'suspend' ? 'suspended' : 'active', reason: note || null,
+  });
+}
+
+/** Call an admin Edge Function with the signed-in admin's session and surface its { error: { code, message } } text. */
+async function callFunction(name: string, body: Record<string, unknown>) {
+  const { error } = await supabase.functions.invoke(name, { body });
+  if (!error) return;
+  let msg = error.message;
+  try { const j = await (error as any).context?.json?.(); msg = j?.error?.message ?? j?.error?.code ?? msg; } catch { /* keep generic message */ }
+  throw new Error(msg);
 }
 
 /** Short-lived signed link to a private identity document. Returns null in demo mode. */

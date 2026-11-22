@@ -1,0 +1,20 @@
+{
+  "call": "supabase.rpc('map_markers')  // anon allowed",
+  "request": {},
+  "response": [
+    {
+      "key": "2984bac986d8",
+      "layer": "donation",
+      "kind": "donation_offer",
+      "urgency": "normal",
+      "lat": 27.72,
+      "lng": 85.33,
+      "item_types": [
+        "cloth",
+        "food"
+      ],
+      "at": "2026-11-22T06:05:00Z"
+    }
+  ],
+  "errors": []
+}

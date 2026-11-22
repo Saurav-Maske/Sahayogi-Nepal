@@ -1,5 +1,6 @@
 import { corsHeaders, fail, ok } from "../_shared/cors.ts";
 import { adminClient, clientIp, EMAIL_RE, NEPAL_PHONE_RE, readJson, recordAttempt, sha256, tooMany } from "../_shared/auth.ts";
+import { claimToken, releaseToken } from "../_shared/otp.ts";
 
 declare const Deno: {
   env: { get(name: string): string | undefined };
@@ -36,6 +37,8 @@ Deno.serve(async (req) => {
   if (!NEPAL_PHONE_RE.test(phone)) return fail("invalid_phone", "Enter a valid Nepal mobile number.");
   if (!TYPES.includes(type)) return fail("invalid_type", "volunteer_type must be manpower, driver or doctor.");
   if (citizenship_no.length < 4 || citizenship_no.length > 30) return fail("invalid_citizenship_no", "Citizenship number required.");
+  const verifyToken = String(b.email_verification_token ?? "");
+  if (!verifyToken) return fail("email_not_verified", "Verify your email with the 6-digit code first.", 403);
   if (type === "driver" && (!license_no || !b.license_photo_path)) return fail("license_required", "Drivers need licence number and photo.");
   if (type === "doctor" && (!service_card_no || !b.service_card_photo_path)) return fail("service_card_required", "Healthcare volunteers need service-card number and photo.");
 
@@ -61,14 +64,20 @@ Deno.serve(async (req) => {
   const { data: existing } = await sb.from("profiles").select("id").eq("email", email).maybeSingle();
   if (existing) return fail("application_exists", "An application or account with this email already exists.", 409);
 
+  // Spend the proof-of-email token only now, after every other check passed, so a typo does not burn it.
+  if (!(await claimToken(sb, email, "signup", verifyToken))) {
+    return fail("email_not_verified", "Your email verification is missing or expired. Verify your email again.", 403);
+  }
+
   const { data, error } = await sb.from("volunteer_applications").insert({
-    full_name, email, phone, volunteer_type: type, citizenship_no,
+    full_name, email, phone, volunteer_type: type, citizenship_no, email_verified_at: new Date().toISOString(),
     citizenship_photo_path: paths.citizenship_photo_path,
     license_no: type === "driver" ? license_no : null, license_photo_path: paths.license_photo_path,
     service_card_no: type === "doctor" ? service_card_no : null, service_card_photo_path: paths.service_card_photo_path,
   }).select("id, review_status").single();
 
   if (error) {
+    await releaseToken(sb, email, "signup"); // the application was not saved, so the verification stays usable
     if (error.code === "23505") return fail("application_exists", "An application or account with this email already exists.", 409);
     console.error("application insert failed:", error.message);
     return fail("submit_failed", "Could not save your application.", 500);

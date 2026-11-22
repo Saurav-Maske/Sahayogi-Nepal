@@ -12,7 +12,9 @@ dependencies:
   supabase_flutter: ^2.6.0
   flutter_riverpod: ^2.5.1
   go_router: ^14.2.0
-  flutter_map: ^7.0.2        # OSM option. If the team picks Google Maps, swap for google_maps_flutter.
+  flutter_map: ^8.3.2
+  flutter_map_location_marker: ^10.3.0
+  geolocator: ^14.1.2
   latlong2: ^0.9.1
   flutter_svg: ^2.5.0
   image_picker: ^1.2.4
@@ -32,4 +34,5 @@ flutter:
     - assets/images/HorizontalLogo.svg
     - assets/images/VerticalLogo.svg
     - assets/images/SahayogiNepalLogo.svg
+    - assets/terms_and_conditions.txt
     - assets/images/SahayogiNepalLogo.png

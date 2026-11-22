@@ -1,0 +1,50 @@
+{
+  "call": "supabase.rpc('admin_map_markers')",
+  "request": {},
+  "response": {
+    "hub": {
+      "name": "Central Inventory Hub",
+      "lat": 27.705,
+      "lng": 85.32,
+      "address_note": "Placeholder hub location"
+    },
+    "requests": [
+      {
+        "id": "3f1c2a52-8d0e-4b7a-9c61-2b7e5a0d1f01",
+        "public_ref": "AB12CD34",
+        "kind": "resource_request",
+        "status": "in_progress",
+        "urgency": "high",
+        "requester_name": "Rita R",
+        "district": "KATHMANDU",
+        "lat": 27.71,
+        "lng": 85.32,
+        "open_incidents": 0,
+        "assignments": {
+          "total": 1,
+          "claimed": 1
+        },
+        "created_at": "2026-11-22T06:00:00Z",
+        "updated_at": "2026-11-22T06:20:00Z"
+      }
+    ],
+    "volunteers": [
+      {
+        "assignment_id": "7c9d1e20-5b3a-4f68-a2d4-91e0b6c3d811",
+        "request_id": "3f1c2a52-8d0e-4b7a-9c61-2b7e5a0d1f01",
+        "public_ref": "AB12CD34",
+        "assignment_type": "delivery",
+        "state": "en_route_to_destination",
+        "volunteer_id": "b7e1c9d2-3a4f-4b5c-8d6e-7f8091a2b3c4",
+        "volunteer_name": "Driver Dan",
+        "volunteer_phone": "9800000002",
+        "lat": 27.705,
+        "lng": 85.321,
+        "updated_at": "2026-11-22T06:31:00Z"
+      }
+    ]
+  },
+  "errors": [
+    "forbidden"
+  ]
+}
