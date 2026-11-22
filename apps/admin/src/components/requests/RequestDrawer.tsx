@@ -40,8 +40,13 @@ export default function RequestDrawer({ id, onClose }: Props) {
             )}
             {r.notes && <p className="drawer__line">Notes: {r.notes}</p>}
 
-            <h3 className="drawer__sub">Request location and live operations</h3>
-            <OperationsMapPreview requestId={r.id} />
+            <section className="map-location-card" aria-label="Request location map">
+              <h3>Confirm request location</h3>
+              <p className="map-location-card__place">⌖ {r.district}</p>
+              <p className="map-location-card__privacy">The marker uses the request location supplied by the service. Exact coordinates are restricted to authorised administrators.</p>
+              <OperationsMapPreview requestId={r.id} />
+              <p className="map-location-card__note">Read-only map · location changes are managed by the request service.</p>
+            </section>
 
             <h3 className="drawer__sub">Request history</h3>
             <ul className="drawer__history">

@@ -4,10 +4,11 @@ import { fmtDate, itemLabel } from './requests';
 import type { HistoryEntry } from './requests';
 
 export const DONATION_TABS: { key: DonationTab; label: string; statuses: string[] | null }[] = [
-  { key: 'all', label: 'All donations', statuses: null },
+  { key: 'all', label: 'All', statuses: null },
   { key: 'pending', label: 'Pending approval', statuses: ['pending_admin_review'] },
   { key: 'accepted', label: 'Accepted', statuses: ['approved', 'awaiting_assignment'] },
-  { key: 'pickup', label: 'Pickup assigned', statuses: ['assigned', 'in_progress'] },
+  { key: 'pickup', label: 'Pickup assigned', statuses: ['assigned'] },
+  { key: 'in_progress', label: 'In progress', statuses: ['in_progress'] },
   { key: 'collected', label: 'Collected', statuses: ['fulfilled', 'partially_fulfilled'] },
   { key: 'declined', label: 'Declined', statuses: ['declined'] },
 ];

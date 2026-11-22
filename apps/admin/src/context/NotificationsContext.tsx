@@ -1,87 +1,96 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { listNotifications, type Notice } from '../services/notificationsService';
 
-const READ_KEY = 'sahayogi-admin-read-notifications';
-const readStoredIds = () => {
+const READ_NOTICES_KEY = 'sahayogi.admin.notifications.read.v1';
+
+function loadReadNoticeIds(): Set<string> | null {
   try {
-    const value: unknown = JSON.parse(localStorage.getItem(READ_KEY) ?? '[]');
-    return Array.isArray(value) ? value.filter((id): id is string => typeof id === 'string') : [];
-  } catch { return []; }
-};
+    const saved = window.localStorage.getItem(READ_NOTICES_KEY);
+    if (saved === null) return null;
+    const parsed: unknown = JSON.parse(saved);
+    return new Set(Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === 'string') : []);
+  } catch {
+    return null;
+  }
+}
+
+function saveReadNoticeIds(ids: Set<string>) {
+  try {
+    window.localStorage.setItem(READ_NOTICES_KEY, JSON.stringify([...ids]));
+  } catch {
+    // Keep the current session usable when browser storage is unavailable.
+  }
+}
 
 type NotificationsState = {
   items: Notice[];
-  readIds: string[];
   unreadCount: number;
   loading: boolean;
   error: string;
   reload: () => void;
   markRead: (id: string) => void;
-  markAllRead: () => void;
 };
 
 const NotificationsContext = createContext<NotificationsState | null>(null);
 
 export function NotificationsProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<Notice[]>([]);
-  const [readIds, setReadIds] = useState<string[]>(readStoredIds);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [readIds, setReadIds] = useState<Set<string>>(() => loadReadNoticeIds() ?? new Set());
+  const readIdsRef = useRef(readIds);
+  const hasReadBaseline = useRef(loadReadNoticeIds() !== null);
   const hasLoaded = useRef(false);
 
   const reload = useCallback(() => {
     if (!hasLoaded.current) setLoading(true);
-    void listNotifications().then((next) => {
-      setItems(next);
-      const activeIds = new Set(next.map((item) => item.id));
-      setReadIds((current) => {
-        const retained = current.filter((id) => activeIds.has(id));
-        localStorage.setItem(READ_KEY, JSON.stringify(retained));
-        return retained;
-      });
-      setError('');
-      hasLoaded.current = true;
-    }).catch((e) => setError(e instanceof Error ? e.message : 'Could not load notifications.'))
+    void listNotifications()
+      .then((next) => {
+        if (!hasReadBaseline.current) {
+          const baseline = new Set(next.map((notice) => notice.id));
+          readIdsRef.current = baseline;
+          setReadIds(baseline);
+          saveReadNoticeIds(baseline);
+          hasReadBaseline.current = true;
+        }
+        setItems(next);
+        setError('');
+        hasLoaded.current = true;
+      })
+      .catch((e) => setError(e instanceof Error ? e.message : 'Could not load operational notifications.'))
       .finally(() => setLoading(false));
   }, []);
 
-  const saveReadIds = useCallback((ids: string[]) => {
-    setReadIds(ids);
-    localStorage.setItem(READ_KEY, JSON.stringify(ids));
-    window.dispatchEvent(new CustomEvent('sahayogi-notifications-read', { detail: ids }));
+  const markRead = useCallback((id: string) => {
+    if (readIdsRef.current.has(id)) return;
+    const updated = new Set(readIdsRef.current);
+    updated.add(id);
+    readIdsRef.current = updated;
+    setReadIds(updated);
+    saveReadNoticeIds(updated);
   }, []);
-
-  const markRead = useCallback((id: string) => saveReadIds([...new Set([...readIds, id])]), [readIds, saveReadIds]);
-  const markAllRead = useCallback(() => saveReadIds([...new Set([...readIds, ...items.map((item) => item.id)])]), [items, readIds, saveReadIds]);
 
   useEffect(() => {
     reload();
-    const poll = window.setInterval(reload, 60_000);
-    const onStorage = (event: StorageEvent) => {
-      if (event.key === READ_KEY) setReadIds(readStoredIds());
-      if (event.key === 'sahayogi-admin-notification-preferences') reload();
+    const poll = window.setInterval(reload, 30_000);
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') reload();
     };
-    const onReadChange = (event: Event) => {
-      const ids = (event as CustomEvent<unknown>).detail;
-      if (Array.isArray(ids)) setReadIds(ids.filter((id): id is string => typeof id === 'string'));
-    };
-    const onPreferencesChange = () => reload();
-    window.addEventListener('storage', onStorage);
-    window.addEventListener('sahayogi-notifications-read', onReadChange);
-    window.addEventListener('sahayogi-notification-preferences', onPreferencesChange);
+    document.addEventListener('visibilitychange', onVisibilityChange);
     return () => {
       window.clearInterval(poll);
-      window.removeEventListener('storage', onStorage);
-      window.removeEventListener('sahayogi-notifications-read', onReadChange);
-      window.removeEventListener('sahayogi-notification-preferences', onPreferencesChange);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
     };
   }, [reload]);
 
-  const value = useMemo(() => ({
-    items, readIds, unreadCount: items.reduce((count, item) => count + (readIds.includes(item.id) ? 0 : 1), 0),
-    loading, error, reload, markRead, markAllRead,
-  }), [items, readIds, loading, error, reload, markRead, markAllRead]);
-
+  const unreadCount = useMemo(
+    () => items.reduce((count, notice) => count + (readIds.has(notice.id) ? 0 : 1), 0),
+    [items, readIds],
+  );
+  const value = useMemo(
+    () => ({ items, unreadCount, loading, error, reload, markRead }),
+    [items, unreadCount, loading, error, reload, markRead],
+  );
   return <NotificationsContext.Provider value={value}>{children}</NotificationsContext.Provider>;
 }
 

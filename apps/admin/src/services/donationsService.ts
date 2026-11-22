@@ -52,9 +52,14 @@ export async function listDonations(f: DonationFilters): Promise<DonationList> {
   const start = (f.page - 1) * PAGE_SIZE;
   q = q.order('created_at', { ascending: false }).range(start, start + PAGE_SIZE - 1);
 
-  const [{ data, count, error }, allTotal, pendingTotal] = await Promise.all([q, countDonations(), countDonations(['pending_admin_review'])]);
+  const [{ data, count, error }, allTotal, pendingTotal, inProgressTotal] = await Promise.all([
+    q,
+    countDonations(),
+    countDonations(['pending_admin_review']),
+    countDonations(['in_progress']),
+  ]);
   if (error) throw error;
-  return { rows: (data ?? []).map(mapDonation), total: count ?? 0, allTotal, pendingTotal };
+  return { rows: (data ?? []).map(mapDonation), total: count ?? 0, allTotal, pendingTotal, inProgressTotal };
 }
 
 export async function getDonation(id: string): Promise<DonationDetail> {

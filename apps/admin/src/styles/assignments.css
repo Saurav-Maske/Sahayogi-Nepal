@@ -31,13 +31,13 @@
   background: none;
   color: var(--muted);
   font: inherit;
-  font-size: 12px;
+  font-size: 16px;
   font-weight: 500;
   cursor: pointer;
   transition: color .15s;
 }
 .assignment-tabs button:hover { color: var(--navy); }
-.assignment-tabs button span { color: var(--muted); font-size: 11px; }
+.assignment-tabs button span { color: var(--muted); font-size: 15px; }
 .assignment-tabs button.is-active {
   color: var(--teal);
   font-weight: 600;
@@ -46,7 +46,7 @@
 
 .assignment-filters {
   display: grid;
-  grid-template-columns: 1.15fr .9fr .9fr .9fr;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, .9fr) minmax(0, .9fr) minmax(0, .9fr);
   gap: 12px;
   margin: 16px 0;
 }
@@ -60,7 +60,7 @@
   background: var(--surface);
   color: var(--text);
   font: inherit;
-  font-size: 12px;
+  font-size: 16px;
 }
 .assignment-filters input::placeholder { color: var(--muted); }
 
@@ -69,6 +69,7 @@
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 16px;
 }
+.assignment-grid > .admin-empty-state { grid-column: 1 / -1; }
 .assignment-card {
   min-height: 108px;
   padding: 18px 20px;
@@ -79,32 +80,42 @@
 }
 .assignment-card:hover {
   border-color: var(--border);
-  box-shadow: 0 8px 24px rgba(23, 59, 87, .12);
+  box-shadow: var(--shadow-md);
   transform: translateY(-1px);
 }
-.assignment-card h2 { font-size: 14px; line-height: 20px; font-weight: 600; color: var(--navy); }
-.assignment-ref   { margin-top: 2px; font-size: 11px; color: var(--blue); }
-.assignment-route { margin-top: 8px;  font-size: 12px; color: var(--text); }
-.assignment-items { margin-top: 3px;  font-size: 11px; color: var(--muted); }
-.assignment-state { margin-top: 8px;  font-size: 11px; font-weight: 600; color: var(--bad); }
+.assignment-card h2 { font-size: 17px; line-height: 20px; font-weight: 600; color: var(--navy); }
+.assignment-ref   { margin-top: 2px; font-size: 15px; color: var(--blue); }
+.assignment-route { margin-top: 8px;  font-size: 16px; color: var(--text); }
+.assignment-items { margin-top: 3px;  font-size: 15px; color: var(--muted); }
+.assignment-state { margin-top: 8px;  font-size: 15px; font-weight: 600; color: var(--teal); }
 .assignment-state.is-progress { color: var(--warn); }
 .assignment-state.is-done     { color: var(--good); }
 
 /* ---------- assignments: detail ---------- */
 .assignment-detail-grid {
   display: grid;
-  grid-template-columns: minmax(0, .9fr) minmax(0, 1fr);
-  gap: 16px;
+  grid-template-columns: minmax(0, .95fr) minmax(0, 1fr);
+  gap: 14px;
 }
-.assignment-detail-grid > .card { min-height: 442px; }
+.assignment-detail-grid > .card {
+  min-width: 0;
+  min-height: 432px;
+  padding: 18px 20px;
+  border-radius: 8px;
+}
+.page .assignment-detail-page .assignment-detail-grid > .card {
+  min-height: 432px;
+}
 
-.assignment-resource .card__sub { margin-top: 6px; }
-.assignment-resource dl { margin: 16px 0 0; font-size: 12px; line-height: 18px; }
+.assignment-resource .card__title,
+.assignment-events .card__title { font-size: 17px; line-height: 23px; }
+.assignment-resource .card__sub { margin-top: 8px; font-size: 16px; }
+.assignment-resource dl { margin: 16px 0 0; font-size: 16px; line-height: 19px; }
 .assignment-resource dl div {
   display: grid;
-  grid-template-columns: 80px 1fr;
+  grid-template-columns: 84px minmax(0, 1fr);
   gap: 8px;
-  padding: 4px 0;
+  padding: 1px 0;
 }
 .assignment-resource dt { font-weight: 500; color: var(--navy); }
 .assignment-resource dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
@@ -112,13 +123,13 @@
 .location-note {
   margin-top: 16px;
   padding: 14px 16px;
-  background: #eaf1f7;
+  background: var(--info-bg);
   border-radius: 8px;
-  font-size: 12px;
+  font-size: 16px;
   color: var(--navy);
 }
 .location-note strong { font-weight: 600; }
-.location-note p { margin-top: 4px; font-size: 11px; color: var(--muted); }
+.location-note p { margin-top: 4px; font-size: 15px; color: var(--muted); }
 
 .assignment-controls { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
 .assignment-hub-actions {
@@ -149,7 +160,7 @@
 .event-list { list-style: none; margin: 18px 0 0; padding: 0 0 0 10px; }
 .event-list li {
   position: relative;
-  padding: 0 0 28px 18px;
+  padding: 0 0 30px 18px;
   border-left: 1px solid var(--border);
 }
 .event-list li:last-child { padding-bottom: 4px; border-left-color: transparent; }
@@ -174,15 +185,16 @@
   background: var(--surface);
   border: 1px solid var(--navy);
   color: var(--navy);
-  font-size: 9px;
+  font-size: 14px;
   font-weight: 700;
   line-height: 1;
 }
-.event-list li span { font-size: 12px; font-weight: 600; color: var(--navy); }
+.event-list li span { font-size: 16px; font-weight: 600; color: var(--navy); }
 .event-list li p,
-.event-list time { display: block; margin-top: 4px; font-size: 11px; color: var(--muted); }
+.event-list time { display: block; margin-top: 5px; font-size: 16px; color: var(--muted); }
+.event-list li p { margin-top: 5px; font-size: 16px; color: var(--muted); }
 
-.discrepancy { margin-top: 14px; font-size: 12px; line-height: 18px; color: var(--text); }
+.discrepancy { margin-top: 14px; font-size: 16px; line-height: 18px; color: var(--text); }
 .discrepancy p + p { margin-top: 2px; }
 
 /* ---------- responsive (same breakpoints as admin) ---------- */
@@ -191,14 +203,50 @@
 }
 @media (max-width: 900px) {
   .assignment-grid,
-  .assignment-detail-grid { grid-template-columns: 1fr; }
-  .assignment-filters { grid-template-columns: 1fr 1fr; }
-  .assignment-detail-grid > .card { min-height: 0; }
+  .assignment-detail-grid { grid-template-columns: minmax(0, 1fr); }
+  .assignment-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .assignment-detail-grid > .card,
+  .page .assignment-detail-page .assignment-detail-grid > .card { min-height: 0; }
   .assignment-tabs { gap: 18px; padding: 0 16px; }
 }
 @media (max-width: 520px) {
-  .assignment-filters { grid-template-columns: 1fr; }
+  .assignment-filters { grid-template-columns: minmax(0, 1fr); }
   .assignment-filters input,
-  .assignment-filters select { font-size: 16px; } /* stops iOS zoom on focus */
+  .assignment-filters select { font-size: 17px; } /* stops iOS zoom on focus */
   .assignment-card { min-height: auto; }
+}
+
+/* Navy and teal fade treatment */
+.page .assignment-tabs {
+  border-color: rgba(191, 211, 222, .5);
+  background: rgba(215, 230, 238, .52);
+  box-shadow: none;
+}
+.page .assignment-tabs button.is-active { color: var(--teal); box-shadow: inset 0 -2px var(--teal); }
+.page .assignment-card {
+  border-color: rgba(191, 211, 222, .5);
+  background: rgba(211, 228, 237, .42);
+  box-shadow: 0 1px 8px rgba(23, 59, 87, .025);
+}
+.page .assignment-card:hover {
+  border-color: rgba(133, 173, 188, .65);
+  background: rgba(233, 242, 247, .76);
+  box-shadow: 0 5px 16px rgba(23, 59, 87, .08);
+}
+
+/* These assignment surfaces sit directly on the page wash; keep their edges quiet. */
+.page .assignments-page .assignment-tabs {
+  border-color: rgba(177, 200, 213, .38);
+  background: linear-gradient(112deg, #dceaf2 0%, #e4eef3 52%, #e9f1f5 100%);
+  box-shadow: none;
+}
+.page .assignments-page .assignment-card {
+  border-color: rgba(177, 200, 213, .34);
+  background: linear-gradient(135deg, #e1edf3 0%, #e8f1f5 56%, #edf3f7 100%);
+  box-shadow: none;
+}
+.page .assignments-page .assignment-card:hover {
+  border-color: rgba(133, 173, 188, .52);
+  background: linear-gradient(135deg, #d9e9f0 0%, #e3eff4 58%, #eaf2f6 100%);
+  box-shadow: 0 3px 12px rgba(23, 59, 87, .055);
 }

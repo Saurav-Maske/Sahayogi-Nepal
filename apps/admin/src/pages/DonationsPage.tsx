@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import QuickAction from '../components/dashboard/QuickAction';
+import DatePicker from '../components/fields/DatePicker';
 import Pagination from '../components/requests/Pagination';
 import StatusBadge from '../components/requests/StatusBadge';
 import { useDonationList } from '../hooks/useDonations';
@@ -52,7 +53,11 @@ export default function DonationsPage() {
   }, [search]);
 
   const hasFilters = !!(filters.q || filters.districtId || filters.itemType || filters.from || filters.to);
-  const count = (key: DonationTab) => (key === 'all' ? data?.allTotal : key === 'pending' ? data?.pendingTotal : undefined);
+  const count = (key: DonationTab) =>
+    key === 'all' ? data?.allTotal
+      : key === 'pending' ? data?.pendingTotal
+        : key === 'in_progress' ? data?.inProgressTotal
+          : undefined;
 
   return (
     <>
@@ -87,10 +92,9 @@ export default function DonationsPage() {
           <option value="">Category: All</option>
           {itemTypes.map((t) => <option key={t} value={t}>{humanize(t)}</option>)}
         </select>
-        <div className="filters__field filters__dates">
-          <input type="date" aria-label="From date" value={filters.from} max={filters.to || undefined} onChange={(e) => update({ from: e.target.value || null })} />
-          <span>–</span>
-          <input type="date" aria-label="To date" value={filters.to} min={filters.from || undefined} onChange={(e) => update({ to: e.target.value || null })} />
+        <div className="filters__dates">
+          <DatePicker label="Start date" value={filters.from} max={filters.to || undefined} onChange={(value) => update({ from: value || null })}/>
+          <DatePicker label="End date" value={filters.to} min={filters.from || undefined} onChange={(value) => update({ to: value || null })}/>
         </div>
       </div>
 

@@ -65,9 +65,12 @@ export default function VolunteersPage() {
         ))}
       </div>
 
-      <div className="filters filters--three">
+      <div className="filters">
         <input className="filters__field filters__search" placeholder="Search name, email or phone" aria-label="Search volunteers"
           value={search} onChange={(e) => setSearch(e.target.value)} />
+        <select className="filters__field" aria-label="District filter unavailable" disabled title="Volunteer records are not linked to districts in the backend.">
+          <option>District: All</option>
+        </select>
         <select className="filters__field" aria-label="Category" value={filters.category} onChange={(e) => update({ category: e.target.value || null })}>
           <option value="">Category: All</option>
           {CATEGORY_OPTIONS.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
@@ -76,6 +79,7 @@ export default function VolunteersPage() {
           {DAY_OPTIONS.map((d) => <option key={d.value} value={d.value}>{d.label}</option>)}
         </select>
       </div>
+      <p className="volunteer-district-note">District filtering is unavailable because volunteer records are not linked to districts in the backend.</p>
 
       <div className="card table-card" aria-busy={loading}>
         {error ? (
