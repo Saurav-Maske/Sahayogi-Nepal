@@ -23,7 +23,7 @@ export default function AdminSidebar({ open, onNavigate }: Props) {
   return (
     <aside className={`sidebar ${open ? 'sidebar--open' : ''}`} aria-label="Admin navigation">
       <div className="sidebar__brand">
-        <div className="sidebar__name">SAHAYOGI NEPAL</div>
+        <img className="sidebar__logo" src={`${import.meta.env.BASE_URL}images/VerticalLogoOnBlue.svg`} alt="Sahayogi Nepal" />
         <div className="sidebar__console">OPERATIONS CONSOLE</div>
       </div>
       <nav className="sidebar__nav">
