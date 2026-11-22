@@ -2,6 +2,13 @@
 
 Newest first. Anything that changes a payload, table, function or seed behaviour gets a line here.
 
+## 2026-11-22 (first full run on the hosted demo project)
+
+- **Result:** `npm run test:api` against the hosted demo project passed: `sahayogi-edge-api` 37 requests / 0 failed, `sahayogi-flows` 86 requests / 0 failed. 28 of 43 Edge endpoints have a Postman request; the sign-up, password-reset, upload, route, driver-location, volunteer-approval and `send-push` functions are not covered yet.
+- **Behaviour:** `admin-api` now answers a missing, invalid or expired token with `401 unauthenticated` (it was `403 forbidden`). `403 forbidden` is only for a signed-in user who is not an admin. Same as `volunteer-api`. Clients should treat 401 as "refresh or sign in again". Change is in `supabase/functions/_shared/rpc.ts`.
+- **Tests:** device-token test now sends a token of at least 20 characters (the RPC requires 20-4096). Removed a contradictory `no error` assertion from the `skip OTP early` flow step (the expected result is a 409 `otp_required` error).
+- **Deploy note:** `submit-request` must be redeployed with the rest (`supabase functions deploy`, no names). A stale copy did not return `request_id`, which broke every flow step that uses it.
+
 ## 2026-11-22 (test runner and demo deploy)
 
 - **Tests:** `scripts/tests/matrix.mjs` (+ `lib.mjs`) runs the concurrency, RLS and role rows of `TEST-MATRIX.md` as real roles over HTTP. `npm run test:matrix` and `test:matrix:fast` in `scripts/`. Not yet run against a project.
