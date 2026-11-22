@@ -39,7 +39,7 @@ export interface RequestFilters {
   page: number;
 }
 
-export interface ListResult { rows: ServiceRequest[]; total: number; allTotal: number; pendingTotal: number; demo: boolean }
-export interface DetailResult { request: ServiceRequest; demo: boolean }
+export interface ListResult { rows: ServiceRequest[]; total: number; allTotal: number; pendingTotal: number }
+export interface DetailResult { request: ServiceRequest }
 export interface District { id: number; name: string }
 export interface ApprovedItem { item_id: string; qty: number }

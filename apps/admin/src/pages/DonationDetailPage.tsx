@@ -97,7 +97,7 @@ export default function DonationDetailPage() {
           <h1>Donation detail · {d.publicRef}</h1>
           <p className="crumbs"><Link to="/donations">Donations</Link> / {d.publicRef} / {d.district} district</p>
         </div>
-        <div className="page__actions">{data?.demo && <span className="pill">Demo data</span>}<QuickAction /></div>
+        <div className="page__actions"><QuickAction /></div>
       </div>
 
       <div className="review">

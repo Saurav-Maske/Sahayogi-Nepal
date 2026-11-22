@@ -8,8 +8,7 @@ export const ADMIN_ROLE = 'admin';
 /**
  * DEV ONLY: set VITE_DEV_BYPASS_AUTH=true in .env to skip login while there is no admin user.
  * Ignored in production builds (import.meta.env.DEV is false there).
- * No real Supabase session exists in bypass mode, so row-level security still applies and
- * pages show demo data. Remove the flag once a real admin exists.
+ * No real Supabase session exists in bypass mode, so database-backed pages will show an access error.
  */
 const DEV_BYPASS = import.meta.env.DEV && import.meta.env.VITE_DEV_BYPASS_AUTH === 'true';
 const BYPASS_SESSION = { user: { id: 'dev-bypass', email: 'dev@localhost' } } as unknown as Session;

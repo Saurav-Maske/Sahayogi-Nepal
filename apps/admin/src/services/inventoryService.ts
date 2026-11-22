@@ -1,31 +1,65 @@
 import { supabase } from '../supabase';
 import { hasSession } from './session';
 
-export type Lot={id:string;itemType:string;unit:string;quantity:number;reserved:number;phase:string;provider:string;contact:string;note:string;createdAt:string;createdBy:string;sourceRequest:string|null};
-export type Movement={id:string;lotId:string;itemType:string;unit:string;quantity:number;fromPhase:string|null;toPhase:string;reason:string;requestRef:string|null;createdAt:string;actor:string};
-const DAY='2026-06-18T00:00:00Z';
-export let demoLots:Lot[]=[
- {id:'demo-inv-0148',itemType:'Rice sacks',unit:'kg',quantity:300,reserved:0,phase:'processing',provider:'Nepal Food Bank',contact:'+977 01 555 0140',note:'Good condition',createdAt:DAY,createdBy:'Anisha Karki',sourceRequest:null},
- {id:'demo-inv-0149',itemType:'Water bottles',unit:'bottles',quantity:120,reserved:0,phase:'processing',provider:'Kiran Joshi',contact:'+977 9800000001',note:'Quality check',createdAt:DAY,createdBy:'Anisha Karki',sourceRequest:null},
- {id:'demo-inv-0150',itemType:'Rice sacks',unit:'kg',quantity:240,reserved:0,phase:'ready_to_ship',provider:'Nepal Food Bank',contact:'+977 01 555 0140',note:'Sealed',createdAt:DAY,createdBy:'Anisha Karki',sourceRequest:null},
- {id:'demo-inv-0151',itemType:'Rice',unit:'kg',quantity:20,reserved:20,phase:'reserved',provider:'Nepal Food Bank',contact:'+977 01 555 0140',note:'Reserved for request',createdAt:DAY,createdBy:'Anisha Karki',sourceRequest:'REQ-1042'},
- {id:'demo-inv-0152',itemType:'Blankets',unit:'units',quantity:80,reserved:0,phase:'received',provider:'Asha Basnet',contact:'+977 9800000002',note:'New',createdAt:DAY,createdBy:'Anisha Karki',sourceRequest:null},
- {id:'demo-inv-0153',itemType:'First-aid kits',unit:'kits',quantity:32,reserved:0,phase:'processing',provider:'Health for Nepal',contact:'+977 9800000003',note:'Check expiry',createdAt:DAY,createdBy:'Anisha Karki',sourceRequest:null},
- {id:'demo-inv-0154',itemType:'Drinking water',unit:'bottles',quantity:84,reserved:0,phase:'ready_to_ship',provider:'Community donor',contact:'—',note:'Low stock',createdAt:DAY,createdBy:'Anisha Karki',sourceRequest:null},
- {id:'demo-inv-0155',itemType:'Tents',unit:'units',quantity:4,reserved:4,phase:'dispatched',provider:'Shelter Nepal',contact:'—',note:'In transit',createdAt:DAY,createdBy:'Anisha Karki',sourceRequest:'REQ-1039'},
-];
-export let demoMovements:Movement[]=[
- {id:'demo-mov-0841',lotId:'demo-inv-0148',itemType:'Rice sacks',unit:'kg',quantity:300,fromPhase:null,toPhase:'received',reason:'Received from Nepal Food Bank',requestRef:null,createdAt:'2026-06-17T06:00:00Z',actor:'Anisha Karki'},
- {id:'demo-mov-0842',lotId:'demo-inv-0148',itemType:'Rice sacks',unit:'kg',quantity:300,fromPhase:'received',toPhase:'processing',reason:'Quality check · No stock balance change',requestRef:null,createdAt:'2026-06-17T11:30:00Z',actor:'Anisha Karki'},
- {id:'demo-mov-0849',lotId:'demo-inv-0150',itemType:'Rice sacks',unit:'kg',quantity:40,fromPhase:'ready_to_ship',toPhase:'dispatched',reason:'Verified delivery',requestRef:'REQ-1036',createdAt:'2026-06-18T08:30:00Z',actor:'Anisha Karki'},
- {id:'demo-mov-0852',lotId:'demo-inv-0148',itemType:'Rice sacks',unit:'kg',quantity:20,fromPhase:'ready_to_ship',toPhase:'reserved',reason:'Reserved for request',requestRef:'REQ-1042',createdAt:'2026-06-18T10:00:00Z',actor:'Anisha Karki'},
-];
-const one=(v:any)=>Array.isArray(v)?v[0]:v;
-export async function listLots():Promise<{lots:Lot[];demo:boolean}>{if(!(await hasSession()))return{lots:demoLots,demo:true};const{data,error}=await supabase.from('inventory_lots').select('id,item_type,unit,quantity,reserved_qty,phase,provider_name,provider_contact,condition_note,created_at,created_by,source_request_id,requests(public_ref),profiles!created_by(full_name)').order('created_at',{ascending:false});if(error)throw error;return{demo:false,lots:(data??[]).map((x:any)=>({id:x.id,itemType:String(x.item_type).replace(/_/g,' '),unit:x.unit,quantity:Number(x.quantity),reserved:Number(x.reserved_qty),phase:x.phase,provider:x.provider_name??'Unspecified provider',contact:x.provider_contact??'—',note:x.condition_note??'',createdAt:x.created_at,createdBy:one(x.profiles)?.full_name??'Admin',sourceRequest:one(x.requests)?.public_ref??null}))};}
-export async function getLot(id:string):Promise<{lot:Lot;demo:boolean}>{const all=await listLots();const lot=all.lots.find(x=>x.id===id);if(!lot)throw new Error('Inventory item not found');return{lot,demo:all.demo};}
-export async function listMovements(lotId?:string):Promise<{movements:Movement[];demo:boolean}>{if(!(await hasSession()))return{movements:demoMovements.filter(x=>!lotId||x.lotId===lotId),demo:true};let q:any=supabase.from('inventory_movements').select('id,lot_id,from_phase,to_phase,quantity,reason,request_id,created_at,inventory_lots!inner(item_type,unit)').order('created_at',{ascending:false});if(lotId)q=q.eq('lot_id',lotId);const{data,error}=await q;if(error)throw error;return{demo:false,movements:(data??[]).map((x:any)=>({id:x.id,lotId:x.lot_id,itemType:String(one(x.inventory_lots)?.item_type??'item').replace(/_/g,' '),unit:one(x.inventory_lots)?.unit??'',quantity:Number(x.quantity),fromPhase:x.from_phase,toPhase:x.to_phase,reason:x.reason??'',requestRef:null,createdAt:x.created_at,actor:'Admin'}))};}
-export async function getMovement(id:string){const result=await listMovements();const movement=result.movements.find(x=>x.id===id);if(!movement)throw new Error('Movement not found');return{movement,demo:result.demo};}
-export const prettyPhase=(p:string|null)=>p?p.replace(/_/g,' ').replace(/^./,(c:string)=>c.toUpperCase()):'Received';
-export const availableQty=(lot:Lot)=>Math.max(0,lot.quantity-lot.reserved);
-export function recordDemoMovement(lotId:string,phase:string,qty:number,reason:string,requestRef:string|null){const lot=demoLots.find(x=>x.id===lotId);if(!lot)throw new Error('Inventory item not found');if(qty<=0)throw new Error('Quantity must be greater than zero.');if(phase==='reserved'&&qty>availableQty(lot))throw new Error('Quantity exceeds available stock.');const from=lot.phase;if(phase==='reserved')lot.reserved+=qty;else if(phase==='dispatched'){lot.reserved=Math.max(0,lot.reserved-qty);}else if(phase==='adjusted')lot.quantity=Math.max(0,lot.quantity+qty);else lot.phase=phase;const movement:Movement={id:`demo-mov-${String(Date.now()).slice(-4)}`,lotId,itemType:lot.itemType,unit:lot.unit,quantity:qty,fromPhase:from,toPhase:phase,reason,requestRef,createdAt:new Date().toISOString(),actor:'Anisha Karki'};demoMovements.unshift(movement);return movement;}
-export function addDemoLot(itemType:string,quantity:number,unit:string,note:string){const id=`demo-inv-${String(Date.now()).slice(-4)}`;demoLots.unshift({id,itemType,unit,quantity,reserved:0,phase:'received',provider:'Admin entry',contact:'—',note,createdAt:new Date().toISOString(),createdBy:'Anisha Karki',sourceRequest:null});return id;}
+export type Lot = { id: string; itemType: string; unit: string; quantity: number; reserved: number; phase: string; provider: string | null; contact: string | null; note: string | null; createdAt: string; createdBy: string | null; sourceRequest: string | null };
+export type Movement = { id: string; lotId: string; itemType: string; unit: string; quantity: number; fromPhase: string | null; toPhase: string; reason: string | null; requestId: string | null; createdAt: string; actorId: string | null };
+const one = (value: any) => Array.isArray(value) ? value[0] : value;
+const requireAdmin = async (message: string) => { if (!(await hasSession())) throw new Error(message); };
+const mapLot = (row: any): Lot => ({
+  id: row.id, itemType: row.item_type, unit: row.unit, quantity: Number(row.quantity), reserved: Number(row.reserved_qty), phase: row.phase,
+  provider: row.provider_name, contact: row.provider_contact, note: row.condition_note, createdAt: row.created_at,
+  createdBy: one(row.profiles)?.full_name ?? null, sourceRequest: one(row.requests)?.public_ref ?? null,
+});
+
+export async function listLots(): Promise<Lot[]> {
+  await requireAdmin('Sign in as an administrator to view inventory.');
+  const { data, error } = await supabase.from('inventory_lots')
+    .select('id,item_type,unit,quantity,reserved_qty,phase,provider_name,provider_contact,condition_note,created_at,created_by,source_request_id,requests(public_ref),profiles!created_by(full_name)')
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return (data ?? []).map(mapLot);
+}
+
+export async function getLot(id: string): Promise<Lot> {
+  const lot = (await listLots()).find((item) => item.id === id);
+  if (!lot) throw new Error('Inventory item not found.');
+  return lot;
+}
+
+export async function listMovements(lotId?: string): Promise<Movement[]> {
+  await requireAdmin('Sign in as an administrator to view inventory history.');
+  let query: any = supabase.from('inventory_movements')
+    .select('id,lot_id,from_phase,to_phase,quantity,reason,request_id,actor_id,created_at,inventory_lots!inner(item_type,unit)')
+    .order('created_at', { ascending: false });
+  if (lotId) query = query.eq('lot_id', lotId);
+  const { data, error } = await query;
+  if (error) throw error;
+  return (data ?? []).map((row: any) => ({
+    id: row.id, lotId: row.lot_id, itemType: one(row.inventory_lots)?.item_type ?? '', unit: one(row.inventory_lots)?.unit ?? '',
+    quantity: Number(row.quantity), fromPhase: row.from_phase, toPhase: row.to_phase, reason: row.reason,
+    requestId: row.request_id, createdAt: row.created_at, actorId: row.actor_id,
+  }));
+}
+
+export async function getMovement(id: string): Promise<Movement> {
+  const movement = (await listMovements()).find((item) => item.id === id);
+  if (!movement) throw new Error('Inventory movement not found.');
+  return movement;
+}
+
+export const prettyPhase = (phase: string | null) => phase ? phase.replace(/_/g, ' ').replace(/^./, (letter) => letter.toUpperCase()) : 'Received';
+export const availableQty = (lot: Lot) => Math.max(0, lot.quantity - lot.reserved);
+
+export async function importStock(items: Array<Record<string, unknown>>) {
+  await requireAdmin('Sign in as an administrator to add inventory.');
+  const { data, error } = await supabase.rpc('admin_import_stock', { p_items: items });
+  if (error) throw error;
+  return data;
+}
+
+export async function moveLot(id: string, phase: string, quantity: number, reason: string | null) {
+  await requireAdmin('Sign in as an administrator to move inventory.');
+  const { data, error } = await supabase.rpc('admin_move_lot', { p_id: id, p_phase: phase, p_qty: quantity, p_reason: reason });
+  if (error) throw error;
+  return data;
+}

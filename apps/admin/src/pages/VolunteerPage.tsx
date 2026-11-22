@@ -49,10 +49,9 @@ export default function VolunteersPage() {
       <div className="page__head">
         <div>
           <h1>Volunteer management</h1>
-          <p className="crumbs">Sahayogi Nepal / Volunteer Management / Kathmandu district</p>
+          <p className="crumbs">Sahayogi Nepal / Volunteer Management / All districts</p>
         </div>
         <div className="page__actions">
-          {data?.demo && <span className="pill" title="Not signed in: showing demo data">Demo data</span>}
           <QuickAction />
         </div>
       </div>

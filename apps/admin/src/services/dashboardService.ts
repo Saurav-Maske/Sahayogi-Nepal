@@ -10,40 +10,6 @@ const APPROVED_STATUSES = ['approved', 'awaiting_assignment'];
 const ACTIVE_ASSIGNMENT_STATES = ['accepted', 'en_route_to_pickup', 'picked_up', 'en_route_to_destination'];
 const EN_ROUTE_STATES = ['en_route_to_pickup', 'en_route_to_destination'];
 
-export const DEMO_DATA: DashboardData = {
-  stats: {
-    totalRequests: 1284, totalRequestsChangePct: 12,
-    pendingRequests: 48, needReviewToday: 12,
-    approvedRequests: 186, fulfilledRequests: 1050, fulfilmentRatePct: 82,
-    activeVolunteers: 124, volunteerCategories: 3,
-    availableInventory: 2840, inventoryCategories: 5,
-    activeAssignments: 32, driversEnRoute: 8,
-    openIncidents: 6, urgentIncidents: 2,
-  },
-  byCategory: [
-    { label: 'Food', value: 88 }, { label: 'Water', value: 62 },
-    { label: 'Shelter', value: 45 }, { label: 'Health', value: 30 }, { label: 'Other', value: 52 },
-  ],
-  fulfilledOverTime: [
-    { label: 'Mon', value: 40 }, { label: 'Tue', value: 52 }, { label: 'Wed', value: 46 },
-    { label: 'Thu', value: 68 }, { label: 'Fri', value: 78 }, { label: 'Sat', value: 89 },
-  ],
-  activity: [
-    { id: '1', time: '10:42', text: 'Delivery completed — REQ-1038, Kirtipur', href: '/requests' },
-    { id: '2', time: '10:35', text: 'Donation picked up — DON-0284, 45 kg rice', href: '/donations' },
-    { id: '3', time: '10:21', text: 'Volunteer approved — Nisha Rai, Healthcare', href: '/volunteers' },
-    { id: '4', time: '10:14', text: 'Inventory updated — 240 kg rice ready to ship', href: '/inventory' },
-    { id: '5', time: '09:58', text: 'New request — REQ-1042, food assistance', href: '/requests' },
-    { id: '6', time: '09:50', text: 'Incident reported — INC-0061, shortage of 2 kg', href: '/incidents' },
-  ],
-  attention: {
-    quantityDiscrepancies: 2,
-    lowStock: { item: 'Drinking water', available: 84, threshold: 100, unit: 'bottles' },
-  },
-  updatedAt: new Date().toISOString(),
-  source: 'demo',
-};
-
 const DAY = 864e5;
 const since = (days: number) => new Date(Date.now() - days * DAY).toISOString();
 
@@ -161,11 +127,6 @@ async function fetchLive(): Promise<DashboardData> {
 }
 
 export async function getDashboardData(): Promise<DashboardData> {
-  if (!(await hasSession())) return { ...DEMO_DATA, updatedAt: new Date().toISOString() };
-  try {
-    return await fetchLive();
-  } catch (err) {
-    console.warn('[dashboard] Supabase query failed, showing demo data:', err);
-    return { ...DEMO_DATA, updatedAt: new Date().toISOString() };
-  }
+  if (!(await hasSession())) throw new Error('Sign in as an administrator to view the operations dashboard.');
+  return fetchLive();
 }

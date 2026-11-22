@@ -1,0 +1,6 @@
+import { supabase } from '../supabase';
+import { hasSession } from './session';
+export type Incident={id:string;status:string;type:string;reporterNote:string;reportedShortfall:unknown;resolution:string|null;adminNotes:string|null;createdAt:string;request:any;assignment:any};
+const map=(x:any):Incident=>({id:x.id,status:x.status,type:x.incident_type,reporterNote:x.reporter_note??'',reportedShortfall:x.reported_shortfall,resolution:x.resolution??null,adminNotes:x.admin_notes??null,createdAt:x.created_at,request:x.request??null,assignment:x.assignment??null});
+export async function listIncidents(status?:string){if(!(await hasSession()))throw new Error('Sign in as an administrator to view incidents.');const{data,error}=await supabase.rpc('admin_list_incidents',{p_status:status||null});if(error)throw error;return((data??[]) as any[]).map(map)}
+export async function resolveIncident(id:string,status:'under_review'|'resolved'|'dismissed',resolution:string|null,notes:string|null){if(!(await hasSession()))throw new Error('Sign in as an administrator to resolve incidents.');const{data,error}=await supabase.rpc('admin_resolve_incident',{p_id:id,p_status:status,p_resolution:resolution,p_notes:notes});if(error)throw error;return data}

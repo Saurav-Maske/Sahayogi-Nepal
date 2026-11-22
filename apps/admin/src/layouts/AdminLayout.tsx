@@ -3,13 +3,16 @@ import { Outlet } from 'react-router-dom';
 import AdminSidebar from '../components/layout/AdminSidebar';
 import AdminTopbar from '../components/layout/AdminTopbar';
 import { useAuth } from '../context/AuthContext';
+import { NotificationsProvider, useNotifications } from '../context/NotificationsContext';
 
 export default function AdminLayout() {
+  return <NotificationsProvider><AdminShell /></NotificationsProvider>;
+}
+
+function AdminShell() {
   const [navOpen, setNavOpen] = useState(false);
   const { profile, session, signOut } = useAuth();
-
-  // TODO: replace with the real unread count once a notifications table exists
-  const unread = 3;
+  const { unreadCount } = useNotifications();
 
   const name = profile?.full_name || session?.user.email || 'Admin';
   const role = profile?.role ? profile.role.charAt(0).toUpperCase() + profile.role.slice(1) : 'Admin';
@@ -20,7 +23,7 @@ export default function AdminLayout() {
       {navOpen && <div className="shell__scrim" onClick={() => setNavOpen(false)} />}
       <div className="shell__main">
         <AdminTopbar
-          notificationCount={unread}
+          notificationCount={unreadCount}
           userName={name}
           userRole={role}
           onMenuClick={() => setNavOpen(true)}

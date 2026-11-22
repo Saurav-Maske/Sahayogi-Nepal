@@ -1,21 +1,70 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import QuickAction from '../components/dashboard/QuickAction';
-import { addDemoLot, availableQty, listLots, type Lot } from '../services/inventoryService';
+import { importStock, availableQty, listLots, prettyPhase, type Lot } from '../services/inventoryService';
 import '../styles/inventory.css';
 
-const PHASES=[['received','Received'],['processing','Processing'],['ready_to_ship','Ready to ship'],['reserved','Reserved / dispatched']];
-const phaseGroup=(p:string)=>p==='dispatched'||p==='reserved'?'reserved':p;
-export default function InventoryPage(){const[lots,setLots]=useState<Lot[]>([]),[demo,setDemo]=useState(false),[query,setQuery]=useState(''),[category,setCategory]=useState('All'),[loading,setLoading]=useState(true),[error,setError]=useState(''),[showAdd,setShowAdd]=useState(false),[addName,setAddName]=useState(''),[addQty,setAddQty]=useState(''),[addUnit,setAddUnit]=useState('units'),[addNote,setAddNote]=useState(''),[toast,setToast]=useState('');
- const refresh=()=>{setLoading(true);void listLots().then(r=>{setLots(r.lots);setDemo(r.demo);setError('')}).catch(e=>setError(e instanceof Error?e.message:'Could not load inventory')).finally(()=>setLoading(false))};useEffect(refresh,[]);
- const categories=[...new Set(lots.map(x=>x.itemType))].sort();const filtered=useMemo(()=>lots.filter(x=>(category==='All'||x.itemType===category)&&(!query||`${x.itemType} ${x.provider} ${x.sourceRequest??''}`.toLowerCase().includes(query.toLowerCase()))),[lots,category,query]);
- function addItem(){if(!addName.trim()||!Number(addQty)){setError('Enter an item name and a quantity greater than zero.');return;}if(!demo){setError('New stock entry is unavailable: the backend does not yet provide an inventory creation action.');return;}addDemoLot(addName.trim(),Number(addQty),addUnit,addNote);setShowAdd(false);setAddName('');setAddQty('');setAddNote('');setToast('Sample item added to this session.');refresh();}
- return <div className="inventory-page"><header className="page__head"><div><h1>Central inventory</h1><p className="crumbs">Sahayogi Nepal&nbsp; / &nbsp;Central Inventory&nbsp; / &nbsp;Kathmandu district</p></div><div className="page__actions"><QuickAction/></div></header>
- <div className="inventory-toolbar"><input placeholder="Search inventory" aria-label="Search inventory" value={query} onChange={e=>setQuery(e.target.value)}/><select aria-label="Filter category" value={category} onChange={e=>setCategory(e.target.value)}><option>All</option>{categories.map(c=><option key={c}>{c}</option>)}</select><button className="btn btn--primary" onClick={()=>{setShowAdd(true);setError('')}}>+ Add inventory</button><Link className="btn" to="/inventory/timeline">Activity timeline</Link></div>
- <div className="inventory-workflow"><strong>Workflow stage ≠ stock movement</strong><p>Moving a card changes its stage only. Record received, reserved, dispatched or adjusted quantities in a separate audited movement.</p></div>
- {error&&<p className="inventory-error" role="alert">{error}</p>}{toast&&<p className="inventory-toast" role="status">{toast}</p>}
- <div className="inventory-board">{PHASES.map(([phase,label])=>{const phaseLots=filtered.filter(l=>phaseGroup(l.phase)===phase);return <section className="inventory-column" key={phase}><h2>{label.toUpperCase()} <span>{phaseLots.length}</span></h2><div className="inventory-column-list">{phaseLots.map(l=><Link to={`/inventory/${l.id}`} className="inventory-lot-card" key={l.id}><strong>{l.itemType}{l.sourceRequest?` · ${l.sourceRequest}`:''}</strong><span className="lot-meta">{l.itemType==='Rice sacks'?'Food':l.itemType==='First-aid kits'?'Medical':'Supply'} · {l.note||label}</span><b>{phase==='ready_to_ship'?`${availableQty(l)} ${l.unit} available`:phase==='reserved'?`${l.reserved} ${l.unit} reserved`:`${l.quantity} ${l.unit} ${phase==='received'?'received':'processing'}`}</b><small>{l.provider} · {new Date(l.createdAt).toLocaleDateString('en-GB',{day:'2-digit',month:'short'})}</small><small>Admin: {l.createdBy} · {l.phase==='ready_to_ship'&&availableQty(l)<100?'Low stock':'Normal'}</small></Link>)}<button className="btn inventory-add-item" onClick={()=>{setShowAdd(true);setError('')}}>+ Add item</button></div></section>})}</div>
- {loading&&<p className="empty">Loading inventory…</p>}{!loading&&!filtered.length&&<p className="empty">No inventory matches this search.</p>}{!demo&&!loading&&<p className="inventory-live-note">Live inventory data · quantity changes require an audited backend action.</p>}
- {showAdd&&<div className="inventory-modal-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget)setShowAdd(false)}}><section className="inventory-modal" role="dialog" aria-modal="true" aria-labelledby="add-inventory-title"><button className="inventory-modal-close" onClick={()=>setShowAdd(false)} aria-label="Close">×</button><h2 id="add-inventory-title">Add inventory item</h2><label>Item name<input value={addName} onChange={e=>setAddName(e.target.value)} placeholder="e.g. Rice sacks"/></label><div className="inventory-modal-row"><label>Quantity<input type="number" min="0.01" value={addQty} onChange={e=>setAddQty(e.target.value)}/></label><label>Unit<select value={addUnit} onChange={e=>setAddUnit(e.target.value)}><option>units</option><option>kg</option><option>bottles</option><option>kits</option></select></label></div><label>Condition note<input value={addNote} onChange={e=>setAddNote(e.target.value)} placeholder="Optional"/></label><button className="btn btn--primary" onClick={addItem}>Save inventory item</button></section></div>}
- </div>
+const PHASES = ['received', 'processing', 'ready_to_ship', 'reserved', 'dispatched', 'adjusted'];
+const ITEM_TYPES = [['food', 'Food'], ['cloth', 'Clothing'], ['temp_shelter', 'Temporary shelter'], ['medical_supplies', 'Medical supplies'], ['drinking_water', 'Drinking water']];
+const itemName = (item: string) => ITEM_TYPES.find(([value]) => value === item)?.[1] ?? item.replace(/_/g, ' ');
+const inventoryId = (id: string) => `INV-${id.slice(0, 8).toUpperCase()}`;
+
+export default function InventoryPage() {
+  const [lots, setLots] = useState<Lot[]>([]);
+  const [query, setQuery] = useState('');
+  const [category, setCategory] = useState('All');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [showAdd, setShowAdd] = useState(false);
+  const [addName, setAddName] = useState('');
+  const [addQty, setAddQty] = useState('');
+  const [addUnit, setAddUnit] = useState('');
+  const [addNote, setAddNote] = useState('');
+  const [toast, setToast] = useState('');
+
+  const refresh = useCallback(() => {
+    setLoading(true);
+    void listLots().then((rows) => { setLots(rows); setError(''); })
+      .catch((e) => setError(e instanceof Error ? e.message : 'Could not load inventory.'))
+      .finally(() => setLoading(false));
+  }, []);
+  useEffect(refresh, [refresh]);
+  const categories = [...new Set(lots.map((lot) => lot.itemType))].sort();
+  const filtered = useMemo(() => lots.filter((lot) => (category === 'All' || lot.itemType === category)
+    && (!query || `${itemName(lot.itemType)} ${lot.provider ?? ''} ${lot.sourceRequest ?? ''} ${inventoryId(lot.id)}`.toLowerCase().includes(query.toLowerCase()))), [lots, category, query]);
+
+  async function addItem() {
+    const quantity = Number(addQty);
+    if (!addName || !Number.isFinite(quantity) || quantity <= 0) { setError('Choose an item type and enter a quantity greater than zero.'); return; }
+    setError('');
+    try {
+      await importStock([{ item_type: addName, qty: quantity, unit: addUnit, condition_note: addNote || null, phase: 'received' }]);
+      setShowAdd(false); setAddName(''); setAddQty(''); setAddUnit(''); setAddNote(''); setToast('Inventory lot added.'); refresh();
+    } catch (e) { setError(e instanceof Error ? e.message : 'Could not add inventory.'); }
+  }
+
+  return <div className="inventory-page"><header className="page__head"><div><h1>Central inventory</h1><p className="crumbs">Sahayogi Nepal&nbsp; / &nbsp;Central Inventory&nbsp; / &nbsp;All districts</p></div><div className="page__actions"><QuickAction/></div></header>
+    <div className="inventory-toolbar"><input placeholder="Search inventory" aria-label="Search inventory" value={query} onChange={(e) => setQuery(e.target.value)}/><select aria-label="Filter category" value={category} onChange={(e) => setCategory(e.target.value)}><option>All</option>{categories.map((value) => <option key={value} value={value}>{itemName(value)}</option>)}</select><button className="btn btn--primary" onClick={() => { setShowAdd(true); setError(''); }}>+ Add inventory</button><Link className="btn" to="/inventory/timeline">Activity timeline</Link></div>
+    <div className="inventory-workflow"><strong>Workflow stage ≠ stock movement</strong><p>Stage changes are audited. Reservations and dispatch quantities are managed by request approval and driver confirmation.</p></div>
+    {error && <p className="inventory-error" role="alert">{error} <button className="btn btn--ghost" onClick={refresh}>Retry</button></p>}{toast && <p className="inventory-toast" role="status">{toast}</p>}
+    {loading ? <p className="empty">Loading inventory…</p> : <div className="inventory-board">{PHASES.map((phase) => {
+      const phaseLots = filtered.filter((lot) => lot.phase === phase);
+      return <section className="inventory-column" key={phase}><h2>{prettyPhase(phase).toUpperCase()} <span>{phaseLots.length}</span></h2><div className="inventory-column-list">
+        {phaseLots.map((lot) => <Link to={`/inventory/${lot.id}`} className="inventory-lot-card" key={lot.id}>
+          <strong>{itemName(lot.itemType)} · {inventoryId(lot.id)}</strong><span className="lot-meta">{prettyPhase(lot.phase)}{lot.note ? ` · ${lot.note}` : ''}</span>
+          <b>{availableQty(lot)} {lot.unit} available{lot.reserved > 0 ? ` · ${lot.reserved} reserved` : ''}</b>
+          <small>{lot.provider ?? 'Provider not recorded'} · {new Date(lot.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}</small>
+          <small>{lot.createdBy ? `Added by ${lot.createdBy}` : 'Admin not recorded'}</small>
+        </Link>)}
+        {phase === 'received' && <button className="btn inventory-add-item" onClick={() => { setShowAdd(true); setError(''); }}>+ Add item</button>}
+      </div></section>;
+    })}</div>}
+    {!loading && !filtered.length && !error && <p className="empty">No inventory matches this search.</p>}
+    {!loading && <p className="inventory-live-note">Live inventory data · quantity changes require an audited backend action.</p>}
+    {showAdd && <div className="inventory-modal-backdrop" onMouseDown={(e) => { if (e.target === e.currentTarget) setShowAdd(false); }}><section className="inventory-modal" role="dialog" aria-modal="true" aria-labelledby="add-inventory-title"><button className="inventory-modal-close" onClick={() => setShowAdd(false)} aria-label="Close">×</button><h2 id="add-inventory-title">Add inventory item</h2>
+      <label>Item type<select value={addName} onChange={(e) => setAddName(e.target.value)}><option value="">Choose item type</option>{ITEM_TYPES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+      <div className="inventory-modal-row"><label>Quantity<input type="number" min="0.01" step="0.01" value={addQty} onChange={(e) => setAddQty(e.target.value)}/></label><label>Unit<input value={addUnit} maxLength={20} onChange={(e) => setAddUnit(e.target.value)} placeholder="kg, bottles, units"/></label></div>
+      <label>Condition note<input value={addNote} maxLength={300} onChange={(e) => setAddNote(e.target.value)} placeholder="Optional"/></label>{error && <p className="inventory-error">{error}</p>}<button className="btn btn--primary" onClick={() => void addItem()}>Save inventory item</button>
+    </section></div>}
+  </div>;
 }
