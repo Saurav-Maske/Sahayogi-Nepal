@@ -36,8 +36,8 @@ Protected calls also send `Authorization: Bearer <access_token>`.
 | `account_suspended`                                                                                    | login, auth-me              | "Account suspended. Contact an admin."                                            |
 | `unauthenticated`                                                                                      | auth-me                     | go to login                                                                       |
 | `forbidden`                                                                                            | admin functions             | caller is not an active admin                                                     |
-| `invalid_email` / `invalid_name` / `invalid_phone` / `invalid_type` / `invalid_citizenship_no` | apply                       | field error                                                                       |
-| `license_required` / `service_card_required`                                                         | apply                       | field error                                                                       |
+| `invalid_email` / `invalid_name` / `invalid_phone` / `invalid_type` / `invalid_citizenship_no` | apply                       | field error (`invalid_type` also covers upload: `volunteer_types` missing, empty, not a list or has an unknown value) |
+| `license_required` / `service_card_required`                                                         | apply                       | field error (asked whenever `driver` / `doctor` is in `volunteer_types`)          |
 | `invalid_files` / `invalid_path` / `document_missing`                                              | upload / apply              | re-upload                                                                         |
 | `application_exists`                                                                                   | apply                       | "An application or account with this email already exists."                       |
 | `invalid_state`                                                                                        | approve                     | already decided                                                                   |
@@ -197,15 +197,17 @@ Errors: `400 invalid_otp` (with `attempts_left`), `400 otp_expired`, `429 otp_lo
 
 ```json
 {
-  "volunteer_type": "driver",
+  "volunteer_types": ["driver", "doctor"],
   "files": [
-    { "kind": "citizenship", "content_type": "image/jpeg" },
-    { "kind": "license",     "content_type": "image/jpeg" }
+    { "kind": "citizenship",  "content_type": "image/jpeg" },
+    { "kind": "license",      "content_type": "image/jpeg" },
+    { "kind": "service_card", "content_type": "image/jpeg" }
   ]
 }
 ```
 
-Allowed kinds: `manpower` → citizenship · `driver` → citizenship + license · `doctor` → citizenship + service_card.
+`volunteer_types` is a list, so one person can be driver and doctor. The old single `"volunteer_type": "driver"` is still accepted.
+Allowed kinds are the union over the selected types: `manpower` → citizenship · `driver` → citizenship + license · `doctor` → citizenship + service_card. Send one entry per kind, citizenship is always required.
 Images only: jpeg / png / webp, max 5 MB.
 
 Response
@@ -235,7 +237,7 @@ await supabase.storage.from('volunteer-docs').uploadBinaryToSignedUrl(
   "email": "sita@gmail.com",
   "email_verification_token": "Zk3...",
   "phone": "9801234567",
-  "volunteer_type": "driver",
+  "volunteer_types": ["driver"],
   "citizenship_no": "12-34-56-78901",
   "citizenship_photo_path": "docs/9f1c....jpg",
   "license_no": "01-06-00123456",
@@ -243,7 +245,9 @@ await supabase.storage.from('volunteer-docs').uploadBinaryToSignedUrl(
 }
 ```
 
-Doctor: send `service_card_no` + `service_card_photo_path` instead of the licence fields.
+Doctor: use `"volunteer_types": ["doctor"]` and send `service_card_no` + `service_card_photo_path` instead of the licence fields.
+Driver and doctor: use `"volunteer_types": ["driver", "doctor"]` and send **both** sets of fields. A missing licence returns `license_required`, a missing service card `service_card_required`.
+The single `"volunteer_type": "driver"` field is still accepted; `volunteer_types` wins if both are sent. The stored `volunteer_type` is the primary type (doctor, then driver, then manpower).
 Phone must be a Nepal mobile (`98XXXXXXXX` or `+97798XXXXXXXX`).
 
 Response 201
@@ -284,7 +288,7 @@ Non-admins get nothing from this bucket.
 
 | decision          | Effect                                                                                                     | Extra                                         |
 | ----------------- | ---------------------------------------------------------------------------------------------------------- | --------------------------------------------- |
-| `approve`       | creates the auth user, profile (categories A / A+B / A+C by type) and **emails a set-password link** | `note` optional                             |
+| `approve`       | creates the auth user, profile (categories A / A+B / A+C by type, or the union when the applicant has several types: driver + doctor = A+B+C) and **emails a set-password link** | `note` optional                             |
 | `decline`       | stores reason; no account created                                                                          | `note` **required** (min 3 chars)     |
 | `resend_invite` | re-sends the link to an approved volunteer who never set a password                                        | if they already did → `409 already_active` |
 

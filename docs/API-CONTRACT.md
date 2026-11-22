@@ -1,4 +1,4 @@
-# API Contract (v1.4, owned by Person 2: Rujan Dhamala, Aakash Thakur)
+# API Contract (v1.5, owned by Person 2: Rujan Dhamala, Aakash Thakur)
 
 Change this file in the same PR as the code, and add a line to `docs/CHANGELOG.md`.
 Auth, login and volunteer sign-up endpoints are in [`api-auth.md`](api-auth.md).
@@ -19,8 +19,9 @@ Headers: `apikey: <ANON_KEY>`, `Content-Type: application/json`, plus `Authoriza
 - `inventory_phase`: `received | processing | ready_to_ship | reserved | dispatched | consumed | returned | adjusted`
 - `item_type`: `food | cloth | temp_shelter | medical_supplies | drinking_water`
 - `urgency`: `low | normal | high | critical`
-- Volunteer categories: A = general, B = driver, C = healthcare. Driver = A+B, doctor = A+C, manpower = A.
+- Volunteer categories: A = general, B = driver, C = healthcare. Driver = A+B, doctor = A+C, manpower = A. A volunteer who is more than one type holds the union: driver + doctor = A+B+C.
 - `volunteer_type`: `manpower | driver | doctor`. `role`: `volunteer | admin`.
+- `volunteer_types`: array of `volunteer_type` on a sign-up request (`create-upload-urls`, `submit-volunteer-application`) and on `volunteer_applications`. `volunteer_type` stays as the primary type (doctor, then driver, then manpower) and is what `profiles.volunteer_type` holds. `profiles.categories` is the source of truth for what a volunteer may do.
 
 ## LIVE endpoints
 
