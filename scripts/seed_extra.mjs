@@ -29,7 +29,7 @@ for (const k of ['admin', 'driver1', 'driver2', 'general', 'doctor']) {
 const { data: cfgRows } = await sb.from('app_settings').select('key,value');
 const cfg = Object.fromEntries((cfgRows ?? []).map((r) => [r.key, r.value]));
 const d = cfg.district ?? { center: { lat: 27.7172, lng: 85.324 }, bounds: { south: 27.62, west: 85.22, north: 27.82, east: 85.44 } };
-const hub = cfg.central_inventory ?? { name: 'Central Inventory Hub', lat: 27.705, lng: 85.32 };
+const hub = cfg.central_inventory ?? { name: 'FWU-SOE', lat: 28.954657907336678, lng: 80.17888176615499 };
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 const pin = (a, b) => ({
   lat: +clamp(d.center.lat + a, d.bounds.south + 0.001, d.bounds.north - 0.001).toFixed(5),

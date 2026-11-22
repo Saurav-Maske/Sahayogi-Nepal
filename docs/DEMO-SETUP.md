@@ -61,12 +61,7 @@ If a migration fails, nothing after it is applied. Fix it in Git as a new migrat
 2. **Auth > URL Configuration:** site URL and `SET_PASSWORD_URL` in the redirect list.
 3. **Auth > SMTP Settings:** custom SMTP: host `smtp.resend.com`, port `465`, username `resend`, password = your Resend API key, sender = `MAIL_FROM_ADDRESS` (the default sender allows only a couple of mails per hour, which breaks invites and OTP emails during a rehearsal).
 4. **Auth > Providers / Sign In:** email sign-ups off, anonymous sign-ins off, minimum password length 10 with lower, upper, digits and symbols (what `config.toml` says locally; the hosted project does not read it).
-5. **Hub coordinates** (data, so a one-off update is acceptable; write the real values down in `docs/CHANGELOG.md`):
-   ```sql
-   update app_settings
-      set value = jsonb_set(jsonb_set(value, '{lat}', to_jsonb(<LAT>::numeric)), '{lng}', to_jsonb(<LNG>::numeric))
-    where key = 'central_inventory';
-   ```
+5. **Hub coordinates:** set by migration `20261122140000_hub_to_fwu_soe.sql` (FWU-SOE, Kanchanpur), so `supabase db push` is enough. To move the hub later, add a new migration that upserts `app_settings` key `central_inventory`.
 
 ## 6. Seed
 

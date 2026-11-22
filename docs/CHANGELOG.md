@@ -2,6 +2,17 @@
 
 Newest first. Anything that changes a payload, table, function or seed behaviour gets a line here.
 
+## 2026-11-22 (hub moved to Kanchanpur, reserve alerts)
+
+- **Hub:** migration `20261122140000_hub_to_fwu_soe.sql` upserts `app_settings` key `central_inventory` to FWU-SOE, Kanchanpur (28.954657907336678, 80.17888176615499), and rewrites the hub point inside `route_snapshot` of every unfinished assignment. The seed scripts, `docs/DEMO-SETUP.md` and `docs/REMOTE_SEED.md` no longer mention the Kathmandu placeholder. **Not yet run against a database.**
+- **Reserve alerts, migration `20261122141000_reserve_alerts.sql`:** new table `inventory_reserve_levels` (one row per `item_type`, whole kits, `min_qty` 0 = off; starts at 10 as a placeholder). Stock for a category = `sum(quantity - reserved_qty)` over lots in phase received, processing or ready_to_ship, so donated stock counts from pickup. A statement-level trigger on `inventory_lots` runs `_reserve_check()`: the first time a category falls below its reserve it queues one `low_stock` row in `push_outbox`; when stock is back at or above the reserve the flag resets. Nothing is sent for the starting state.
+- **Push outbox:** `kind` also allows `low_stock`; `assignment_id`, `request_id` and `assignment_type` are now nullable; new column `item_type`. `push_claim_batch` returns `item_type` as well. `send-push` broadcasts `low_stock` to `push_recipients_all()` (every device seen in the last 90 days, volunteers and normal users). Payload: `{ type: "low_stock", item_type }`, no personal data.
+- **Devices:** `device_tokens.profile_id` is nullable. New anon RPC `register_public_device_token(p_token, p_platform)`, exposed as `POST /functions/v1/public-api/device-token` with `{ token, platform }` (token 20-4096 characters, platform android, ios or web). It never changes the owner of a token that already belongs to a volunteer.
+- **Admin:** `POST /functions/v1/admin-api/stock/reserve-levels` returns `[{ item_type, min_qty, stock, below_reserve, last_alert_at }]`. `POST /functions/v1/admin-api/stock/reserve-levels/set` with `{ item_type, min_qty }` sets a level (whole number, 0 to 1000000) and runs the check at once. Errors: `forbidden`, `invalid_items` (unknown category), `invalid_qty`.
+- **Scripts:** `scripts/check_function_privileges.sql` allow-lists the three new RPCs.
+- **Deploy:** `supabase db push`, then `supabase functions deploy send-push public-api admin-api` straight away (an old `send-push` would mark `low_stock` rows as done without sending). Run `scripts/check_function_privileges.sql` afterwards.
+- **Not done here:** the mobile app does not register a device token for normal users yet, and the admin app has no screen for reserve levels.
+
 ## 2026-11-22 (volunteers with more than one type)
 
 - **Why:** one volunteer can now be both driver and doctor. Before, an application and a profile had a single `volunteer_type`, so a person could only get A+B or A+C.

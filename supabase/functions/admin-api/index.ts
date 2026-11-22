@@ -14,6 +14,9 @@ serveApi("admin-api", {
   "stock/import":       { rpc: "admin_import_stock",    auth: "admin", spec: { items: "array" } },
   "stock/move-lot":     { rpc: "admin_move_lot",        auth: "admin", spec: { id: "uuid", phase: "text", qty: "num?", reason: "text?" } },
 
+  "stock/reserve-levels":     { rpc: "admin_list_reserve_levels", auth: "admin" },
+  "stock/reserve-levels/set": { rpc: "admin_set_reserve_level",   auth: "admin", spec: { item_type: "text", min_qty: "num" } },
+
   "stock/reconcile":    { rpc: "admin_inventory_reconcile", auth: "admin" },
 
   "incidents/list":     { rpc: "admin_list_incidents",  auth: "admin", spec: { status: "text?" } },
