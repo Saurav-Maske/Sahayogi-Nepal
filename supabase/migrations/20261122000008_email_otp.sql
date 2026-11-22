@@ -81,3 +81,16 @@ revoke all on function public.purge_email_otps()           from public, anon, au
 revoke all on function public.revoke_user_sessions(uuid)   from public, anon, authenticated;
 grant execute on function public.purge_email_otps()         to service_role;
 grant execute on function public.revoke_user_sessions(uuid) to service_role;
+
+-- 7. Daily housekeeping schedule (pg_cron, runs as postgres) -------------------------------------------
+-- purge_email_otps() is defined above; purge_auth_attempts() comes from 20261121000003_auth_support.sql.
+-- Neither was scheduled before. Re-running this migration replaces the jobs instead of duplicating them.
+create extension if not exists pg_cron;
+
+select cron.unschedule('purge-email-otps')
+ where exists (select 1 from cron.job where jobname = 'purge-email-otps');
+select cron.schedule('purge-email-otps', '23 3 * * *', $$select public.purge_email_otps();$$);
+
+select cron.unschedule('purge-auth-attempts')
+ where exists (select 1 from cron.job where jobname = 'purge-auth-attempts');
+select cron.schedule('purge-auth-attempts', '29 3 * * *', $$select public.purge_auth_attempts();$$);

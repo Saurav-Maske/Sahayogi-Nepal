@@ -3,6 +3,7 @@ dist/
 .env
 .env.*
 !.env.example
+!.env.demo.example
 .dart_tool/
 build/
 .flutter-plugins*
@@ -16,4 +17,4 @@ GoogleService-Info.plist
 key.properties
 .DS_Store
 supabase/functions/node_modules
-
+scripts/tests/last-run.json
