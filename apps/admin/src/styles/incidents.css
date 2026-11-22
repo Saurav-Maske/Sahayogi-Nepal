@@ -1,0 +1,162 @@
+/* ---------- incidents: list ---------- */
+.incidents-page,
+.incident-detail-page { width: 100%; max-width: none; margin: 0; }
+
+/* .btn--primary is defined in the inventory CSS; if that file isn't loaded here, uncomment:
+.btn--primary { background: var(--navy); border-color: var(--navy); color: #fff; }
+.btn--primary:hover:not(:disabled) { background: var(--teal); border-color: var(--teal); }
+*/
+
+.incident-alert {
+  min-height: 62px;
+  padding: 14px 16px;
+  background: #eaf1f7;
+  border-radius: 8px;
+  font-size: 12px;
+  color: var(--navy);
+}
+.incident-alert strong { font-size: 12px; font-weight: 600; }
+.incident-alert p { margin-top: 4px; font-size: 11px; line-height: 16px; color: var(--muted); }
+
+.incident-filters {
+  display: grid;
+  grid-template-columns: 1.15fr .9fr .9fr .9fr;
+  gap: 12px;
+  margin: 16px 0;
+}
+.incident-filters input,
+.incident-filters select {
+  width: 100%;
+  height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+}
+.incident-filters input::placeholder { color: var(--muted); }
+
+.incident-table-wrap {
+  background: var(--surface);
+  border-radius: var(--radius);
+  overflow-x: auto;
+}
+.incident-table {
+  width: 100%;
+  min-width: 740px;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.incident-table th {
+  padding: 12px;
+  background: #edf2f7;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 500;
+  text-align: left;
+  white-space: nowrap;
+}
+.incident-table th:first-child { border-radius: 8px 0 0 8px; }
+.incident-table th:last-child  { border-radius: 0 8px 8px 0; }
+.incident-table td {
+  padding: 12px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+  white-space: nowrap;
+}
+.incident-table tbody tr { transition: background .15s; }
+.incident-table tbody tr:hover { background: var(--bg); }
+.incident-table tbody tr:last-child td { border-bottom: 0; }
+.incident-table td a { color: var(--blue); }
+.incident-table td a:hover { text-decoration: underline; }
+
+.incident-status { font-weight: 500; color: var(--muted); }
+.incident-status--open         { color: #b7740b; } /* darker than --warn so text stays readable on white */
+.incident-status--under_review { color: var(--blue); }
+.incident-status--resolved     { color: var(--good); }
+.incident-status--dismissed    { color: var(--muted); }
+
+.incident-demo-note { margin-top: 12px; font-size: 10px; color: var(--muted); }
+.incident-error { margin: 8px 0; font-size: 12px; color: var(--bad); }
+
+/* ---------- incidents: detail ---------- */
+.incident-detail-grid {
+  display: grid;
+  grid-template-columns: minmax(0, .9fr) minmax(0, 1fr);
+  gap: 16px;
+}
+.incident-detail-grid > .card { min-height: 442px; }
+
+.incident-report .card__sub { margin-top: 6px; }
+.reporter-details { margin-top: 16px; font-size: 12px; line-height: 18px; }
+.reporter-details p { display: grid; grid-template-columns: 72px 1fr; gap: 8px; padding: 2px 0; }
+.reporter-details strong { font-weight: 500; color: var(--navy); }
+.reporter-details blockquote { margin: 2px 0 0; font-size: 12px; color: var(--text); }
+
+.quantity-review { margin: 16px 0 0; font-size: 12px; line-height: 18px; }
+.quantity-review div { display: grid; grid-template-columns: 145px 1fr; gap: 8px; padding: 3px 0; }
+.quantity-review dt,
+.quantity-review dd { margin: 0; min-width: 0; font-weight: 500; color: var(--navy); overflow-wrap: anywhere; }
+
+.incident-guidance,
+.incident-report .incident-guidance { margin-top: 16px; padding: 12px 14px; min-height: 0; }
+.incident-guidance p { max-width: 340px; line-height: 16px; }
+.incident-history { display: inline-flex; align-items: center; margin-top: 12px; }
+
+/* resolution card */
+.incident-resolution > .card__title { margin-bottom: 16px; }
+.incident-activity { margin: 0 0 18px 10px; font-size: 11px; color: var(--muted); }
+.incident-activity strong { font-size: 12px; color: var(--navy); }
+.incident-activity p { margin-top: 4px; }
+.incident-activity time { display: block; margin-top: 4px; }
+
+.incident-input-card {
+  display: block;
+  margin: 12px 0;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  transition: border-color .15s;
+}
+.incident-input-card:focus-within { border-color: var(--blue); box-shadow: 0 0 0 1px var(--blue); }
+.incident-input-card > span { display: block; font-size: 11px; color: var(--muted); }
+.incident-input-card textarea,
+.incident-input-card select {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  padding: 6px 0;
+  border: 0;
+  outline: 0; /* the wrapper shows focus instead */
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+}
+.incident-input-card textarea { min-height: 40px; resize: vertical; }
+.incident-input-card small { display: block; font-size: 10px; line-height: 14px; color: var(--muted); }
+
+.incident-resolution .btn--primary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: max-content;
+  margin-top: 12px;
+}
+.incident-suspension { margin-top: 12px; }
+
+/* ---------- responsive (same breakpoints as admin) ---------- */
+@media (max-width: 900px) {
+  .incident-detail-grid { grid-template-columns: 1fr; }
+  .incident-detail-grid > .card { min-height: 0; }
+  .incident-filters { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 520px) {
+  .incident-filters { grid-template-columns: 1fr; }
+  .incident-filters input,
+  .incident-filters select,
+  .incident-input-card textarea,
+  .incident-input-card select { font-size: 16px; } /* stops iOS zoom on focus */
+}

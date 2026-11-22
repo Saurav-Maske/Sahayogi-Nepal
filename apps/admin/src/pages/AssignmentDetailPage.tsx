@@ -1,0 +1,11 @@
+import { Link, useParams } from 'react-router-dom';
+import QuickAction from '../components/dashboard/QuickAction';
+import '../styles/assignments.css';
+
+export default function AssignmentDetailPage(){
+ const {id}=useParams(); const code=id?.includes('0302')?'ASG-0302':id?.replace('demo-asg-','ASG-')?.toUpperCase()??'ASG-0302';
+ return <div className="assignment-detail-page"><header className="page__head"><div><h1>Assignment detail · {code}</h1><p className="crumbs"><Link to="/">Sahayogi Nepal</Link>&nbsp; / &nbsp;<Link to="/assignments">Assignments</Link>&nbsp; / &nbsp;Kathmandu district</p></div><div className="page__actions"><QuickAction/></div></header>
+ <div className="assignment-detail-grid"><section className="card assignment-resource"><h2 className="card__title">Resource delivery</h2><p className="card__sub">REQ-1042 · Ramesh Gurung · In progress</p><dl><div><dt>Pickup</dt><dd>Central Inventory, Teku</dd></div><div><dt>Destination</dt><dd>Sita Tamang, Kirtipur</dd></div><div><dt>Items</dt><dd>Rice 20 kg · Water 12 bottles</dd></div><div><dt>Assigned</dt><dd>18 Jun 2026, 10:20</dd></div><div><dt>ETA</dt><dd>18 minutes · 4.8 km</dd></div></dl><div className="location-note"><strong>Active location sharing</strong><p>Live coordinates are restricted and sharing ends when this assignment ends.</p></div><div className="assignment-controls"><button className="btn">Reassign volunteer</button><button className="btn assignment-cancel">Cancel assignment</button></div></section>
+ <section className="card assignment-events"><h2 className="card__title">Pickup and delivery events</h2><ol className="event-list"><li className="event-done"><span>Assignment accepted</span><p>Ramesh Gurung accepted the delivery.</p><time>18 Jun 2026 · 10:22</time></li><li className="event-done"><span>Inventory pickup verified</span><p>Pickup OTP verified · Rice 20 kg, water 12.</p><time>18 Jun 2026 · 10:36</time></li><li className="event-current"><span>Delivery in progress</span><p>Delivery OTP has not been verified.</p><time>Updated 18 Jun 2026 · 10:45</time></li></ol><div className="discrepancy"><p>Discrepancy review</p><p>Approved 20 kg · Delivered pending</p><p>Requester confirmation required after OTP.</p></div></section></div>
+ </div>
+}
