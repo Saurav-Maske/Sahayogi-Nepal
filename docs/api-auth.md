@@ -258,7 +258,7 @@ Response 201
 
 `email` must be the **same address that was verified**. A missing, used or expired token returns `403 email_not_verified`: send the user back to Step 0a. The token is only spent when the application is actually saved, so a validation error (bad phone, missing photo) does not burn it.
 
-Limits: 5 per IP and 3 per phone per 24 h. One live application per email (`409 application_exists`).
+Limits: 500 per IP and 3 per phone per 24 h. One live application per email (`409 application_exists`).
 
 Show the applicant: *"Application received. You will get an email with a link to set your password once an admin approves it."*
 

@@ -31,19 +31,19 @@ read -r -p "Type the project ref again to continue: " again
 [ "$again" = "$REF" ] || { echo "Mismatch, stopping."; exit 1; }
 
 echo "== 1/4 link =="
-supabase link --project-ref "$REF" --password "$SUPABASE_DB_PASSWORD"
+supabase link --project-ref "$REF"
 
 echo "== 2/4 migrations + district seed =="
-supabase db push --include-seed --password "$SUPABASE_DB_PASSWORD"
+supabase db push --include-seed --remote
 
 echo "== 3/4 secrets =="
-supabase secrets set --env-file supabase/functions/.env.demo --project-ref "$REF"
+supabase secrets set --env-file supabase/functions/.env.demo --remote="$REF"
 
 echo "== 4/4 functions =="
-FUNCS=$(find supabase/functions -mindepth 1 -maxdepth 1 -type d ! -name '_*' -exec basename {} \; | sort)
+FUNCS=$(find supabase/functions -mindepth 1 -maxdepth 1 -type d ! -name '_*' ! -name 'node_modules' -exec basename {} \; | sort)
 for f in $FUNCS; do
   echo "-- deploy $f"
-  supabase functions deploy "$f" --project-ref "$REF"
+  supabase functions deploy "$f" --remote="$REF" --use-api
 done
 
 cat <<NEXT

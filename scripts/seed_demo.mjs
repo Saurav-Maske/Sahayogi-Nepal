@@ -29,18 +29,19 @@ const must = (res, what) => {
 const sha256 = (s) => createHash('sha256').update(s).digest('hex');
 const hoursAgo = (h) => new Date(Date.now() - h * 3600_000).toISOString();
 
-// app_settings is optional: if a 'district' row exists use it, otherwise fall back to a box around Kathmandu.
+// app_settings is optional: use the current Kanchanpur pilot values if a row is missing.
 // requests.district_id is filled in by the DB trigger from the point, so the seed does not set it.
 const { data: cfgRows } = await sb.from('app_settings').select('key,value');
 const cfg = Object.fromEntries((cfgRows ?? []).map((r) => [r.key, r.value]));
 const district = cfg.district ?? {
-  center: { lat: 27.7172, lng: 85.3240 },
-  bounds: { south: 27.62, west: 85.22, north: 27.82, east: 85.44 },
+  name: 'Kanchanpur',
+  center: { lat: 28.97, lng: 80.18 },
+  bounds: { south: 28.63, west: 80.05, north: 29.47, east: 80.55 },
 };
 // Safety net: the migration seeds these rows; this only fills them in if someone deleted them.
 // ignoreDuplicates => never overwrites a value already set on the project.
 const missingSettings = [
-  ...(cfg.district ? [] : [{ key: 'district', value: { name: 'Kathmandu', ...district, zoom: 11 } }]),
+  ...(cfg.district ? [] : [{ key: 'district', value: { ...district, zoom: 10 } }]),
   ...(cfg.central_inventory ? [] : [{ key: 'central_inventory', value: { name: 'FWU-SOE', lat: 28.954657907336678, lng: 80.17888176615499, address_note: 'FWU-SOE central inventory, Kanchanpur' } }]),
 ];
 if (missingSettings.length) must(await sb.from('app_settings').upsert(missingSettings, { onConflict: 'key', ignoreDuplicates: true }), 'ensure app_settings rows');
@@ -112,11 +113,11 @@ if (lotCount > 0) {
   console.log(`Inventory: ${lotCount} demo lots already there, skipped (use --reset to redo)`);
 } else {
   const lots = [
-    { item_type: 'drinking_water',  unit: 'litre', quantity: 1000, phase: 'ready_to_ship', provider_name: 'Demo Water Supplier', provider_contact: '9800000201', condition_note: 'sealed' },
-    { item_type: 'food',            unit: 'pack',  quantity: 500,  phase: 'ready_to_ship', provider_name: 'Demo Food Donor',     provider_contact: '9800000202', condition_note: 'good' },
-    { item_type: 'medical_supplies',unit: 'box',   quantity: 200,  phase: 'ready_to_ship', provider_name: 'Demo Pharma Supplier',provider_contact: '9800000203', condition_note: 'sealed' },
-    { item_type: 'cloth',           unit: 'piece', quantity: 300,  phase: 'received',      provider_name: 'Demo Clothes Donor',  provider_contact: '9800000204', condition_note: 'sorted soon' },
-    { item_type: 'temp_shelter',    unit: 'tent',  quantity: 40,   phase: 'processing',    provider_name: 'Demo Shelter Supplier',provider_contact: '9800000205', condition_note: 'new' },
+    { item_type: 'drinking_water',  unit: 'kit', quantity: 1000, phase: 'ready_to_ship', provider_name: 'Demo Water Supplier', provider_contact: '9800000201', condition_note: 'sealed' },
+    { item_type: 'food',            unit: 'kit', quantity: 500,  phase: 'ready_to_ship', provider_name: 'Demo Food Donor',     provider_contact: '9800000202', condition_note: 'good' },
+    { item_type: 'medical_supplies',unit: 'kit', quantity: 200,  phase: 'ready_to_ship', provider_name: 'Demo Pharma Supplier',provider_contact: '9800000203', condition_note: 'sealed' },
+    { item_type: 'cloth',           unit: 'kit', quantity: 300,  phase: 'received',      provider_name: 'Demo Clothes Donor',  provider_contact: '9800000204', condition_note: 'sorted soon' },
+    { item_type: 'temp_shelter',    unit: 'kit', quantity: 40,   phase: 'processing',    provider_name: 'Demo Shelter Supplier',provider_contact: '9800000205', condition_note: 'new' },
   ];
   const inserted = must(await sb.from('inventory_lots').insert(lots).select('id, phase, quantity'), 'insert lots');
   must(await sb.from('inventory_movements').insert(inserted.map((l) => ({
@@ -132,28 +133,28 @@ if (reqCount > 0) {
   const demo = [
     { key: 'pending resource', kind: 'resource_request', status: 'pending_admin_review', name: 'Demo Requester A', phone: '9800000001',
       at: pin(0.010, 0.012), urgency: 'high', notes: 'DEMO: flooded ward, water and food needed',
-      items: [['drinking_water', 200, 'litre'], ['food', 50, 'pack']] },
+      items: [['drinking_water', 200, 'kit'], ['food', 50, 'kit']] },
     { key: 'pending donation', kind: 'donation_offer', status: 'pending_admin_review', name: 'Demo Donor B', phone: '9800000002',
       at: pin(-0.015, 0.008), urgency: 'normal', notes: 'DEMO: donating food packs',
-      items: [['food', 20, 'pack']] },
+      items: [['food', 20, 'kit']] },
     { key: 'pending manpower', kind: 'manpower_request', status: 'pending_admin_review', name: 'Demo Requester C', phone: '9800000003',
       at: pin(0.020, -0.010), urgency: 'critical', notes: 'DEMO: 3 volunteers to clear debris', volunteers_needed: 3, items: [] },
 
     { key: 'open manpower (approved)', kind: 'manpower_request', status: 'awaiting_assignment', name: 'Demo Requester D', phone: '9800000004',
       at: pin(-0.008, -0.015), urgency: 'high', notes: 'DEMO: 2 helpers, already approved', volunteers_needed: 2, items: [],
       approved_at: hoursAgo(0.1), assignments: 2 },
-    { key: 'pickup 2h ago', kind: 'donation_offer', status: 'in_progress', name: 'Demo Donor E', phone: '9800000005',
+    { key: 'pickup 2h ago', kind: 'donation_offer', status: 'fulfilled', name: 'Demo Donor E', phone: '9800000005',
       at: pin(0.004, 0.025), urgency: 'normal', notes: 'DEMO: picked up 2 h ago (shows on 6 h layer)',
-      items: [['food', 30, 'pack', 30]], approved_at: hoursAgo(4), picked_up_at: hoursAgo(2) },
+      items: [['food', 30, 'kit', 30]], approved_at: hoursAgo(4), picked_up_at: hoursAgo(2), fulfilled_at: hoursAgo(1.5) },
     { key: 'pickup 7h ago (hidden)', kind: 'donation_offer', status: 'in_progress', name: 'Demo Donor F', phone: '9800000006',
       at: pin(0.030, 0.020), urgency: 'low', notes: 'DEMO: picked up 7 h ago (must NOT show)',
-      items: [['cloth', 40, 'piece', 40]], approved_at: hoursAgo(9), picked_up_at: hoursAgo(7) },
+      items: [['cloth', 40, 'kit', 40]], approved_at: hoursAgo(9), picked_up_at: hoursAgo(7) },
     { key: 'fulfilled 3h ago', kind: 'resource_request', status: 'fulfilled', name: 'Demo Requester G', phone: '9800000007',
       at: pin(-0.022, 0.004), urgency: 'high', notes: 'DEMO: delivered 3 h ago (shows on 12 h layer)',
-      items: [['drinking_water', 100, 'litre', 100]], approved_at: hoursAgo(6), fulfilled_at: hoursAgo(3) },
+      items: [['drinking_water', 100, 'kit', 100]], approved_at: hoursAgo(6), fulfilled_at: hoursAgo(3) },
     { key: 'fulfilled 13h ago (hidden)', kind: 'resource_request', status: 'fulfilled', name: 'Demo Requester H', phone: '9800000008',
       at: pin(0.016, -0.028), urgency: 'normal', notes: 'DEMO: delivered 13 h ago (must NOT show)',
-      items: [['food', 60, 'pack', 60]], approved_at: hoursAgo(16), fulfilled_at: hoursAgo(13) },
+      items: [['food', 60, 'kit', 60]], approved_at: hoursAgo(16), fulfilled_at: hoursAgo(13) },
   ];
 
   const tokens = [];

@@ -2,7 +2,7 @@
 // is a table of routes. A route names the RPC and the body fields it takes (the RPC parameter name without `p_`).
 // The caller's own JWT is forwarded to Postgres, so auth.uid(), is_admin() and the function grants apply exactly
 // as they do when the SDK calls the RPC directly. No service role is used here.
-import { createClient } from "@supabase/supabase-js";
+import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders, fail, ok } from "./cors.ts";
 import { anonClient, bearer, readJson, requireAdmin, requireUser } from "./auth.ts";
 

@@ -6,6 +6,7 @@ Newest first. Anything that changes a payload, table, function or seed behaviour
 ## 2026-11-23 (mobile auth, request history and transfer handoffs, contract v1.7)
 - Mobile auth-aware navigation, profile prefill and volunteer stats; saved request history clears between anonymous and volunteer sessions.
 - Added owner-scoped volunteer request history and requester/driver OTP, quantity and issue-report flows; admin assignment details can count donations and issue hub OTPs.
+- Increased the volunteer application IP limit to 500 per 24 hours; the per-phone limit remains 3.
 
 ## 2026-11-23 (hub pickup code and refusal for resource requests, contract v1.6)
 
