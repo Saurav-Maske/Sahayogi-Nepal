@@ -1,11 +1,13 @@
 import 'dart:typed_data';
 
+import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../core/app_colors.dart';
 import '../core/volunteer_auth_service.dart';
+import 'volunteer_application_status_screen.dart';
 import 'terms_and_conditions_screen.dart';
 
 class VolunteerRegistrationScreen extends StatefulWidget {
@@ -24,11 +26,15 @@ class _VolunteerRegistrationScreenState
   final _nameController = TextEditingController();
   final _phoneController = TextEditingController();
   final _emailController = TextEditingController();
+  final _signupOtpController = TextEditingController();
   final _citizenshipNumberController = TextEditingController();
   final _drivingLicenseNumberController = TextEditingController();
   final _medicalLicenseNumberController = TextEditingController();
   final _imagePicker = ImagePicker();
   bool _isSubmitting = false;
+  bool _signupOtpSent = false;
+  String? _emailVerificationToken;
+  String? _otpErrorMessage;
   bool _agreedToVolunteer = false;
   bool _transportManpowerSelected = false;
   bool _healthWorkerSelected = false;
@@ -144,6 +150,7 @@ class _VolunteerRegistrationScreenState
     _nameController.dispose();
     _phoneController.dispose();
     _emailController.dispose();
+    _signupOtpController.dispose();
     _citizenshipNumberController.dispose();
     _drivingLicenseNumberController.dispose();
     _medicalLicenseNumberController.dispose();
@@ -176,10 +183,32 @@ class _VolunteerRegistrationScreenState
     setState(() => _isSubmitting = true);
     try {
       final email = _emailController.text.trim().toLowerCase();
-      await VolunteerAuthService.sendSignupOtp(email);
-      if (!mounted) return;
-      final verificationToken = await _requestEmailCode(email);
-      if (verificationToken == null || !mounted) return;
+      if (_emailVerificationToken == null) {
+        if (!_signupOtpSent) {
+          await VolunteerAuthService.sendSignupOtp(email);
+          if (!mounted) return;
+          setState(() {
+            _signupOtpSent = true;
+            _otpErrorMessage = null;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Verification code sent to $email.')),
+          );
+          return;
+        }
+
+        final verificationToken =
+            await VolunteerAuthService.verifySignupOtp(
+          email: email,
+          code: _signupOtpController.text,
+        );
+        if (!mounted) return;
+        setState(() {
+          _emailVerificationToken = verificationToken;
+          _otpErrorMessage = null;
+        });
+        return;
+      }
 
       final documents = <VolunteerDocument>[
         VolunteerDocument(
@@ -200,7 +229,7 @@ class _VolunteerRegistrationScreenState
             contentType: _contentType(_medicalLicenseImage!),
           ),
       ];
-      await VolunteerAuthService.submitApplication(
+      final application = await VolunteerAuthService.submitApplication(
         fullName: _nameController.text,
         email: email,
         phone: _phoneController.text,
@@ -211,16 +240,34 @@ class _VolunteerRegistrationScreenState
             : null,
         medicalLicenseNumber:
             _healthWorkerSelected ? _medicalLicenseNumberController.text : null,
-        emailVerificationToken: verificationToken,
+        emailVerificationToken: _emailVerificationToken!,
         documents: documents,
       );
       if (!mounted) return;
-      await _showApplicationSubmitted();
+      await Navigator.of(context).pushReplacement(
+        MaterialPageRoute<void>(
+          builder: (_) => VolunteerApplicationStatusScreen(
+            application: application,
+            name: _nameController.text.trim(),
+            email: email,
+            phone: _phoneController.text.trim(),
+            roles: [
+              'Human Manpower',
+              if (_transportManpowerSelected) 'Transport Manpower',
+              if (_healthWorkerSelected) 'Health Worker',
+            ],
+          ),
+        ),
+      );
     } on VolunteerAuthException catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(error.message)),
-        );
+        if (_signupOtpSent && _emailVerificationToken == null) {
+          setState(() => _otpErrorMessage = error.message);
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(error.message)),
+          );
+        }
       }
     } catch (_) {
       if (mounted) {
@@ -241,107 +288,6 @@ class _VolunteerRegistrationScreenState
     if (extension.endsWith('.png')) return 'image/png';
     if (extension.endsWith('.webp')) return 'image/webp';
     return 'image/jpeg';
-  }
-
-  Future<String?> _requestEmailCode(String email) async {
-    final controller = TextEditingController();
-    var verifying = false;
-    String? errorMessage;
-    try {
-      return await showDialog<String>(
-        context: context,
-        barrierDismissible: false,
-        builder: (dialogContext) => StatefulBuilder(
-          builder: (dialogContext, setDialogState) => AlertDialog(
-            title: const Text('Verify your email'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Enter the 6-digit code sent to $email.'),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: controller,
-                  autofocus: true,
-                  keyboardType: TextInputType.number,
-                  maxLength: 6,
-                  decoration: InputDecoration(
-                    labelText: 'Verification code',
-                    errorText: errorMessage,
-                  ),
-                ),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed:
-                    verifying ? null : () => Navigator.of(dialogContext).pop(),
-                child: const Text('Cancel'),
-              ),
-              FilledButton(
-                onPressed: verifying
-                    ? null
-                    : () async {
-                        setDialogState(() {
-                          verifying = true;
-                          errorMessage = null;
-                        });
-                        try {
-                          final token =
-                              await VolunteerAuthService.verifySignupOtp(
-                            email: email,
-                            code: controller.text,
-                          );
-                          if (dialogContext.mounted) {
-                            Navigator.of(dialogContext).pop(token);
-                          }
-                        } on VolunteerAuthException catch (error) {
-                          setDialogState(() {
-                            verifying = false;
-                            errorMessage = error.message;
-                          });
-                        } catch (_) {
-                          setDialogState(() {
-                            verifying = false;
-                            errorMessage = 'Could not verify the code.';
-                          });
-                        }
-                      },
-                child: verifying
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Text('Verify code'),
-              ),
-            ],
-          ),
-        ),
-      );
-    } finally {
-      controller.dispose();
-    }
-  }
-
-  Future<void> _showApplicationSubmitted() async {
-    await showDialog<void>(
-      context: context,
-      barrierDismissible: false,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Application submitted'),
-        content: const Text(
-          'Your application is awaiting review. If approved, you will receive an invitation to set your password and log in.',
-        ),
-        actions: [
-          FilledButton(
-            onPressed: () => Navigator.of(dialogContext).pop(),
-            child: const Text('Done'),
-          ),
-        ],
-      ),
-    );
-    if (mounted) Navigator.of(context).pop();
   }
 
   @override
@@ -424,9 +370,28 @@ class _VolunteerRegistrationScreenState
                     label: 'Full name',
                     hint: 'John Dow',
                     controller: _nameController,
-                    validator: (value) => value == null || value.trim().isEmpty
-                        ? 'Enter your full name'
-                        : null,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.allow(
+                        RegExp(r'[\p{L}\p{M} ]', unicode: true),
+                      ),
+                      TextInputFormatter.withFunction((oldValue, newValue) =>
+                          newValue.text.startsWith(' ') ? oldValue : newValue),
+                    ],
+                    validator: (value) {
+                      final name = value ?? '';
+                      if (name.trim().isEmpty) return 'Enter your full name';
+                      if (name.startsWith(' ')) {
+                        return 'Name cannot start with a space';
+                      }
+                      if (!RegExp(r'^[\p{L}\p{M} ]+$', unicode: true)
+                          .hasMatch(name)) {
+                        return 'Use letters and spaces only';
+                      }
+                      if (!RegExp(r'\p{L}', unicode: true).hasMatch(name)) {
+                        return 'Enter at least one letter';
+                      }
+                      return null;
+                    },
                   ),
                   const SizedBox(height: 18),
                   _formField(
@@ -448,6 +413,16 @@ class _VolunteerRegistrationScreenState
                     hint: 'johndoe@email.com',
                     controller: _emailController,
                     keyboardType: TextInputType.emailAddress,
+                    onChanged: (_) {
+                      if (_emailVerificationToken != null || _signupOtpSent) {
+                        setState(() {
+                          _emailVerificationToken = null;
+                          _signupOtpSent = false;
+                          _otpErrorMessage = null;
+                          _signupOtpController.clear();
+                        });
+                      }
+                    },
                     validator: (value) {
                       final email = value?.trim() ?? '';
                       if (!RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$')
@@ -457,6 +432,37 @@ class _VolunteerRegistrationScreenState
                       return null;
                     },
                   ),
+                  if (_signupOtpSent && _emailVerificationToken == null) ...[
+                    const SizedBox(height: 18),
+                    _formField(
+                      label: 'Email verification code',
+                      hint: 'Enter the 6-digit code',
+                      controller: _signupOtpController,
+                      keyboardType: TextInputType.number,
+                      maxLength: 6,
+                      onChanged: (_) {
+                        if (_otpErrorMessage != null) {
+                          setState(() => _otpErrorMessage = null);
+                        }
+                      },
+                      validator: (value) {
+                        if (!RegExp(r'^\d{6}$').hasMatch(value?.trim() ?? '')) {
+                          return 'Enter the 6-digit code from your email';
+                        }
+                        return null;
+                      },
+                    ),
+                    if (_otpErrorMessage != null) ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        _otpErrorMessage!,
+                        style: const TextStyle(
+                          color: Colors.redAccent,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
+                  ],
                   const SizedBox(height: 18),
                   _formField(
                     label: 'Citizenship number',
@@ -654,6 +660,36 @@ class _VolunteerRegistrationScreenState
                     ],
                   ),
                   const SizedBox(height: 20),
+                  if (_emailVerificationToken != null) ...[
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE8F3EC),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Row(
+                        children: [
+                          Icon(
+                            Icons.verified_rounded,
+                            color: Color(0xFF159B55),
+                            size: 19,
+                          ),
+                          SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Email verified. Confirm your request to send the application for admin review.',
+                              style: TextStyle(
+                                color: appNavy,
+                                fontSize: 11,
+                                height: 1.4,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
                   SizedBox(
                     width: double.infinity,
                     height: 52,
@@ -670,7 +706,13 @@ class _VolunteerRegistrationScreenState
                                 color: Colors.white,
                               ),
                             )
-                          : const Text('Submit application'),
+                          : Text(
+                              _emailVerificationToken == null
+                                  ? _signupOtpSent
+                                      ? 'Verify code'
+                                      : 'Verify email'
+                                  : 'Confirm request',
+                            ),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: appNavy,
                         foregroundColor: Colors.white,
@@ -973,6 +1015,9 @@ class _VolunteerRegistrationScreenState
     bool obscureText = false,
     String? helperText,
     Widget? suffixIcon,
+    void Function(String)? onChanged,
+    int? maxLength,
+    List<TextInputFormatter>? inputFormatters,
   }) =>
       Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -990,6 +1035,9 @@ class _VolunteerRegistrationScreenState
             controller: controller,
             keyboardType: keyboardType,
             obscureText: obscureText,
+            maxLength: maxLength,
+            inputFormatters: inputFormatters,
+            onChanged: onChanged,
             validator: validator,
             style: const TextStyle(color: appNavy, fontSize: 14),
             decoration: InputDecoration(
