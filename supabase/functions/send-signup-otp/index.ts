@@ -3,6 +3,9 @@ import { adminClient, clientIp, EMAIL_RE, readJson, recordAttempt, sha256, tooMa
 import { CODE_TTL_MIN, issueOtp, RESEND_COOLDOWN_S } from "../_shared/otp.ts";
 import { sendOtpEmail } from "../_shared/mailer.ts";
 
+const t0 = Date.now();
+const lap = (label: string) => console.log(`[otp] ${label} +${Date.now() - t0}ms`);
+
 declare const Deno: {
   env: { get(name: string): string | undefined };
   serve(handler: (req: Request) => Response | Promise<Response>): void;
@@ -22,6 +25,7 @@ Deno.serve(async (req) => {
   if (await tooMany(sb, { kind: "otp_send", identHash: idHash, ip, identMax: 5, ipMax: 15, windowMin: 60 })) {
     return fail("too_many_attempts", "Too many codes requested. Try again later.", 429);
   }
+  lap("rate limit done");
   await recordAttempt(sb, "otp_send", idHash, ip, false);
 
   // Same rule the application step enforces, checked early so nobody fills the whole form for nothing.
@@ -31,6 +35,7 @@ Deno.serve(async (req) => {
   if (profile || live?.length) {
     return fail("application_exists", "An application or account with this email already exists.", 409);
   }
+  lap("lookups done");
 
   const issued = await issueOtp(sb, email, "signup", ip);
   if ("cooldown" in issued) {
@@ -38,8 +43,12 @@ Deno.serve(async (req) => {
   }
   if ("error" in issued) return fail("otp_failed", "Could not create a code. Try again.", 500);
 
+  lap("code created");
   if (!(await sendOtpEmail(email, issued.code, "signup", CODE_TTL_MIN))) {
     return fail("email_failed", "Could not send the email. Try again in a moment.", 502);
   }
+    lap("mail sent");
+
   return ok({ message: "A 6-digit code has been sent to your email.", expires_in: CODE_TTL_MIN * 60, resend_after: RESEND_COOLDOWN_S });
-});
+}
+);
