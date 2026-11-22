@@ -59,10 +59,9 @@ export default function RequestsPage() {
       <div className="page__head">
         <div>
           <h1>Request management</h1>
-          <p className="crumbs">Sahayogi Nepal / Requests / Kathmandu district</p>
+          <p className="crumbs">Sahayogi Nepal / Requests / All districts</p>
         </div>
         <div className="page__actions">
-          {data?.demo && <span className="pill" title="Not signed in: showing demo data">Demo data</span>}
           <QuickAction />
         </div>
       </div>

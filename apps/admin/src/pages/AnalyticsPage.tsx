@@ -33,7 +33,9 @@ function exportCsv(d: AnalyticsData) {
 }
 
 export default function AnalyticsPage() {
-  const { data, loading, reload } = useAnalytics();
+  const { data, loading, error, reload } = useAnalytics();
+
+  if (error && !data) return <div className="table-msg"><p className="auth-error" role="alert">Couldn’t load analytics: {error}</p><button className="btn" onClick={reload}>Try again</button></div>;
 
   if (loading || !data) {
     return (
@@ -56,12 +58,9 @@ export default function AnalyticsPage() {
       <div className="page__head">
         <div>
           <h1>Analytics &amp; impact</h1>
-          <p className="crumbs">Sahayogi Nepal / Analytics / Kathmandu district</p>
+          <p className="crumbs">Sahayogi Nepal / Analytics / All districts</p>
         </div>
         <div className="page__actions">
-          {data.demoSections.length > 0 && (
-            <span className="pill" title={`Demo data: ${data.demoSections.join(', ')}`}>Demo data</span>
-          )}
           <button className="btn btn--ghost" onClick={() => exportCsv(data)}>Export CSV</button>
           <button className="btn btn--ghost" onClick={reload}>Refresh</button>
           <QuickAction />
@@ -69,7 +68,7 @@ export default function AnalyticsPage() {
       </div>
 
       <div className="grid-stats">
-        <StatCard to="/requests?status=fulfilled" label="People supported" value={k.peopleSupported}
+        <StatCard to="/requests?status=fulfilled" label="Fulfilled requests" value={k.fulfilledRequests}
           note={`Across ${k.districtsCovered} districts`} />
         <StatCard to="/volunteers" label="Volunteer hours" value={k.volunteerHours ?? '—'}
           note={vh.note || (k.volunteerHours === null ? 'Not tracked yet' : 'All time')} tone={vh.tone} />
@@ -80,10 +79,10 @@ export default function AnalyticsPage() {
       </div>
 
       <div className="grid-charts">
-        <BarChart title="Donations vs distribution · kg" points={data.donationsVsDistribution}
+        <BarChart title="Stock receipts and distribution · kg" points={data.donationsVsDistribution}
           caption={caption('Last 3 weeks')} />
-        <BarChart title="Volunteer participation" points={data.volunteerParticipation}
-          caption={caption('Active volunteers')} />
+        <BarChart title="Volunteers by category" points={data.volunteerParticipation}
+          caption={caption('Current volunteer profiles')} />
         <BarChart title="Inventory stock distribution" points={data.inventoryStock}
           caption={caption('Current stock')} />
         <BarChart title="Requests by district" points={data.requestsByDistrict}

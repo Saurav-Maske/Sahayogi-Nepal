@@ -27,7 +27,7 @@ export default function LoginPage() {
   return (
     <div className="login">
       <section className="login__brand">
-        <h2>SAHAYOGI NEPAL</h2>
+        <img className="login__logo" src={`${import.meta.env.BASE_URL}images/HorizontalLogoOnBlue.svg`} alt="Sahayogi Nepal" />
         <p className="login__console">OPERATIONS CONSOLE</p>
         <p className="login__tagline">Support that reaches further.</p>
       </section>

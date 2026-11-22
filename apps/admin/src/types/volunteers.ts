@@ -30,6 +30,6 @@ export interface VolunteerStats {
 }
 
 export interface VolunteerFilters { tab: VolunteerTab; q: string; category: string; days: string; page: number }
-export interface VolunteerList { rows: Volunteer[]; total: number; pendingTotal: number; approvedTotal: number; demo: boolean }
-export interface VolunteerDetail { volunteer: Volunteer; stats: VolunteerStats | null; demo: boolean }
+export interface VolunteerList { rows: Volunteer[]; total: number; pendingTotal: number; approvedTotal: number }
+export interface VolunteerDetail { volunteer: Volunteer; stats: VolunteerStats | null }
 export type VolunteerDecision = 'approve' | 'reject' | 'suspend' | 'reinstate';

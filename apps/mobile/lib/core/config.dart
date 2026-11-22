@@ -1,5 +1,11 @@
-// Pass at run time: flutter run --dart-define=SUPABASE_URL=... --dart-define=SUPABASE_ANON_KEY=...
+// Client-safe Supabase values from the repository environment.
 class Config {
-  static const supabaseUrl = String.fromEnvironment('SUPABASE_URL', defaultValue: 'http://10.0.2.2:54321');
-  static const supabaseAnonKey = String.fromEnvironment('SUPABASE_ANON_KEY');
+  static const supabaseUrl = String.fromEnvironment(
+    'SUPABASE_URL',
+    defaultValue: 'https://gtehciwxxiovriymogpa.supabase.co',
+  );
+  static const supabaseAnonKey = String.fromEnvironment(
+    'SUPABASE_ANON_KEY',
+    defaultValue: 'sb_publishable_zF1QFOkQG-kqe-cJld6RGA_gB9TVdAV',
+  );
 }

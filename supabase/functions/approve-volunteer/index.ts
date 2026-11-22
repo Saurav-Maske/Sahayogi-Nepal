@@ -1,7 +1,6 @@
 import { corsHeaders, fail, ok } from "../_shared/cors.ts";
 import { adminClient, audit, readJson, requireAdmin } from "../_shared/auth.ts";
-
-const CATEGORIES: Record<string, string[]> = { manpower: ["A"], driver: ["A", "B"], doctor: ["A", "C"] };
+import { categoriesFor, primaryType, type VolunteerType } from "../_shared/volunteer_types.ts";
 
 declare const Deno: {
   env: { get(name: string): string | undefined };
@@ -56,10 +55,16 @@ Deno.serve(async (req) => {
     return fail("invite_failed", "Could not send the invitation email.", 400, { detail: invErr?.message });
   }
 
+  // Categories are the union over every type the applicant signed up for (driver + doctor = A, B, C).
+  // Rows from before volunteer_types existed only have the single volunteer_type.
+  const types: VolunteerType[] = Array.isArray(app.volunteer_types) && app.volunteer_types.length
+    ? app.volunteer_types : [app.volunteer_type];
+  const categories = categoriesFor(types);
+
   const { error: pErr } = await sb.from("profiles").upsert({
     id: invited.user.id, full_name: app.full_name, email, phone: app.phone,
-    role: "volunteer", volunteer_type: app.volunteer_type,
-    categories: CATEGORIES[app.volunteer_type] ?? ["A"], account_status: "active",
+    role: "volunteer", volunteer_type: primaryType(types),
+    categories: categories.length ? categories : ["A"], account_status: "active",
   });
   if (pErr) {
     await sb.auth.admin.deleteUser(invited.user.id).catch(() => {}); // do not leave an orphan auth user
@@ -73,7 +78,7 @@ Deno.serve(async (req) => {
   }).eq("id", app.id);
   await audit(sb, {
     action: "volunteer_approved", actorId: caller.id, entity: "volunteer_application", entityId: app.id,
-    detail: { profile_id: invited.user.id, categories: CATEGORIES[app.volunteer_type] },
+    detail: { profile_id: invited.user.id, volunteer_types: types, categories },
   });
   return ok({ application_id: app.id, decision, profile_id: invited.user.id });
 });

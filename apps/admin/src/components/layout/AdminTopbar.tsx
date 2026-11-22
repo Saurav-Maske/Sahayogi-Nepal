@@ -44,7 +44,7 @@ export default function AdminTopbar({ notificationCount, userName, userRole, onM
         <span className="topbar__date">{today}</span>
         <Link to="/notifications" className="topbar__notif">
           Notifications
-          {notificationCount > 0 && <span className="topbar__badge">{notificationCount}</span>}
+          {notificationCount > 0 && <span className="topbar__badge" aria-label={`${notificationCount} unread notifications`} title={`${notificationCount} unread notifications`}>{notificationCount > 99 ? '99+' : notificationCount}</span>}
         </Link>
         <span className="topbar__user">
           <strong>{userName}</strong> / {userRole}

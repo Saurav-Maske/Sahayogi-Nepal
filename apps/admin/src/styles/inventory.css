@@ -1,0 +1,242 @@
+/* ---------- inventory: shared ---------- */
+.inventory-page,
+.inventory-detail-page,
+.inventory-movement-page,
+.inventory-timeline-page { width: 100%; max-width: none; margin: 0; }
+
+/* .btn--primary isn't in the admin file; if you add it there, delete this block */
+.btn--primary { background: var(--navy); border-color: var(--navy); color: #fff; }
+.btn--primary:hover:not(:disabled) { background: var(--teal); border-color: var(--teal); }
+
+/* ---------- inventory: board ---------- */
+.inventory-toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+.inventory-toolbar input,
+.inventory-toolbar select {
+  height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+}
+.inventory-toolbar input  { width: 180px; }
+.inventory-toolbar select { width: 160px; }
+.inventory-toolbar input::placeholder { color: var(--muted); }
+.inventory-toolbar .btn { white-space: nowrap; }
+
+.inventory-workflow,
+.inventory-reconciliation {
+  background: #eaf1f7;
+  border-radius: 8px;
+  color: var(--navy);
+  font-size: 12px;
+}
+.inventory-workflow { padding: 14px 16px; margin-bottom: 16px; }
+.inventory-workflow strong,
+.inventory-reconciliation strong { font-weight: 600; }
+.inventory-workflow p,
+.inventory-reconciliation p { margin-top: 4px; font-size: 11px; line-height: 16px; color: var(--muted); }
+
+.inventory-board {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  align-items: stretch;
+}
+.inventory-column {
+  min-width: 0;
+  padding: 12px;
+  background: #edf2f7; /* slightly darker than --bg so cards stand out */
+  border-radius: var(--radius);
+}
+.inventory-column h2 { margin: 0 0 12px; font-size: 11px; font-weight: 600; color: var(--navy); }
+.inventory-column h2 span { margin-left: 4px; color: var(--muted); }
+.inventory-column-list { display: flex; flex-direction: column; gap: 10px; }
+
+.inventory-lot-card {
+  display: flex;
+  flex-direction: column;
+  min-height: 97px;
+  padding: 12px 14px;
+  background: var(--surface);
+  border: 1px solid transparent;
+  border-radius: 10px;
+  transition: border-color .15s, box-shadow .15s;
+}
+.inventory-lot-card:hover { border-color: var(--border); box-shadow: 0 8px 24px rgba(23, 59, 87, .12); }
+.inventory-lot-card strong { font-size: 12px; font-weight: 600; color: var(--navy); }
+.inventory-lot-card .lot-meta { margin-top: 3px; font-size: 11px; color: var(--blue); }
+.inventory-lot-card b { margin-top: 4px; font-size: 14px; line-height: 20px; color: var(--navy); }
+.inventory-lot-card small { margin-top: 2px; font-size: 10px; line-height: 14px; color: var(--muted); }
+
+.inventory-add-item { height: 32px; font-size: 11px; background: var(--surface); }
+.inventory-live-note { margin-top: 12px; font-size: 10px; color: var(--muted); }
+.inventory-error { margin: 8px 0; font-size: 12px; color: var(--bad); }
+.inventory-toast { margin: 8px 0; font-size: 12px; color: var(--good); }
+
+/* ---------- inventory: modal ---------- */
+.inventory-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(23, 59, 87, .45); /* same as .shell__scrim */
+}
+.inventory-modal {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 100%;
+  max-width: 440px;
+  padding: 24px;
+  background: var(--surface);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 24px rgba(23, 59, 87, .12);
+}
+.inventory-modal--map { max-width: 760px; max-height: 90vh; overflow-y: auto; }
+.inventory-map-toggle { align-self: flex-start; }
+.inventory-map-panel > p { margin: 0 0 8px; color: var(--muted); font-size: 11px; line-height: 16px; }
+.inventory-map-panel .operations-map-preview { height: 300px; }
+.inventory-modal h2 { font-size: 17px; line-height: 24px; color: var(--navy); }
+.inventory-modal > label,
+.inventory-modal-row label { flex: 1; display: flex; flex-direction: column; gap: 6px; font-size: 11px; color: var(--muted); }
+.inventory-modal input,
+.inventory-modal select {
+  height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--text);
+}
+.inventory-modal-row { display: flex; gap: 12px; }
+.inventory-modal .btn { background: var(--navy); border-color: var(--navy); color: #fff; }
+.inventory-modal-close {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  border: 0;
+  background: transparent;
+  font-size: 24px;
+  line-height: 1;
+  color: var(--muted);
+  cursor: pointer;
+}
+.inventory-modal-close:hover { color: var(--navy); }
+
+/* ---------- inventory: detail ---------- */
+.inventory-detail-grid {
+  display: grid;
+  grid-template-columns: minmax(0, .9fr) minmax(0, 1fr);
+  gap: 16px;
+}
+.inventory-detail-grid > .card { min-height: 442px; }
+
+.inventory-detail-summary .card__sub { margin-top: 6px; }
+.inventory-quantities { margin: 16px 0; font-size: 12px; line-height: 18px; color: var(--navy); }
+.inventory-quantities div { display: grid; grid-template-columns: 150px 1fr; gap: 8px; padding: 3px 0; }
+.inventory-quantities dt,
+.inventory-quantities dd { margin: 0; font-weight: 500; min-width: 0; overflow-wrap: anywhere; }
+.inventory-provider { margin-top: 12px; font-size: 11px; line-height: 16px; color: var(--muted); }
+.inventory-reconciliation { margin: 16px 0; padding: 12px 14px; }
+
+.inventory-card-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.inventory-card-heading > a,
+.movement-preview > a { font-size: 11px; color: var(--blue); }
+.inventory-card-heading > a:hover,
+.movement-preview > a:hover { text-decoration: underline; }
+
+.inventory-event-list,
+.inventory-timeline { list-style: none; margin: 16px 0 0; padding: 0; }
+.inventory-event-list li { position: relative; padding: 0 0 26px 16px; border-left: 1px solid var(--border); }
+.inventory-event-list li::before {
+  content: '✓';
+  position: absolute;
+  left: -6px;
+  top: 1px;
+  background: var(--surface);
+  font-size: 10px;
+  color: var(--navy);
+}
+.inventory-event-list li > a { font-size: 12px; font-weight: 600; color: var(--navy); }
+.inventory-event-list li > a:hover { color: var(--teal); text-decoration: underline; }
+.inventory-event-list li p,
+.inventory-event-list li time { display: block; margin-top: 4px; font-size: 11px; color: var(--muted); }
+
+/* ---------- inventory: movement ---------- */
+.movement-form-card,
+.movement-preview { display: flex; flex-direction: column; align-items: flex-start; }
+
+.movement-field {
+  display: block;
+  width: 100%;
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  transition: border-color .15s;
+}
+.movement-field:focus-within { border-color: var(--blue); box-shadow: 0 0 0 1px var(--blue); }
+.movement-field > span { display: block; font-size: 11px; color: var(--muted); }
+.movement-field select,
+.movement-field input,
+.movement-field textarea {
+  display: block;
+  width: 100%;
+  padding: 6px 0;
+  border: 0;
+  outline: 0; /* the wrapper shows focus instead */
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+}
+.movement-field textarea { min-height: 40px; resize: vertical; }
+.movement-field small { display: block; font-size: 10px; line-height: 14px; color: var(--muted); }
+
+.movement-form-card > .btn--primary { margin-top: 16px; }
+.movement-preview .card__title { margin-bottom: 12px; }
+.movement-preview > p { font-size: 14px; line-height: 20px; color: var(--navy); }
+.movement-preview .inventory-reconciliation { width: 100%; margin-top: 12px; }
+.movement-preview > .movement-audit-copy { margin: 0 0 12px; font-size: 11px; line-height: 16px; color: var(--muted); }
+
+/* ---------- inventory: timeline page ---------- */
+.inventory-timeline-card { min-height: 390px; }
+.inventory-timeline { margin-top: 16px; padding-left: 8px; }
+.inventory-timeline li { padding: 0 0 26px 16px; border-left: 1px solid var(--border); }
+.inventory-timeline li:last-child { border-left-color: transparent; }
+.inventory-timeline li > a { display: flex; flex-direction: column; gap: 6px; }
+.inventory-timeline li > a:hover strong { color: var(--teal); }
+.inventory-timeline strong { font-size: 12px; color: var(--navy); }
+.inventory-timeline span,
+.inventory-timeline time { font-size: 11px; color: var(--muted); }
+
+/* ---------- responsive (same breakpoints as admin) ---------- */
+@media (max-width: 1100px) {
+  .inventory-board { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 900px) {
+  .inventory-toolbar { flex-wrap: wrap; }
+  .inventory-toolbar input,
+  .inventory-toolbar select,
+  .inventory-toolbar .btn { flex: 1; width: auto; }
+  .inventory-detail-grid { grid-template-columns: 1fr; }
+  .inventory-detail-grid > .card { min-height: 0; }
+}
+@media (max-width: 520px) {
+  .inventory-board { grid-template-columns: 1fr; }
+  .inventory-modal-row { flex-direction: column; }
+  .inventory-toolbar input,
+  .inventory-toolbar select,
+  .inventory-modal input,
+  .inventory-modal select,
+  .movement-field select,
+  .movement-field input,
+  .movement-field textarea { font-size: 16px; } /* stops iOS zoom on focus */
+}

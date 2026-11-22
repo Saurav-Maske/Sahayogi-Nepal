@@ -2,9 +2,26 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../core/app_colors.dart';
+import '../core/volunteer_auth_service.dart';
+import 'volunteer_dashboard_screen.dart';
 import 'volunteer_registration_screen.dart';
 
-void openVolunteerLogin(BuildContext context) {
+Future<void> openVolunteerLogin(BuildContext context) async {
+  if (VolunteerAuthService.hasSession) {
+    try {
+      final account = await VolunteerAuthService.currentVolunteer();
+      if (!context.mounted) return;
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => VolunteerDashboardScreen(account: account),
+        ),
+      );
+      return;
+    } catch (_) {
+      await VolunteerAuthService.signOut();
+    }
+  }
+  if (!context.mounted) return;
   Navigator.of(context).push(
     MaterialPageRoute<void>(
       builder: (_) => const VolunteerLoginScreen(),
@@ -24,6 +41,9 @@ class _VolunteerLoginScreenState extends State<VolunteerLoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _passwordVisible = false;
+  bool _isSigningIn = false;
+  bool _isResettingPassword = false;
+  String? _signInError;
 
   @override
   void dispose() {
@@ -32,11 +52,231 @@ class _VolunteerLoginScreenState extends State<VolunteerLoginScreen> {
     super.dispose();
   }
 
-  void _signIn() {
+  Future<void> _signIn() async {
     if (!_formKey.currentState!.validate()) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Volunteer log in is not connected yet.')),
-    );
+    setState(() {
+      _isSigningIn = true;
+      _signInError = null;
+    });
+    try {
+      final account = await VolunteerAuthService.signIn(
+        email: _emailController.text,
+        password: _passwordController.text,
+      );
+      if (!mounted) return;
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute<void>(
+          builder: (_) => VolunteerDashboardScreen(account: account),
+        ),
+        (route) => route.isFirst,
+      );
+    } on VolunteerAuthException catch (error) {
+      if (mounted) setState(() => _signInError = error.message);
+    } catch (_) {
+      if (mounted) {
+        setState(() => _signInError = 'Unable to log in. Please try again.');
+      }
+    } finally {
+      if (mounted) setState(() => _isSigningIn = false);
+    }
+  }
+
+  Future<void> _resetPassword() async {
+    final email = _emailController.text.trim().toLowerCase();
+    if (!RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(email)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enter your email address first.')),
+      );
+      return;
+    }
+    setState(() => _isResettingPassword = true);
+    try {
+      await VolunteerAuthService.requestPasswordReset(email);
+      if (!mounted) return;
+      final resetToken = await _requestResetCode(email);
+      if (resetToken == null || !mounted) return;
+      final newPassword = await _requestNewPassword();
+      if (newPassword == null || !mounted) return;
+      await VolunteerAuthService.resetPassword(
+        email: email,
+        resetToken: resetToken,
+        newPassword: newPassword,
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Password updated. You can now log in.'),
+          ),
+        );
+      }
+    } on VolunteerAuthException catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(error.message)),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not reset the password.')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isResettingPassword = false);
+    }
+  }
+
+  Future<String?> _requestResetCode(String email) async {
+    final controller = TextEditingController();
+    var verifying = false;
+    String? errorMessage;
+    try {
+      return await showDialog<String>(
+        context: context,
+        barrierDismissible: false,
+        builder: (dialogContext) => StatefulBuilder(
+          builder: (dialogContext, setDialogState) => AlertDialog(
+            title: const Text('Verify your email'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Enter the 6-digit code sent to $email.'),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: controller,
+                  keyboardType: TextInputType.number,
+                  maxLength: 6,
+                  decoration: InputDecoration(
+                    labelText: 'Verification code',
+                    errorText: errorMessage,
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed:
+                    verifying ? null : () => Navigator.of(dialogContext).pop(),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: verifying
+                    ? null
+                    : () async {
+                        setDialogState(() {
+                          verifying = true;
+                          errorMessage = null;
+                        });
+                        try {
+                          final token =
+                              await VolunteerAuthService.verifyPasswordResetOtp(
+                            email: email,
+                            code: controller.text,
+                          );
+                          if (dialogContext.mounted) {
+                            Navigator.of(dialogContext).pop(token);
+                          }
+                        } on VolunteerAuthException catch (error) {
+                          setDialogState(() {
+                            verifying = false;
+                            errorMessage = error.message;
+                          });
+                        } catch (_) {
+                          setDialogState(() {
+                            verifying = false;
+                            errorMessage = 'Could not verify the code.';
+                          });
+                        }
+                      },
+                child: verifying
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Text('Verify code'),
+              ),
+            ],
+          ),
+        ),
+      );
+    } finally {
+      controller.dispose();
+    }
+  }
+
+  Future<String?> _requestNewPassword() async {
+    final formKey = GlobalKey<FormState>();
+    final passwordController = TextEditingController();
+    final confirmController = TextEditingController();
+    try {
+      return await showDialog<String>(
+        context: context,
+        barrierDismissible: false,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Create a new password'),
+          content: Form(
+            key: formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextFormField(
+                  controller: passwordController,
+                  obscureText: true,
+                  decoration: const InputDecoration(
+                    labelText: 'New password',
+                    helperText:
+                        '10+ characters with upper, lower, number and symbol',
+                    helperMaxLines: 2,
+                  ),
+                  validator: (value) {
+                    final password = value ?? '';
+                    if (password.length < 10 || password.length > 128) {
+                      return 'Use 10 to 128 characters';
+                    }
+                    if (!RegExp(r'[A-Z]').hasMatch(password) ||
+                        !RegExp(r'[a-z]').hasMatch(password) ||
+                        !RegExp(r'\d').hasMatch(password) ||
+                        !RegExp(r'[^A-Za-z0-9]').hasMatch(password)) {
+                      return 'Add uppercase, lowercase, number and symbol';
+                    }
+                    return null;
+                  },
+                ),
+                TextFormField(
+                  controller: confirmController,
+                  obscureText: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Confirm new password',
+                  ),
+                  validator: (value) => value != passwordController.text
+                      ? 'Passwords do not match'
+                      : null,
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () {
+                if (formKey.currentState!.validate()) {
+                  Navigator.of(dialogContext).pop(passwordController.text);
+                }
+              },
+              child: const Text('Update password'),
+            ),
+          ],
+        ),
+      );
+    } finally {
+      passwordController.dispose();
+      confirmController.dispose();
+    }
   }
 
   void _openRegistration() {
@@ -145,15 +385,7 @@ class _VolunteerLoginScreenState extends State<VolunteerLoginScreen> {
                   Align(
                     alignment: Alignment.centerRight,
                     child: TextButton(
-                      onPressed: () => ScaffoldMessenger.of(context)
-                        ..hideCurrentSnackBar()
-                        ..showSnackBar(
-                          const SnackBar(
-                            content: Text(
-                              'Password reset is not connected yet.',
-                            ),
-                          ),
-                        ),
+                      onPressed: _isResettingPassword ? null : _resetPassword,
                       style: TextButton.styleFrom(
                         foregroundColor: appTeal,
                         padding: const EdgeInsets.symmetric(vertical: 8),
@@ -165,14 +397,34 @@ class _VolunteerLoginScreenState extends State<VolunteerLoginScreen> {
                     ),
                   ),
                   const SizedBox(height: 12),
+                  if (_signInError != null) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      _signInError!,
+                      style: const TextStyle(
+                        color: Colors.redAccent,
+                        fontSize: 12,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                  ],
                   SizedBox(
                     width: double.infinity,
                     height: 52,
                     child: ElevatedButton.icon(
-                      onPressed: _signIn,
+                      onPressed: _isSigningIn ? null : _signIn,
                       iconAlignment: IconAlignment.end,
                       icon: const Icon(Icons.arrow_forward_rounded, size: 20),
-                      label: const Text('Log in'),
+                      label: _isSigningIn
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Text('Log in'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: appNavy,
                         foregroundColor: Colors.white,
