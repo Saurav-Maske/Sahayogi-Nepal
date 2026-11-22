@@ -44,19 +44,19 @@ $again = Read-Host "Type the project ref again to continue"
 if ($again -ne $ref) { Stop-Here "Mismatch, stopping." }
 
 Write-Host "== 1/4 link =="
-supabase link --project-ref $ref --password $dbPass; Run "supabase link"
+supabase link --project-ref $ref; Run "supabase link"
 
 Write-Host "== 2/4 migrations + district seed =="
-supabase db push --include-seed --password $dbPass; Run "supabase db push"
+supabase db push --include-seed --remote; Run "supabase db push"
 
 Write-Host "== 3/4 secrets =="
-supabase secrets set --env-file $secretsFile --project-ref $ref; Run "supabase secrets set"
+supabase secrets set --env-file $secretsFile --remote=$ref; Run "supabase secrets set"
 
 Write-Host "== 4/4 functions =="
-$funcs = Get-ChildItem supabase\functions -Directory | Where-Object { $_.Name -notlike "_*" } | Sort-Object Name
+$funcs = Get-ChildItem supabase\functions -Directory | Where-Object { $_.Name -notlike "_*" -and $_.Name -ne "node_modules" } | Sort-Object Name
 foreach ($f in $funcs) {
   Write-Host "-- deploy $($f.Name)"
-  supabase functions deploy $f.Name --project-ref $ref; Run "deploy $($f.Name)"
+  supabase functions deploy $f.Name --remote=$ref --use-api; Run "deploy $($f.Name)"
 }
 
 Write-Host @"

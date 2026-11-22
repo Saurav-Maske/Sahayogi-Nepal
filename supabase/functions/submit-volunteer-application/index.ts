@@ -55,7 +55,7 @@ Deno.serve(async (req) => {
   const sb = adminClient();
   const ip = clientIp(req);
   const phoneHash = await sha256(phone);
-  if (await tooMany(sb, { kind: "apply", identHash: phoneHash, ip, identMax: 3, ipMax: 5, windowMin: 1440 })) {
+  if (await tooMany(sb, { kind: "apply", identHash: phoneHash, ip, identMax: 3, ipMax: 500, windowMin: 1440 })) {
     return fail("too_many_attempts", "Too many applications. Try again later.", 429);
   }
   await recordAttempt(sb, "apply", phoneHash, ip, false);

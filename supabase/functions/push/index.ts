@@ -1,5 +1,5 @@
-import { withSupabase } from "@supabase/server-js"
-import { JWT } from '@google_auth_library'
+import { createClient } from "npm:@supabase/supabase-js@2";
+import { GoogleAuth } from "npm:google-auth-library@9";
 
 interface Notification {
   id: string
