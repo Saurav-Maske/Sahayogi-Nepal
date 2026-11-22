@@ -1,12 +1,22 @@
 name: Deploy admin
-on: { push: { branches: [main] }, workflow_dispatch: }
+# Deploys only after the "CI" workflow (admin build, mobile analyze + test,
+# functions check) has succeeded on the deployment branch. Can still be run by hand.
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [deployment]
+  workflow_dispatch:
 permissions: { contents: read, pages: write, id-token: write }
 jobs:
   build:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     defaults: { run: { working-directory: apps/admin } }
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
       - uses: actions/setup-node@v4
         with: { node-version: 20, cache: npm, cache-dependency-path: apps/admin/package-lock.json }
       - run: npm ci

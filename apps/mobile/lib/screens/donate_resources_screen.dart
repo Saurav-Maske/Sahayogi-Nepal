@@ -3,6 +3,8 @@ import 'package:latlong2/latlong.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../core/app_colors.dart';
+import '../core/api.dart';
+import '../core/request_submission.dart';
 import 'explore_screen.dart';
 import 'location_picker_screen.dart';
 import 'my_requests_screen.dart';
@@ -27,6 +29,7 @@ class _DonateResourcesScreenState extends State<DonateResourcesScreen> {
     TextEditingController(),
   ];
   final _contactController = TextEditingController();
+  final _donorNameController = TextEditingController();
 
   final List<String?> _categories = [null];
   final List<bool> _categoryErrors = [false];
@@ -35,6 +38,7 @@ class _DonateResourcesScreenState extends State<DonateResourcesScreen> {
   bool _locationAllowed = false;
   bool _locationServiceEnabled = true;
   bool _locationError = false;
+  bool _isSubmitting = false;
 
   static const _categoryOptions = [
     'Food supplies',
@@ -116,6 +120,7 @@ class _DonateResourcesScreenState extends State<DonateResourcesScreen> {
       controller.dispose();
     }
     _contactController.dispose();
+    _donorNameController.dispose();
     super.dispose();
   }
 
@@ -181,7 +186,7 @@ class _DonateResourcesScreenState extends State<DonateResourcesScreen> {
     if (selected != null && mounted) onSelected(selected);
   }
 
-  void _submitDonation() {
+  Future<void> _submitDonation() async {
     final fieldsValid = _formKey.currentState!.validate();
     final categoriesValid = _categories.every((category) => category != null);
     final locationValid = _location != null;
@@ -192,10 +197,42 @@ class _DonateResourcesScreenState extends State<DonateResourcesScreen> {
       _locationError = !locationValid;
     });
     if (!fieldsValid || !categoriesValid || !locationValid) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-          content: Text('Donation submission is not connected yet.')),
-    );
+    setState(() => _isSubmitting = true);
+    final items = List.generate(_categories.length, (index) {
+      final quantity = parseQuantityAndUnit(_quantityControllers[index].text)!;
+      return {
+        'item_type': resourceItemType(_categories[index]!)!,
+        ...quantity,
+      };
+    });
+    final itemNotes = List.generate(_categories.length, (index) {
+      final name = _nameControllers[index].text.trim();
+      final description = _descriptionControllers[index].text.trim();
+      return description.isEmpty
+          ? 'Resource: $name'
+          : 'Resource: $name — $description';
+    }).join('\n');
+    final payload = <String, dynamic>{
+      'kind': 'donation_offer',
+      'requester_name': _donorNameController.text.trim(),
+      'requester_phone': normalizeNepalPhone(_contactController.text)!,
+      'lat': _location!.latitude,
+      'lng': _location!.longitude,
+      'urgency': 'normal',
+      'notes': itemNotes,
+      'items': items,
+    };
+    final result = await Api.submitRequest(payload);
+    if (!mounted) return;
+    setState(() => _isSubmitting = false);
+    if (!result.ok || result.data == null) {
+      showSubmissionError(context, result);
+      return;
+    }
+    await saveSubmittedRequest(response: result.data!, payload: payload);
+    if (!mounted) return;
+    await showSubmissionSuccessDialog(context, result.data!);
+    if (mounted) Navigator.of(context).pop();
   }
 
   @override
@@ -333,10 +370,12 @@ class _DonateResourcesScreenState extends State<DonateResourcesScreen> {
                           _textField(
                             controller: _quantityControllers[index],
                             hint: '40 family kits',
-                            validator: (value) =>
-                                value == null || value.trim().isEmpty
-                                    ? 'Enter the available quantity'
-                                    : null,
+                            validator: (value) => parseQuantityAndUnit(
+                                      value ?? '',
+                                    ) ==
+                                    null
+                                ? 'Enter a quantity, for example 40 kits'
+                                : null,
                           ),
                         ],
                       ),
@@ -430,24 +469,26 @@ class _DonateResourcesScreenState extends State<DonateResourcesScreen> {
                     controller: _contactController,
                     hint: '+977 9841 234 567',
                     keyboardType: TextInputType.phone,
-                    validator: (value) {
-                      final contact = value?.trim() ?? '';
-                      if (contact.isEmpty) return 'Enter a contact number';
-                      if (contact.replaceAll(RegExp(r'\D'), '').length < 7) {
-                        return 'Enter a valid contact number';
-                      }
-                      return null;
-                    },
+                    validator: validateNepalPhone,
+                  ),
+                  const SizedBox(height: 16),
+                  _fieldLabel('Donor name'),
+                  const SizedBox(height: 8),
+                  _textField(
+                    controller: _donorNameController,
+                    hint: 'Your full name',
+                    validator: validateRequesterName,
                   ),
                   const SizedBox(height: 24),
                   SizedBox(
                     width: double.infinity,
                     height: 52,
                     child: FilledButton.icon(
-                      onPressed: _submitDonation,
+                      onPressed: _isSubmitting ? null : _submitDonation,
                       iconAlignment: IconAlignment.end,
                       icon: const Icon(Icons.arrow_forward_rounded, size: 20),
-                      label: const Text('Share resources'),
+                      label: Text(
+                          _isSubmitting ? 'Submitting…' : 'Share resources'),
                       style: FilledButton.styleFrom(
                         backgroundColor: appNavy,
                         foregroundColor: Colors.white,
@@ -592,7 +633,7 @@ Widget _donationNavigationBar(BuildContext context) => Container(
                 selected: false,
                 onTap: () => Navigator.of(context).push(
                   MaterialPageRoute<void>(
-                    builder: (_) => const ExploreScreen(),
+                    builder: (_) => ExploreScreen(),
                   ),
                 ),
               ),
@@ -602,7 +643,7 @@ Widget _donationNavigationBar(BuildContext context) => Container(
                 selected: false,
                 onTap: () => Navigator.of(context).push(
                   MaterialPageRoute<void>(
-                    builder: (_) => const MyRequestsScreen(),
+                    builder: (_) => MyRequestsScreen(),
                   ),
                 ),
               ),

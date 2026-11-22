@@ -3,6 +3,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../core/app_colors.dart';
+import '../core/volunteer_session_guard.dart';
 import 'explore_screen.dart';
 import 'my_requests_screen.dart';
 import 'volunteer_login_screen.dart';
@@ -14,7 +15,9 @@ class AssignedTaskScreen extends StatelessWidget {
   static const _delivery = LatLng(27.7175, 85.3488);
 
   @override
-  Widget build(BuildContext context) => Scaffold(
+  Widget build(BuildContext context) => VolunteerSessionGuard(
+        onUnauthorized: () => openVolunteerLogin(context),
+        child: Scaffold(
         backgroundColor: appPaper,
         appBar: AppBar(
           backgroundColor: appPaper,
@@ -67,11 +70,11 @@ class AssignedTaskScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 20),
-              _TaskCard(
+              const _TaskCard(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
+                    Text(
                       'VT-0142 · Blanket delivery',
                       style: TextStyle(
                         color: appNavy,
@@ -79,13 +82,13 @@ class AssignedTaskScreen extends StatelessWidget {
                         fontWeight: FontWeight.w700,
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    const Text(
+                    SizedBox(height: 8),
+                    Text(
                       '30 blankets for 6 families',
                       style: TextStyle(color: appTeal, fontSize: 14),
                     ),
-                    const SizedBox(height: 12),
-                    const Text(
+                    SizedBox(height: 12),
+                    Text(
                       'Coordinator: Aasha Tamang\n+977 9800 112 233',
                       style: TextStyle(
                         color: appMuted,
@@ -97,9 +100,9 @@ class AssignedTaskScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 20),
-              _TaskCard(
+              const _TaskCard(
                 child: Column(
-                  children: const [
+                  children: [
                     _StopRow(
                       icon: Icons.inventory_2_outlined,
                       number: '01',
@@ -173,12 +176,17 @@ class AssignedTaskScreen extends StatelessWidget {
         bottomNavigationBar: _TaskNavigationBar(
           onHome: () => Navigator.of(context).pop(),
           onExplore: () => Navigator.of(context).push(
-            MaterialPageRoute<void>(builder: (_) => const ExploreScreen()),
+          MaterialPageRoute<void>(
+            builder: (_) => ExploreScreen(requireVolunteerSession: true),
+          ),
           ),
           onRequests: () => Navigator.of(context).push(
-            MaterialPageRoute<void>(builder: (_) => const MyRequestsScreen()),
+          MaterialPageRoute<void>(
+            builder: (_) => MyRequestsScreen(requireVolunteerSession: true),
+          ),
           ),
           onProfile: () => openVolunteerLogin(context),
+        ),
         ),
       );
 
@@ -364,12 +372,12 @@ class _AssignedTaskMapScreen extends StatelessWidget {
               ),
             ),
           ),
-          Positioned(
+          const Positioned(
             left: 16,
             right: 16,
             bottom: 16,
             child: _TaskCard(
-              child: const Row(
+              child: Row(
                 children: [
                   Icon(Icons.inventory_2_outlined, color: appNavy),
                   SizedBox(width: 12),

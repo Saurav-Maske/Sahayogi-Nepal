@@ -7,12 +7,20 @@ import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:material_ui/material_ui.dart';
 
+import '../core/api.dart';
+import '../core/app_home_navigation.dart';
 import '../core/app_colors.dart';
+import '../core/volunteer_auth_service.dart';
+import '../core/volunteer_session_guard.dart';
 import 'my_requests_screen.dart';
 import 'volunteer_login_screen.dart';
 
 class ExploreScreen extends StatefulWidget {
-  const ExploreScreen({super.key});
+  ExploreScreen({super.key, bool? requireVolunteerSession})
+      : requireVolunteerSession =
+            requireVolunteerSession ?? VolunteerAuthService.hasSession;
+
+  final bool requireVolunteerSession;
 
   @override
   State<ExploreScreen> createState() => _ExploreScreenState();
@@ -26,80 +34,40 @@ class _ExploreScreenState extends State<ExploreScreen>
   bool _locationAllowed = false;
   bool _locationServiceEnabled = true;
   bool _permissionPermanentlyDenied = false;
+  bool _loadingRequests = true;
+  String? _requestLoadError;
   Position? _currentPosition;
-  LatLng? _sampleAnchor;
+  List<_ReliefRequest> _mapRequests = const [];
   StreamSubscription<Position>? _positionSubscription;
-
-  List<_ReliefRequest> get _dummyRequests {
-    final anchor = _sampleAnchor ?? _defaultSampleAnchor;
-    return [
-      _ReliefRequest(
-        position: LatLng(anchor.latitude + 0.008, anchor.longitude + 0.010),
-        title: 'Food and clean water needed',
-        location: 'Nearby area',
-        quantity: '8 households',
-        kind: 'Multiple help requests',
-        status: _RequestStatus.needed,
-        isMultiple: true,
-      ),
-      _ReliefRequest(
-        position: LatLng(anchor.latitude + 0.015, anchor.longitude - 0.006),
-        title: 'Temporary shelter support',
-        location: 'Nearby area',
-        quantity: '4 families',
-        kind: 'Temporary shelter',
-        status: _RequestStatus.onTheWay,
-        icon: Icons.home_rounded,
-      ),
-      _ReliefRequest(
-        position: LatLng(anchor.latitude - 0.012, anchor.longitude + 0.004),
-        title: 'Food kits delivered',
-        location: 'Nearby area',
-        quantity: '12 kits',
-        kind: 'Food only',
-        status: _RequestStatus.closed,
-        icon: Icons.restaurant_rounded,
-      ),
-      _ReliefRequest(
-        position: LatLng(anchor.latitude - 0.018, anchor.longitude - 0.010),
-        title: 'Transport volunteers needed',
-        location: 'Nearby area',
-        quantity: '3 volunteers',
-        kind: 'Manpower only',
-        status: _RequestStatus.needed,
-        icon: Icons.person_rounded,
-      ),
-      _ReliefRequest(
-        position: LatLng(anchor.latitude + 0.004, anchor.longitude - 0.018),
-        title: 'Multiple community requests',
-        location: 'Nearby area',
-        quantity: '3 requests',
-        kind: 'Multiple help requests',
-        status: _RequestStatus.onTheWay,
-        isMultiple: true,
-      ),
-    ];
-  }
 
   List<_ReliefRequest> get _nearbyRequests {
     final position = _currentPosition;
     if (position == null) return const [];
 
-    return _dummyRequests.where((request) {
-      final distanceInMeters = Geolocator.distanceBetween(
-        position.latitude,
-        position.longitude,
-        request.position.latitude,
-        request.position.longitude,
-      );
-      return distanceInMeters <= 100000;
-    }).toList();
+    final nearby = _mapRequests
+        .map((request) {
+          final distanceInMeters = Geolocator.distanceBetween(
+            position.latitude,
+            position.longitude,
+            request.position.latitude,
+            request.position.longitude,
+          );
+          return request.copyWith(
+            distanceKm: distanceInMeters / 1000,
+            quantity: '${(distanceInMeters / 1000).toStringAsFixed(1)} km away',
+          );
+        })
+        .where((request) => request.distanceKm! <= 100)
+        .toList();
+    nearby.sort((a, b) => a.distanceKm!.compareTo(b.distanceKm!));
+    return nearby;
   }
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _loadMapRequests();
     _requestLocationAccess();
   }
 
@@ -193,8 +161,131 @@ class _ExploreScreenState extends State<ExploreScreen>
     if (!mounted) return;
     setState(() {
       _currentPosition = position;
-      _sampleAnchor ??= LatLng(position.latitude, position.longitude);
     });
+  }
+
+  Future<void> _loadMapRequests() async {
+    if (mounted) {
+      setState(() {
+        _loadingRequests = true;
+        _requestLoadError = null;
+      });
+    }
+    final result = await Api.getMapMarkers();
+    if (!mounted) return;
+    if (!result.ok || result.data == null) {
+      setState(() {
+        _loadingRequests = false;
+        _requestLoadError =
+            result.errorMessage ?? 'Could not load map requests.';
+      });
+      return;
+    }
+    final parsed = result.data!
+        .map(_requestFromMarker)
+        .whereType<_ReliefRequest>()
+        .toList();
+    final groups = <String, _ReliefRequest>{};
+    for (final request in parsed) {
+      final key =
+          '${request.position.latitude.toStringAsFixed(2)},${request.position.longitude.toStringAsFixed(2)}';
+      final existing = groups[key];
+      if (existing == null) {
+        groups[key] = request;
+      } else {
+        final status = existing.status.index < request.status.index
+            ? existing.status
+            : request.status;
+        groups[key] = existing.copyWith(
+          title: 'Multiple community requests',
+          kind: 'Multiple help requests',
+          status: status,
+          icon: null,
+          isMultiple: true,
+        );
+      }
+    }
+    setState(() {
+      _mapRequests = groups.values.toList();
+      _loadingRequests = false;
+    });
+  }
+
+  _ReliefRequest? _requestFromMarker(Map<String, dynamic> marker) {
+    final latitude = (marker['lat'] as num?)?.toDouble();
+    final longitude = (marker['lng'] as num?)?.toDouble();
+    if (latitude == null || longitude == null) return null;
+    final layer = '${marker['layer'] ?? ''}';
+    final kindCode = '${marker['kind'] ?? ''}';
+    final itemTypes = (marker['item_types'] as List? ?? const [])
+        .map((item) => '$item')
+        .toList();
+    final status = switch (layer) {
+      'fulfilled' => _RequestStatus.closed,
+      'pickup' || 'donation' => _RequestStatus.onTheWay,
+      _ => _RequestStatus.needed,
+    };
+    final kind = switch (kindCode) {
+      'healthcare_request' => 'Health worker support',
+      'transport_request' => 'Transport manpower',
+      'manpower_request' => 'Human manpower',
+      'donation_offer' => 'Community donation',
+      _ => itemTypes.length > 1
+          ? 'Multiple resource types'
+          : itemTypes.isEmpty
+              ? 'Community request'
+              : '${_itemTypeLabel(itemTypes.first)} only',
+    };
+    final title = kindCode == 'donation_offer'
+        ? 'Community resources offered'
+        : kindCode.endsWith('_request') && itemTypes.isEmpty
+            ? '$kind needed'
+            : itemTypes.length > 1
+                ? 'Multiple resource needs'
+                : itemTypes.isEmpty
+                    ? 'Community support needed'
+                    : '${_itemTypeLabel(itemTypes.first)} needed';
+    return _ReliefRequest(
+      position: LatLng(latitude, longitude),
+      title: title,
+      location: 'Approx. location',
+      quantity: 'within 100 km',
+      kind: kind,
+      status: status,
+      icon: _markerIcon(kindCode, itemTypes),
+      isMultiple: itemTypes.length > 1,
+      key: '${marker['key'] ?? ''}',
+    );
+  }
+
+  String _itemTypeLabel(String type) => switch (type) {
+        'food' => 'Food',
+        'drinking_water' => 'Drinking water',
+        'medical_supplies' => 'Medicine',
+        'cloth' => 'Clothing',
+        'temp_shelter' => 'Temporary shelter',
+        _ => type.replaceAll('_', ' '),
+      };
+
+  IconData _markerIcon(String kind, List<String> itemTypes) {
+    if (kind == 'healthcare_request' ||
+        kind == 'transport_request' ||
+        kind == 'manpower_request') {
+      return Icons.person_rounded;
+    }
+    if (itemTypes.length != 1) return Icons.inventory_2_outlined;
+    return switch (itemTypes.single) {
+      'food' => Icons.restaurant_rounded,
+      'temp_shelter' => Icons.home_rounded,
+      'drinking_water' => Icons.water_drop_rounded,
+      'medical_supplies' => Icons.medical_services_rounded,
+      'cloth' => Icons.checkroom_rounded,
+      _ => Icons.inventory_2_outlined,
+    };
+  }
+
+  Future<void> _refreshExplore() async {
+    await Future.wait([_requestLocationAccess(), _loadMapRequests()]);
   }
 
   Future<void> _openLocationSettings() async {
@@ -235,12 +326,12 @@ class _ExploreScreenState extends State<ExploreScreen>
           ),
           const SizedBox(height: 10),
           const Text(
-            'Sample map request',
+            'Live public map marker',
             style: TextStyle(color: appMuted, fontSize: 12),
           ),
           const SizedBox(height: 4),
           const Text(
-            'This marker uses demo coordinates. Live request locations can replace these when backend coordinates are available.',
+            'The map uses an approximate location. Requester details are kept private.',
             style: TextStyle(color: appNavy, fontSize: 14, height: 1.4),
           ),
         ],
@@ -276,7 +367,8 @@ class _ExploreScreenState extends State<ExploreScreen>
       );
 
   @override
-  Widget build(BuildContext context) => Scaffold(
+  Widget build(BuildContext context) {
+    final screen = Scaffold(
         backgroundColor: appPaper,
         body: SafeArea(
           bottom: false,
@@ -306,7 +398,7 @@ class _ExploreScreenState extends State<ExploreScreen>
                       ),
                     ),
                     IconButton(
-                      onPressed: _requestLocationAccess,
+                      onPressed: _refreshExplore,
                       tooltip: 'Refresh location',
                       icon:
                           const Icon(Icons.my_location_rounded, color: appTeal),
@@ -338,8 +430,13 @@ class _ExploreScreenState extends State<ExploreScreen>
                           child: Stack(
                             children: [
                               FlutterMap(
-                                options: const MapOptions(
-                                  initialCenter: LatLng(27.7172, 85.3240),
+                                options: MapOptions(
+                                  initialCenter: _currentPosition == null
+                                      ? _defaultSampleAnchor
+                                      : LatLng(
+                                          _currentPosition!.latitude,
+                                          _currentPosition!.longitude,
+                                        ),
                                   initialZoom: 13,
                                   minZoom: 5,
                                   maxZoom: 19,
@@ -585,47 +682,59 @@ class _ExploreScreenState extends State<ExploreScreen>
                               ],
                             ),
                             const SizedBox(height: 5),
-                            const Text(
-                              'Sample requests until live request data is connected.',
-                              style: TextStyle(color: appMuted, fontSize: 11),
+                            Text(
+                              _requestLoadError == null
+                                  ? 'Approved requests shared by the community.'
+                                  : 'Could not load live requests. Pull to refresh.',
+                              style: const TextStyle(
+                                color: appMuted,
+                                fontSize: 11,
+                              ),
                             ),
                             const SizedBox(height: 10),
                             SizedBox(
                               height: 236,
-                              child: _nearbyRequests.isEmpty
-                                  ? Center(
-                                      child: Padding(
-                                        padding: const EdgeInsets.all(16),
-                                        child: Text(
-                                          _currentPosition == null
-                                              ? 'Allow location access to find sample requests within 100 km.'
-                                              : 'There are no sample requests within 100 km of your location.',
-                                          textAlign: TextAlign.center,
-                                          style: const TextStyle(
-                                            color: appMuted,
-                                            fontSize: 12,
-                                          ),
-                                        ),
-                                      ),
+                              child: _loadingRequests
+                                  ? const Center(
+                                      child: CircularProgressIndicator(),
                                     )
-                                  : ListView.separated(
-                                      itemCount: _nearbyRequests.length,
-                                      separatorBuilder: (_, __) =>
-                                          const Divider(height: 1),
-                                      itemBuilder: (context, index) {
-                                        final request = _nearbyRequests[index];
-                                        return InkWell(
-                                          onTap: () =>
-                                              _showRequestDetails(request),
+                                  : _nearbyRequests.isEmpty
+                                      ? Center(
                                           child: Padding(
-                                            padding: const EdgeInsets.symmetric(
-                                              vertical: 9,
+                                            padding: const EdgeInsets.all(16),
+                                            child: Text(
+                                              _currentPosition == null
+                                                  ? 'Allow location access to find requests within 100 km.'
+                                                  : _requestLoadError ??
+                                                      'There are no approved requests within 100 km of your location.',
+                                              textAlign: TextAlign.center,
+                                              style: const TextStyle(
+                                                color: appMuted,
+                                                fontSize: 12,
+                                              ),
                                             ),
-                                            child: _requestSummary(request),
                                           ),
-                                        );
-                                      },
-                                    ),
+                                        )
+                                      : ListView.separated(
+                                          itemCount: _nearbyRequests.length,
+                                          separatorBuilder: (_, __) =>
+                                              const Divider(height: 1),
+                                          itemBuilder: (context, index) {
+                                            final request =
+                                                _nearbyRequests[index];
+                                            return InkWell(
+                                              onTap: () =>
+                                                  _showRequestDetails(request),
+                                              child: Padding(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                  vertical: 9,
+                                                ),
+                                                child: _requestSummary(request),
+                                              ),
+                                            );
+                                          },
+                                        ),
                             ),
                           ],
                         ),
@@ -638,14 +747,23 @@ class _ExploreScreenState extends State<ExploreScreen>
           ),
         ),
         bottomNavigationBar: _ExploreNavigationBar(
-          onHome: () =>
-              Navigator.of(context).popUntil((route) => route.isFirst),
+          onHome: () => openRoleAwareHome(context),
           onRequests: () => Navigator.of(context).push(
-            MaterialPageRoute<void>(builder: (_) => const MyRequestsScreen()),
+            MaterialPageRoute<void>(
+              builder: (_) => MyRequestsScreen(
+                requireVolunteerSession: widget.requireVolunteerSession,
+              ),
+            ),
           ),
           onProfile: () => openVolunteerLogin(context),
         ),
       );
+    if (!widget.requireVolunteerSession) return screen;
+    return VolunteerSessionGuard(
+      onUnauthorized: () => openVolunteerLogin(context),
+      child: screen,
+    );
+  }
 }
 
 class _ReliefRequest {
@@ -658,6 +776,8 @@ class _ReliefRequest {
     this.icon,
     required this.status,
     this.isMultiple = false,
+    this.key = '',
+    this.distanceKm,
   });
 
   final LatLng position;
@@ -668,6 +788,30 @@ class _ReliefRequest {
   final IconData? icon;
   final _RequestStatus status;
   final bool isMultiple;
+  final String key;
+  final double? distanceKm;
+
+  _ReliefRequest copyWith({
+    String? title,
+    String? quantity,
+    String? kind,
+    IconData? icon,
+    _RequestStatus? status,
+    bool? isMultiple,
+    double? distanceKm,
+  }) =>
+      _ReliefRequest(
+        position: position,
+        title: title ?? this.title,
+        location: location,
+        quantity: quantity ?? this.quantity,
+        kind: kind ?? this.kind,
+        icon: icon ?? this.icon,
+        status: status ?? this.status,
+        isMultiple: isMultiple ?? this.isMultiple,
+        key: key,
+        distanceKm: distanceKm ?? this.distanceKm,
+      );
 
   String get statusLabel => switch (status) {
         _RequestStatus.needed => 'Currently needed',

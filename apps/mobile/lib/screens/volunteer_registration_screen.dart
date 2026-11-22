@@ -1,11 +1,10 @@
-import 'dart:typed_data';
-
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../core/app_colors.dart';
+import '../core/saved_volunteer_application.dart';
 import '../core/volunteer_auth_service.dart';
 import 'volunteer_application_status_screen.dart';
 import 'terms_and_conditions_screen.dart';
@@ -243,6 +242,25 @@ class _VolunteerRegistrationScreenState
         emailVerificationToken: _emailVerificationToken!,
         documents: documents,
       );
+      final roles = [
+        'Human Manpower',
+        if (_transportManpowerSelected) 'Transport Manpower',
+        if (_healthWorkerSelected) 'Health Worker',
+      ];
+      try {
+        await SavedVolunteerApplication.save(
+          SavedVolunteerApplication(
+            applicationId: application.applicationId,
+            status: application.status,
+            name: _nameController.text.trim(),
+            email: email,
+            phone: _phoneController.text.trim(),
+            roles: roles,
+          ),
+        );
+      } catch (_) {
+        // Keep the API-submitted application visible for this session.
+      }
       if (!mounted) return;
       await Navigator.of(context).pushReplacement(
         MaterialPageRoute<void>(
@@ -251,11 +269,7 @@ class _VolunteerRegistrationScreenState
             name: _nameController.text.trim(),
             email: email,
             phone: _phoneController.text.trim(),
-            roles: [
-              'Human Manpower',
-              if (_transportManpowerSelected) 'Transport Manpower',
-              if (_healthWorkerSelected) 'Health Worker',
-            ],
+            roles: roles,
           ),
         ),
       );

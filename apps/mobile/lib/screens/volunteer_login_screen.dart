@@ -2,26 +2,46 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../core/app_colors.dart';
+import '../core/saved_volunteer_application.dart';
 import '../core/volunteer_auth_service.dart';
 import 'volunteer_dashboard_screen.dart';
+import 'volunteer_application_status_screen.dart';
 import 'volunteer_registration_screen.dart';
 
 Future<void> openVolunteerLogin(BuildContext context) async {
   if (VolunteerAuthService.hasSession) {
     try {
       final account = await VolunteerAuthService.currentVolunteer();
+      await SavedVolunteerApplication.clearForEmail(account.email);
       if (!context.mounted) return;
-      Navigator.of(context).push(
+      Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute<void>(
           builder: (_) => VolunteerDashboardScreen(account: account),
         ),
+        (_) => false,
       );
       return;
     } catch (_) {
       await VolunteerAuthService.signOut();
     }
   }
+  final application = await SavedVolunteerApplication.load();
   if (!context.mounted) return;
+  if (application != null) {
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute<void>(
+        builder: (_) => VolunteerApplicationStatusScreen(
+          application: application.submission,
+          name: application.name,
+          email: application.email,
+          phone: application.phone,
+          roles: application.roles,
+        ),
+      ),
+      (_) => false,
+    );
+    return;
+  }
   Navigator.of(context).push(
     MaterialPageRoute<void>(
       builder: (_) => const VolunteerLoginScreen(),
@@ -63,12 +83,13 @@ class _VolunteerLoginScreenState extends State<VolunteerLoginScreen> {
         email: _emailController.text,
         password: _passwordController.text,
       );
+      await SavedVolunteerApplication.clearForEmail(account.email);
       if (!mounted) return;
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute<void>(
           builder: (_) => VolunteerDashboardScreen(account: account),
         ),
-        (route) => route.isFirst,
+        (_) => false,
       );
     } on VolunteerAuthException catch (error) {
       if (mounted) setState(() => _signInError = error.message);

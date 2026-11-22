@@ -51,6 +51,10 @@ class VolunteerDocument {
 }
 
 class VolunteerAuthService {
+  static VolunteerAccount? _lastKnownAccount;
+
+  static VolunteerAccount? get lastKnownAccount => _lastKnownAccount;
+
   VolunteerAuthService._();
 
   static final _client = Supabase.instance.client;
@@ -79,12 +83,14 @@ class VolunteerAuthService {
       );
     }
     await _client.auth.setSession(refreshToken);
-    return VolunteerAccount(
+    final account = VolunteerAccount(
       name: '${profile['full_name'] ?? 'Volunteer'}',
       email: '${profile['email'] ?? email}'.trim(),
       phone: '${profile['phone'] ?? ''}'.trim(),
       roles: _rolesFromProfile(profile),
     );
+    _lastKnownAccount = account;
+    return account;
   }
 
   static Future<VolunteerAccount> currentVolunteer() async {
@@ -99,15 +105,20 @@ class VolunteerAuthService {
         'This volunteer account is not active.',
       );
     }
-    return VolunteerAccount(
+    final account = VolunteerAccount(
       name: '${profile['full_name'] ?? 'Volunteer'}',
       email: '${profile['email'] ?? ''}'.trim(),
       phone: '${profile['phone'] ?? ''}'.trim(),
       roles: _rolesFromProfile(profile),
     );
+    _lastKnownAccount = account;
+    return account;
   }
 
-  static Future<void> signOut() => _client.auth.signOut();
+  static Future<void> signOut() async {
+    _lastKnownAccount = null;
+    await _client.auth.signOut();
+  }
 
   static Future<void> sendSignupOtp(String email) async {
     await _invoke('send-signup-otp', {'email': email.trim().toLowerCase()});

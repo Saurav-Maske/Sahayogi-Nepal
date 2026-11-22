@@ -3,8 +3,9 @@ import 'dart:async';
 import 'package:material_ui/material_ui.dart';
 
 import '../core/app_colors.dart';
+import '../core/saved_volunteer_application.dart';
 import '../core/volunteer_auth_service.dart';
-import 'volunteer_dashboard_screen.dart';
+import 'volunteer_login_screen.dart';
 import 'volunteer_registration_screen.dart';
 
 class VolunteerApplicationStatusScreen extends StatefulWidget {
@@ -33,7 +34,6 @@ class _VolunteerApplicationStatusScreenState
   Timer? _pollTimer;
   late String _status;
   bool _isRefreshing = false;
-  bool _openingDashboard = false;
   String? _error;
 
   bool get _isApproved =>
@@ -72,7 +72,8 @@ class _VolunteerApplicationStatusScreenState
       );
       if (!mounted) return;
       setState(() => _status = status);
-      if (_isApproved) await _openDashboard();
+      await SavedVolunteerApplication.updateStatus(status);
+      if (_isApproved || _isRejected) _pollTimer?.cancel();
     } on VolunteerAuthException catch (error) {
       if (mounted) setState(() => _error = error.message);
     } catch (_) {
@@ -84,29 +85,22 @@ class _VolunteerApplicationStatusScreenState
     }
   }
 
-  Future<void> _openDashboard() async {
-    if (_openingDashboard || !mounted) return;
-    _openingDashboard = true;
-    _pollTimer?.cancel();
-    await Navigator.of(context).pushReplacement(
+  Future<void> _signUpAgain() async {
+    await SavedVolunteerApplication.clear();
+    if (!mounted) return;
+    Navigator.of(context).pushReplacement(
       MaterialPageRoute<void>(
-        builder: (_) => VolunteerDashboardScreen(
-          account: VolunteerAccount(
-            name: widget.name,
-            email: widget.email,
-            phone: widget.phone,
-            roles: widget.roles,
-          ),
-        ),
+        builder: (_) => const VolunteerRegistrationScreen(),
       ),
     );
   }
 
-  void _signUpAgain() => Navigator.of(context).pushReplacement(
-        MaterialPageRoute<void>(
-          builder: (_) => const VolunteerRegistrationScreen(),
-        ),
-      );
+  void _goToLogin() {
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute<void>(builder: (_) => const VolunteerLoginScreen()),
+      (_) => false,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -118,7 +112,7 @@ class _VolunteerApplicationStatusScreenState
     final description = _isRejected
         ? 'Your application was not approved. You can update your details and submit a new application.'
         : _isApproved
-            ? 'Your application has been approved. Opening your volunteer dashboard…'
+            ? 'We sent a secure password setup link to ${widget.email}. Create and confirm your password from that link, then log in to open your volunteer dashboard.'
             : 'Your application has been sent to the admin team. We will keep checking for a decision.';
 
     return Scaffold(
@@ -304,7 +298,22 @@ class _VolunteerApplicationStatusScreenState
                   ),
                 ),
               if (_isApproved)
-                const Center(child: CircularProgressIndicator()),
+                SizedBox(
+                  height: 52,
+                  child: ElevatedButton.icon(
+                    onPressed: _goToLogin,
+                    iconAlignment: IconAlignment.end,
+                    icon: const Icon(Icons.arrow_forward_rounded, size: 19),
+                    label: const Text('Go to log in'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: appNavy,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(15),
+                      ),
+                    ),
+                  ),
+                ),
             ],
           ),
         ),
