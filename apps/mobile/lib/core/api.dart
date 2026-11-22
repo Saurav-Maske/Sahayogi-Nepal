@@ -94,6 +94,60 @@ class Api {
     return _mapResult(result, 'assignment');
   }
 
+  static Future<ApiResult<Map<String, dynamic>>> getVolunteerRoutePreview({
+    required double originLatitude,
+    required double originLongitude,
+    required double destinationLatitude,
+    required double destinationLongitude,
+  }) async {
+    try {
+      final response = await _sb.functions.invoke(
+        'get-route',
+        body: {
+          'locations': [
+            {'lat': originLatitude, 'lon': originLongitude},
+            {'lat': destinationLatitude, 'lon': destinationLongitude},
+          ],
+        },
+      );
+      final envelope = response.data is Map
+          ? Map<String, dynamic>.from(response.data as Map)
+          : <String, dynamic>{};
+      final rawError = envelope['error'];
+      if (rawError is Map) {
+        final error = Map<String, dynamic>.from(rawError);
+        return ApiResult(
+          errorCode: error['code']?.toString() ?? 'route_failed',
+          errorMessage:
+              error['message']?.toString() ?? 'Could not load a route preview.',
+        );
+      }
+      final data = envelope['data'];
+      if (data is! Map) {
+        return const ApiResult(
+          errorCode: 'invalid_response',
+          errorMessage: 'The server returned an unexpected route response.',
+        );
+      }
+      return ApiResult(data: Map<String, dynamic>.from(data));
+    } on FunctionException catch (error) {
+      final details = error.details;
+      final envelope = details is Map
+          ? Map<String, dynamic>.from(details)
+          : <String, dynamic>{};
+      final rawError = envelope['error'];
+      final body = rawError is Map
+          ? Map<String, dynamic>.from(rawError)
+          : <String, dynamic>{};
+      return ApiResult(
+        errorCode: body['code']?.toString() ?? 'route_failed',
+        errorMessage: body['message']?.toString() ?? error.toString(),
+      );
+    } catch (error) {
+      return ApiResult(errorCode: 'route_failed', errorMessage: error.toString());
+    }
+  }
+
   static Future<ApiResult<Map<String, dynamic>>> claimVolunteerAssignment(
     String id,
   ) async {

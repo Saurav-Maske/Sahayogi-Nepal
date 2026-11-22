@@ -56,11 +56,6 @@ class _StartupScreenState extends State<StartupScreen> {
                 Container(
                   width: 82,
                   height: 82,
-                  padding: const EdgeInsets.all(12),
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
-                    shape: BoxShape.circle,
-                  ),
                   child: Image.asset(
                     'assets/images/SahayogiNepalLogo.png',
                     fit: BoxFit.contain,

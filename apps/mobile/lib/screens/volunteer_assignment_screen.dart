@@ -30,11 +30,14 @@ class VolunteerAssignmentScreen extends StatefulWidget {
 }
 
 class _VolunteerAssignmentScreenState extends State<VolunteerAssignmentScreen> {
+  final MapController _mapController = MapController();
   late Map<String, dynamic> _assignment;
   final _otpController = TextEditingController();
   StreamSubscription<Position>? _locationSubscription;
   bool _loading = true;
   bool _claiming = false;
+bool _loadingPreviewRoute = false;
+List<LatLng> _previewRoute = const [];
   String? _error;
 
   @override
@@ -60,6 +63,86 @@ class _VolunteerAssignmentScreenState extends State<VolunteerAssignmentScreen> {
       }
     });
     await _syncLocationUpdates();
+    if (!_isMine) await _loadPreviewRoute();
+  }
+
+  Future<void> _loadPreviewRoute() async {
+    final destination = _previewDestination;
+    if (destination == null) return;
+    if (mounted) setState(() => _loadingPreviewRoute = true);
+    try {
+      if (!await Geolocator.isLocationServiceEnabled()) return;
+      final permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        return;
+      }
+      final origin = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+        ),
+      );
+      final result = await Api.getVolunteerRoutePreview(
+        originLatitude: origin.latitude,
+        originLongitude: origin.longitude,
+        destinationLatitude: destination.latitude,
+        destinationLongitude: destination.longitude,
+      );
+      if (!mounted || !result.ok || result.data == null) return;
+      final legs = result.data!['legs'];
+      final shape = result.data!['shape']?.toString() ??
+          (legs is List && legs.isNotEmpty && legs.first is Map
+              ? (legs.first as Map)['shape']?.toString() ?? ''
+              : '');
+      final points = _decodePolyline(shape);
+      if (points.isNotEmpty) {
+        setState(() => _previewRoute = points);
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted || _route.length < 2) return;
+          _mapController.fitCamera(
+            CameraFit.coordinates(
+              coordinates: _route,
+              padding: const EdgeInsets.all(45),
+            ),
+          );
+        });
+      }
+    } catch (_) {
+      // Keep the destination marker visible if routing is temporarily unavailable.
+    } finally {
+      if (mounted) setState(() => _loadingPreviewRoute = false);
+    }
+  }
+
+  List<LatLng> _decodePolyline(String encoded) {
+    final points = <LatLng>[];
+    var index = 0;
+    var latitude = 0;
+    var longitude = 0;
+    while (index < encoded.length) {
+      var result = 0;
+      var shift = 0;
+      int value;
+      do {
+        if (index >= encoded.length) return points;
+        value = encoded.codeUnitAt(index++) - 63;
+        result |= (value & 0x1f) << shift;
+        shift += 5;
+      } while (value >= 0x20);
+      latitude += (result & 1) != 0 ? ~(result >> 1) : (result >> 1);
+
+      result = 0;
+      shift = 0;
+      do {
+        if (index >= encoded.length) return points;
+        value = encoded.codeUnitAt(index++) - 63;
+        result |= (value & 0x1f) << shift;
+        shift += 5;
+      } while (value >= 0x20);
+      longitude += (result & 1) != 0 ? ~(result >> 1) : (result >> 1);
+      points.add(LatLng(latitude / 1e5, longitude / 1e5));
+    }
+    return points;
   }
 
   Future<void> _claim() async {
@@ -88,6 +171,7 @@ class _VolunteerAssignmentScreenState extends State<VolunteerAssignmentScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Task accepted.')),
     );
+    if (mounted) Navigator.of(context).pop(true);
   }
 
   @override
@@ -260,13 +344,23 @@ class _VolunteerAssignmentScreenState extends State<VolunteerAssignmentScreen> {
           .map((item) => Map<String, dynamic>.from(item))
           .toList();
 
-  List<LatLng> get _route => (_assignment['route'] as List? ?? const [])
-      .whereType<Map>()
-      .map((point) => LatLng(
-            (point['lat'] as num).toDouble(),
-            (point['lng'] as num).toDouble(),
-          ))
-      .toList();
+  List<LatLng> get _route {
+    final savedRoute = (_assignment['route'] as List? ?? const [])
+        .whereType<Map>()
+        .map((point) => LatLng(
+              (point['lat'] as num).toDouble(),
+              (point['lng'] as num).toDouble(),
+            ))
+        .toList();
+    return savedRoute.isNotEmpty ? savedRoute : _previewRoute;
+  }
+
+  LatLng? get _previewDestination {
+    final latitude = _assignment['approx_lat'];
+    final longitude = _assignment['approx_lng'];
+    if (latitude is! num || longitude is! num) return null;
+    return LatLng(latitude.toDouble(), longitude.toDouble());
+  }
 
   bool get _isMine => _assignment['is_mine'] == true;
 
@@ -278,6 +372,12 @@ class _VolunteerAssignmentScreenState extends State<VolunteerAssignmentScreen> {
     final requester = _assignment['requester'] is Map
         ? Map<String, dynamic>.from(_assignment['requester'] as Map)
         : <String, dynamic>{};
+    final previewDestination = _previewDestination;
+    final routePoints = _route.isNotEmpty
+        ? _route
+        : previewDestination == null
+            ? const <LatLng>[]
+            : [previewDestination];
     final title = _title(type);
     final quantities = _items.map((item) {
       final qty = item['qty'] ?? item['approved_qty'] ?? '';
@@ -351,10 +451,10 @@ class _VolunteerAssignmentScreenState extends State<VolunteerAssignmentScreen> {
                       border: true,
                     ),
                   ],
-                  if (_route.isNotEmpty) ...[
+                  if (routePoints.isNotEmpty) ...[
                     const SizedBox(height: 18),
-                    const Text(
-                      'Task route',
+                    Text(
+                      _isMine ? 'Task route' : 'Destination route preview',
                       style: TextStyle(
                         color: appNavy,
                         fontSize: 18,
@@ -362,18 +462,26 @@ class _VolunteerAssignmentScreenState extends State<VolunteerAssignmentScreen> {
                       ),
                     ),
                     const SizedBox(height: 10),
+                    if (_loadingPreviewRoute)
+                      const Padding(
+                        padding: EdgeInsets.only(bottom: 8),
+                        child: LinearProgressIndicator(),
+                      ),
                     SizedBox(
                       height: 220,
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(18),
                         child: FlutterMap(
+                          mapController: _mapController,
                           options: MapOptions(
-                            initialCenter: _route.first,
+                            initialCenter: routePoints.first,
                             initialZoom: 11,
-                            initialCameraFit: CameraFit.coordinates(
-                              coordinates: _route,
-                              padding: const EdgeInsets.all(45),
-                            ),
+                            initialCameraFit: routePoints.length > 1
+                                ? CameraFit.coordinates(
+                                    coordinates: routePoints,
+                                    padding: const EdgeInsets.all(45),
+                                  )
+                                : null,
                           ),
                           children: [
                             TileLayer(
@@ -381,11 +489,11 @@ class _VolunteerAssignmentScreenState extends State<VolunteerAssignmentScreen> {
                                   'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                               userAgentPackageName: 'np.sahayogi.sahayogi_mobile',
                             ),
-                            if (_route.length > 1)
+                            if (routePoints.length > 1)
                               PolylineLayer(
                                 polylines: [
                                   Polyline(
-                                    points: _route,
+                                    points: routePoints,
                                     color: appTeal,
                                     strokeWidth: 4,
                                   ),
@@ -394,9 +502,11 @@ class _VolunteerAssignmentScreenState extends State<VolunteerAssignmentScreen> {
                             CurrentLocationLayer(),
                             MarkerLayer(
                               markers: [
-                                for (var index = 0; index < _route.length; index++)
+                                for (var index = 0;
+                                    index < routePoints.length;
+                                    index++)
                                   Marker(
-                                    point: _route[index],
+                                    point: routePoints[index],
                                     width: 34,
                                     height: 34,
                                     child: const Icon(
@@ -414,7 +524,7 @@ class _VolunteerAssignmentScreenState extends State<VolunteerAssignmentScreen> {
                   ] else if (!_isMine) ...[
                     const SizedBox(height: 10),
                     Text(
-                      'Approximate location: ${_assignment['approx_lat'] ?? ''}, ${_assignment['approx_lng'] ?? ''}',
+                      'Destination location is unavailable for this request.',
                       style: const TextStyle(color: appMuted, fontSize: 12),
                     ),
                   ],
@@ -430,7 +540,7 @@ class _VolunteerAssignmentScreenState extends State<VolunteerAssignmentScreen> {
                                 child: CircularProgressIndicator(strokeWidth: 2),
                               )
                             : const Icon(Icons.check_rounded),
-                        label: Text(_claiming ? 'Accepting…' : 'Accept task'),
+                        label: Text(_claiming ? 'Joining…' : 'Join now'),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: appGold,
                           foregroundColor: appNavy,

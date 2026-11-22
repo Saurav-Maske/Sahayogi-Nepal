@@ -187,10 +187,10 @@ class _RequestHelpScreenState extends State<RequestHelpScreen> {
     if (!fieldsValid || !categoriesValid || !locationValid) return;
     setState(() => _isSubmitting = true);
     final items = List.generate(_resourceCategories.length, (index) {
-      final quantity = parseQuantityAndUnit(_quantityControllers[index].text)!;
       return {
         'item_type': resourceItemType(_resourceCategories[index]!)!,
-        ...quantity,
+        'qty': int.parse(_quantityControllers[index].text.trim()),
+        'unit': 'kit',
       };
     });
     final payload = <String, dynamic>{
@@ -370,13 +370,16 @@ class _RequestHelpScreenState extends State<RequestHelpScreen> {
                           const SizedBox(height: 8),
                           _textField(
                             controller: _quantityControllers[index],
-                            hint: 'e.g. 8 kits',
-                            validator: (value) => parseQuantityAndUnit(
-                                      value ?? '',
-                                    ) ==
-                                    null
-                                ? 'Enter a quantity, for example 8 kits'
-                                : null,
+                            hint: 'Enter a number',
+                            keyboardType: TextInputType.number,
+                            suffixText: 'kit',
+                            validator: (value) {
+                              final quantity =
+                                  int.tryParse(value?.trim() ?? '');
+                              return quantity == null || quantity < 1
+                                  ? 'Enter a valid quantity'
+                                  : null;
+                            },
                           ),
                         ],
                       ),
@@ -468,11 +471,9 @@ class _RequestHelpScreenState extends State<RequestHelpScreen> {
                   SizedBox(
                     width: double.infinity,
                     height: 52,
-                    child: FilledButton.icon(
+                    child: FilledButton(
                       onPressed: _isSubmitting ? null : _submitRequest,
-                      iconAlignment: IconAlignment.end,
-                      icon: const Icon(Icons.arrow_forward_rounded, size: 20),
-                      label: Text(
+                      child: Text(
                           _isSubmitting ? 'Submitting…' : 'Submit request'),
                       style: FilledButton.styleFrom(
                         backgroundColor: appNavy,
@@ -538,11 +539,6 @@ class _RequestHelpScreenState extends State<RequestHelpScreen> {
                     style: const TextStyle(color: appMuted, fontSize: 14),
                   ),
                 ),
-                const Icon(
-                  Icons.chevron_right_rounded,
-                  color: appMuted,
-                  size: 22,
-                ),
               ],
             ),
           ),
@@ -554,6 +550,7 @@ class _RequestHelpScreenState extends State<RequestHelpScreen> {
     required String hint,
     required String? Function(String?) validator,
     TextInputType keyboardType = TextInputType.text,
+    String? suffixText,
   }) =>
       TextFormField(
         controller: controller,
@@ -568,11 +565,7 @@ class _RequestHelpScreenState extends State<RequestHelpScreen> {
           isDense: true,
           contentPadding:
               const EdgeInsets.symmetric(horizontal: 14, vertical: 15),
-          suffixIcon: const Icon(
-            Icons.chevron_right_rounded,
-            color: appMuted,
-            size: 22,
-          ),
+          suffixText: suffixText,
           errorStyle: const TextStyle(fontSize: 11),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(14),
