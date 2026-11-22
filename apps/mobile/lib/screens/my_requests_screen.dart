@@ -150,11 +150,6 @@ class _MyRequestsScreenState extends State<MyRequestsScreen> {
                       ),
                     ),
                   ),
-                  IconButton(
-                    onPressed: _loading ? null : _loadRequests,
-                    tooltip: 'Refresh requests',
-                    icon: const Icon(Icons.refresh_rounded, color: appTeal),
-                  ),
                   const Icon(
                     Icons.verified_user_outlined,
                     color: appTeal,
@@ -164,7 +159,10 @@ class _MyRequestsScreenState extends State<MyRequestsScreen> {
               ),
             ),
             Expanded(
-              child: ListView(
+              child: RefreshIndicator(
+                onRefresh: _loadRequests,
+                child: ListView(
+                  physics: const AlwaysScrollableScrollPhysics(),
                 padding: const EdgeInsets.fromLTRB(24, 12, 24, 20),
                 children: [
                   const SizedBox(height: 8),
@@ -220,6 +218,7 @@ class _MyRequestsScreenState extends State<MyRequestsScreen> {
                       ),
                     ),
                 ],
+                ),
               ),
             ),
           ],

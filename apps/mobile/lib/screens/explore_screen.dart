@@ -550,8 +550,8 @@ class _ExploreScreenState extends State<ExploreScreen>
                           ),
                         ),
                         IconButton(
-                          onPressed: _refreshExplore,
-                          tooltip: 'Refresh location',
+                          onPressed: _requestLocationAccess,
+                          tooltip: 'Find my location',
                           icon: const Icon(Icons.my_location_rounded,
                               color: appTeal),
                         ),
@@ -559,7 +559,10 @@ class _ExploreScreenState extends State<ExploreScreen>
                     ),
                   ),
                   Expanded(
-                    child: SingleChildScrollView(
+                    child: RefreshIndicator(
+                      onRefresh: _refreshExplore,
+                      child: SingleChildScrollView(
+                        physics: const AlwaysScrollableScrollPhysics(),
                       padding: const EdgeInsets.fromLTRB(24, 0, 24, 18),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -909,6 +912,7 @@ class _ExploreScreenState extends State<ExploreScreen>
                       ),
                     ),
                   ),
+                  ),
                 ],
               ),
             )
@@ -960,15 +964,18 @@ class _ExploreScreenState extends State<ExploreScreen>
                     ),
                   ),
                   IconButton(
-                    onPressed: _refreshExplore,
-                    tooltip: 'Refresh location',
+                    onPressed: _requestLocationAccess,
+                    tooltip: 'Find my location',
                     icon: const Icon(Icons.my_location_rounded, color: appTeal),
                   ),
                 ],
               ),
             ),
             Expanded(
-              child: SingleChildScrollView(
+              child: RefreshIndicator(
+                onRefresh: _refreshExplore,
+                child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
                 padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -980,7 +987,7 @@ class _ExploreScreenState extends State<ExploreScreen>
                         fontSize: 18,
                         fontWeight: FontWeight.w700,
                       ),
-                    ),
+                  ),
                     const SizedBox(height: 12),
                     SizedBox(
                       height: (MediaQuery.sizeOf(context).height * 0.62)
@@ -1125,6 +1132,7 @@ class _ExploreScreenState extends State<ExploreScreen>
                   ],
                 ),
               ),
+            ),
             ),
           ],
         ),

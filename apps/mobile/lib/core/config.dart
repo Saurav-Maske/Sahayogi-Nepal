@@ -2,10 +2,10 @@
 class Config {
   static const supabaseUrl = String.fromEnvironment(
     'SUPABASE_URL',
-    defaultValue: 'https://gtehciwxxiovriymogpa.supabase.co',
+    defaultValue: 'https://zttpmbxktwyriwtjlenm.supabase.co',
   );
   static const supabaseAnonKey = String.fromEnvironment(
     'SUPABASE_ANON_KEY',
-    defaultValue: 'sb_publishable_zF1QFOkQG-kqe-cJld6RGA_gB9TVdAV',
+    defaultValue: 'sb_publishable_VxqApoHCGmu7VDmE9akq4Q_AZw_MWjl',
   );
 }
