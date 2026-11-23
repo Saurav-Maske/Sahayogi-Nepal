@@ -1,4 +1,9 @@
-# Sahayogi Nepal
+# <img src="docs/logo.png" alt="Sahayogi Nepal Logo" width="40" align="left"> Sahayogi Nepal
+
+**A mobile relief and community coordination platform...**
+
+---
+##Overview
 
 Mobile coordination platform for community requests, donations, volunteers and emergency supplies.
 Public requesters and donors submit forms without an account; volunteers are verified before they can
