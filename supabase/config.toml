@@ -16,7 +16,10 @@ port = 54324
 
 [auth]
 site_url = "http://localhost:5173"
-additional_redirect_urls = ["http://localhost:5173/set-password/"]
+additional_redirect_urls = [
+  "http://localhost:5173/set-password/",
+  "https://fedupgenji.github.io/Sahayogi-Nepal/set-password/",
+]
 enable_signup = false
 enable_anonymous_sign_ins = false
 jwt_expiry = 3600
