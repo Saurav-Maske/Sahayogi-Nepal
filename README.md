@@ -1,9 +1,11 @@
-<div align="center"> 
-# <img src="docs/logo.jpeg" alt="Sahayogi Nepal Logo" > Sahayogi Nepal
+ <img src="docs/logo.jpeg" alt="Sahayogi Nepal Logo" > 
 
-**A mobile coordination platform for community requests, donations, volunteers, and emergency supplies.**
+<div align="center"> 
+# Sahayogi Nepal
+### **A mobile coordination platform for community requests, donations, volunteers, and emergency supplies.**
 </div>
 
+**Saurav Maske · Aakash Thakur · Utsav Subedi · Rujan Dhamala** **INNEX 2026**
 ---
 ## Overview
 
