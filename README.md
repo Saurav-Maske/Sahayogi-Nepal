@@ -1,6 +1,8 @@
+<div align="center"> 
 # <img src="docs/logo.jpeg" alt="Sahayogi Nepal Logo" > Sahayogi Nepal
 
-**A mobile relief and community coordination platform...**
+**A mobile coordination platform for community requests, donations, volunteers, and emergency supplies.**
+</div>
 
 ---
 ## Overview
@@ -11,6 +13,14 @@ take work; admins approve requests, run the central inventory and review inciden
 
 > **Status: hackathon prototype**, not production-ready. See `docs/` for the contract, seeding guide
 > and test matrix, and `docs/CHANGELOG.md` for what changed recently.
+
+## Use Cases
+
+* **Disaster & Emergency Relief (Floods, Landslides, Earthquakes):** Affected residents or local bystanders submit immediate aid requests (food, clean water, tarps, medical kits) without creating an account, enabling rapid triage during critical first hours.
+* **Community Supply Drives & Donations:** Individuals, local businesses, and NGOs pledge relief goods or funds through open donor forms, allowing central coordinators to track incoming pledges against active shortages.
+* **Verified Field Dispatch & Last-Mile Delivery:** Vetted volunteers view approved tasks in their area, claim supply drop-offs or rescue/support assignments, and update delivery statuses in real time.
+* **Centralized Warehouse & Inventory Control:** Administrators monitor central stock levels across collection hubs, allocate supplies to approved requests, and prevent over-distribution or bottlenecks.
+* **Incident Auditing & Fraud Prevention:** Admins review flagged requests, duplicate submissions, and field incident reports to maintain accountability and ensure aid reaches genuine recipients.
 
 ## Team
 
