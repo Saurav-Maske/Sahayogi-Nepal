@@ -156,13 +156,13 @@ class _VolunteerDashboardScreenState extends State<VolunteerDashboardScreen> {
   }
 
   Future<void> _openOffer(Map<String, dynamic> offer) async {
-    final id = offer['id'];
+    final id = offer['assignment_id'] ?? offer['id'];
     if (id is! String || id.isEmpty) return;
     final joined = await Navigator.of(context).push<bool>(
       MaterialPageRoute<bool>(
         builder: (_) => VolunteerAssignmentScreen(
           assignmentId: id,
-          initialOffer: offer,
+          initialOffer: {...offer, 'id': id},
         ),
       ),
     );

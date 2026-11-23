@@ -4,6 +4,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:intl/intl.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../core/api.dart';
 import '../core/app_home_navigation.dart';
@@ -30,6 +31,7 @@ class _RequestTrackingScreenState extends State<RequestTrackingScreen> {
   Timer? _trackingTimer;
   bool _refreshing = false;
   bool _actionLoading = false;
+  bool _deliveryConfirmed = false;
 
   RequestSummaryData get request => _currentRequest;
 
@@ -37,6 +39,7 @@ class _RequestTrackingScreenState extends State<RequestTrackingScreen> {
   void initState() {
     super.initState();
     _currentRequest = widget.request;
+    _loadDeliveryConfirmation();
     _refreshTracking();
     _trackingTimer = Timer.periodic(
       const Duration(seconds: 15),
@@ -47,6 +50,15 @@ class _RequestTrackingScreenState extends State<RequestTrackingScreen> {
       },
     );
   }
+
+  Future<void> _loadDeliveryConfirmation() async {
+    final preferences = await SharedPreferences.getInstance();
+    final confirmed = preferences.getBool(_deliveryConfirmationKey) ?? false;
+    if (mounted && confirmed) setState(() => _deliveryConfirmed = true);
+  }
+
+  String get _deliveryConfirmationKey =>
+      'delivery_confirmed_${widget.request.id}';
 
   @override
   void dispose() {
@@ -321,6 +333,11 @@ class _RequestTrackingScreenState extends State<RequestTrackingScreen> {
       _showActionError(result.errorMessage);
       return;
     }
+    if (full) {
+      setState(() => _deliveryConfirmed = true);
+      final preferences = await SharedPreferences.getInstance();
+      await preferences.setBool(_deliveryConfirmationKey, true);
+    }
     await _refreshTracking(showErrors: false);
     if (!full && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -345,6 +362,7 @@ class _RequestTrackingScreenState extends State<RequestTrackingScreen> {
     final purpose = '${_tracking!['otp_purpose'] ?? ''}';
     final canEditPickup = _tracking!['can_update_pickup_qty'] == true;
     final canConfirmDelivery = request.requestKind == 'resource_request' &&
+        !_deliveryConfirmed &&
         _tracking!['status'] == 'fulfilled' &&
         '${_tracking!['incident_status'] ?? ''}' != 'open';
     if (!canEditPickup && purpose.isEmpty && !canConfirmDelivery) {

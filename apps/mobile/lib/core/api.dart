@@ -175,41 +175,6 @@ class Api {
     return _mapResult(result, 'assignment');
   }
 
-  static Future<ApiResult<Map<String, dynamic>>> getVolunteerAssignmentRoute({
-    required String id,
-    required double latitude,
-    required double longitude,
-  }) async {
-    try {
-      final response = await _sb.functions.invoke(
-        'get-offer-route',
-        body: {'id': id, 'lat': latitude, 'lng': longitude},
-      );
-      final envelope = response.data is Map
-          ? Map<String, dynamic>.from(response.data as Map)
-          : <String, dynamic>{};
-      final rawError = envelope['error'];
-      if (rawError is Map) {
-        final error = Map<String, dynamic>.from(rawError);
-        return ApiResult(
-          errorCode: error['code']?.toString() ?? 'route_failed',
-          errorMessage:
-              error['message']?.toString() ?? 'Could not load the task route.',
-        );
-      }
-      final data = envelope['data'];
-      if (data is! Map) {
-        return const ApiResult(
-          errorCode: 'invalid_response',
-          errorMessage: 'The server returned an unexpected route response.',
-        );
-      }
-      return ApiResult(data: Map<String, dynamic>.from(data));
-    } catch (error) {
-      return ApiResult(errorCode: 'network', errorMessage: error.toString());
-    }
-  }
-
   static Future<ApiResult<Map<String, dynamic>>> getVolunteerRoutePreview({
     required double originLatitude,
     required double originLongitude,
