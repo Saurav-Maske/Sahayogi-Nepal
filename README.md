@@ -1,4 +1,4 @@
-# <img src="docs/logo.png" alt="Sahayogi Nepal Logo" width="40" > Sahayogi Nepal
+# <img src="docs/logo.jpeg" alt="Sahayogi Nepal Logo" width="40" > Sahayogi Nepal
 
 **A mobile relief and community coordination platform...**
 
