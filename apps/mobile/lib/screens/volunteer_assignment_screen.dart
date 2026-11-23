@@ -38,6 +38,7 @@ class _VolunteerAssignmentScreenState extends State<VolunteerAssignmentScreen> {
   bool _loadingPreviewRoute = false;
   DateTime? _lastPreviewRouteAt;
   List<LatLng> _previewRoute = const [];
+  String? _routeError;
   String? _error;
 
   @override
@@ -72,16 +73,36 @@ class _VolunteerAssignmentScreenState extends State<VolunteerAssignmentScreen> {
 
   Future<void> _loadPreviewRoute() async {
     final activeLegIndex = _isMine ? _activeRouteLegIndex : null;
-    final destination = _previewDestination;
-    if (activeLegIndex == null && destination == null) return;
+    final destination = activeLegIndex == null
+        ? _previewDestination
+        : _activeRouteDestination;
+    if (destination == null) {
+      if (mounted) {
+        setState(() => _routeError = 'The route location is unavailable.');
+      }
+      return;
+    }
     _lastPreviewRouteAt = DateTime.now();
-    if (mounted) setState(() => _previewRoute = const []);
-    if (mounted) setState(() => _loadingPreviewRoute = true);
+    if (mounted) {
+      setState(() {
+        _previewRoute = const [];
+        _routeError = null;
+        _loadingPreviewRoute = true;
+      });
+    }
     try {
-      if (!await Geolocator.isLocationServiceEnabled()) return;
+      if (!await Geolocator.isLocationServiceEnabled()) {
+        if (mounted) {
+          setState(() => _routeError = 'Turn on location services to load the route.');
+        }
+        return;
+      }
       final permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied ||
           permission == LocationPermission.deniedForever) {
+        if (mounted) {
+          setState(() => _routeError = 'Allow location access to load the route.');
+        }
         return;
       }
       final origin = await Geolocator.getCurrentPosition(
@@ -89,29 +110,23 @@ class _VolunteerAssignmentScreenState extends State<VolunteerAssignmentScreen> {
           accuracy: LocationAccuracy.high,
         ),
       );
-      final result = activeLegIndex != null
-          ? await Api.getVolunteerAssignmentRoute(
-              id: widget.assignmentId,
-              latitude: origin.latitude,
-              longitude: origin.longitude,
-            )
-          : await Api.getVolunteerRoutePreview(
-              originLatitude: origin.latitude,
-              originLongitude: origin.longitude,
-              destinationLatitude: destination!.latitude,
-              destinationLongitude: destination.longitude,
-            );
-      if (!mounted || !result.ok || result.data == null) return;
+      final result = await Api.getVolunteerRoutePreview(
+        originLatitude: origin.latitude,
+        originLongitude: origin.longitude,
+        destinationLatitude: destination.latitude,
+        destinationLongitude: destination.longitude,
+      );
+      if (!mounted) return;
+      if (!result.ok || result.data == null) {
+        setState(() => _routeError =
+            result.errorMessage ?? 'Could not load the route from the server.');
+        return;
+      }
       final precision = (result.data!['shape_precision'] as num?)?.toInt() ?? 6;
       final points = <LatLng>[];
       final legs = result.data!['legs'];
       if (legs is List && legs.isNotEmpty) {
-        final selectedLegs = activeLegIndex == null
-            ? legs.whereType<Map>()
-            : activeLegIndex < legs.length && legs[activeLegIndex] is Map
-                ? [legs[activeLegIndex] as Map]
-                : const <Map>[];
-        for (final leg in selectedLegs) {
+        for (final leg in legs.whereType<Map>()) {
           final shape = leg['shape']?.toString() ?? '';
           final legPoints = _decodePolyline(shape, precision: precision);
           if (points.isNotEmpty &&
@@ -141,9 +156,13 @@ class _VolunteerAssignmentScreenState extends State<VolunteerAssignmentScreen> {
             ),
           );
         });
+      } else {
+        setState(() => _routeError = 'The server returned no route points.');
       }
-    } catch (_) {
-      // Keep the destination marker visible if routing is temporarily unavailable.
+    } catch (error) {
+      if (mounted) {
+        setState(() => _routeError = 'Could not load route: $error');
+      }
     } finally {
       if (mounted) setState(() => _loadingPreviewRoute = false);
     }
@@ -232,6 +251,23 @@ class _VolunteerAssignmentScreenState extends State<VolunteerAssignmentScreen> {
     if (state == 'en_route_to_pickup') return 0;
     if (state == 'picked_up' || state == 'en_route_to_destination') return 1;
     return null;
+  }
+
+  LatLng? get _activeRouteDestination {
+    final legIndex = _activeRouteLegIndex;
+    if (legIndex == null) return null;
+    final route = _assignment['route'];
+    if (route is! List || legIndex >= route.length || route[legIndex] is! Map) {
+      return null;
+    }
+    final point = Map<String, dynamic>.from(route[legIndex] as Map);
+    final latitude = point['lat'];
+    final longitude = point['lng'];
+    if (latitude is! num || longitude is! num) return null;
+    final lat = latitude.toDouble();
+    final lng = longitude.toDouble();
+    if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return null;
+    return LatLng(lat, lng);
   }
 
   Future<void> _syncLocationUpdates() async {
@@ -800,7 +836,8 @@ class _VolunteerAssignmentScreenState extends State<VolunteerAssignmentScreen> {
                         _InfoBox(
                           text: _loadingPreviewRoute
                               ? 'Loading the next route from the server…'
-                              : 'Route preview is unavailable. Pull down to try again.',
+                              : _routeError ??
+                                  'Route preview is unavailable. Pull down to try again.',
                           color: const Color(0xFFE8F0F4),
                         ),
                     ] else if (!_isMine) ...[
