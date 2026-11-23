@@ -403,13 +403,13 @@ class _ExploreScreenState extends State<ExploreScreen>
   }
 
   Future<void> _joinOffer(Map<String, dynamic> offer) async {
-    final assignmentId = offer['id'];
+    final assignmentId = offer['assignment_id'] ?? offer['id'];
     if (assignmentId is! String || assignmentId.isEmpty) return;
     final joined = await Navigator.of(context).push<bool>(
       MaterialPageRoute<bool>(
         builder: (_) => VolunteerAssignmentScreen(
           assignmentId: assignmentId,
-          initialOffer: offer,
+          initialOffer: {...offer, 'id': assignmentId},
         ),
       ),
     );
