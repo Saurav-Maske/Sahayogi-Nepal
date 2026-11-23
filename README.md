@@ -4,7 +4,7 @@
 
 # Sahayogi Nepal
 
-### **A mobile coordination platform for community requests, donations, volunteers, and emergency supplies.**
+ **A mobile coordination platform for community requests, donations, volunteers, and emergency supplies.**
 
 **Saurav Maske · Aakash Thakur · Utsav Subedi · Rujan Dhamala** **INNEX 2026**
 
