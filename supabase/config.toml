@@ -52,6 +52,8 @@ file_size_limit = "5MiB"
 
 [functions.submit-request]
 verify_jwt = false
+[functions.assist-form]
+verify_jwt = false
 [functions.admin-login]
 verify_jwt = false
 [functions.volunteer-login]
